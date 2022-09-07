@@ -1,0 +1,9 @@
+[package]
+name = "consensus_on_demand"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+libp2p = "0.43.0"
+futures = "0.3.21"
+async-std = { version = "1.10.0", features = ["attributes"] }
