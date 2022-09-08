@@ -31,13 +31,19 @@ use libp2p::{
     development_transport, identity,
     mdns::{Mdns, MdnsConfig, MdnsEvent},
     swarm::SwarmEvent,
-    NetworkBehaviour, PeerId, Swarm,
+    PeerId, Swarm,
 };
 use std::error::Error;
 
+pub mod behaviour;
+use crate::behaviour::behaviour_config::{
+    MyBehaviour, MyBehaviourEvent,
+    get_kademlia_behaviour_mut_reference
+};
+
 #[async_std::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    // env_logger::init();
+    pretty_env_logger::init();
 
     // Create a random key for ourselves.
     let local_key = identity::Keypair::generate_ed25519();
@@ -46,38 +52,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Set up a an encrypted DNS-enabled TCP Transport over the Mplex protocol.
     let transport = development_transport(local_key).await?;
 
-    // We create a custom network behaviour that combines Kademlia and mDNS.
-    #[derive(NetworkBehaviour)]
-    #[behaviour(out_event = "MyBehaviourEvent")]
-    struct MyBehaviour {
-        kademlia: Kademlia<MemoryStore>,
-        mdns: Mdns,
-    }
-
-    enum MyBehaviourEvent {
-        Kademlia(KademliaEvent),
-        Mdns(MdnsEvent),
-    }
-
-    impl From<KademliaEvent> for MyBehaviourEvent {
-        fn from(event: KademliaEvent) -> Self {
-            MyBehaviourEvent::Kademlia(event)
-        }
-    }
-
-    impl From<MdnsEvent> for MyBehaviourEvent {
-        fn from(event: MdnsEvent) -> Self {
-            MyBehaviourEvent::Mdns(event)
-        }
-    }
-
     // Create a swarm to manage peers and events.
     let mut swarm = {
         // Create a Kademlia behaviour.
         let store = MemoryStore::new(local_peer_id);
         let kademlia = Kademlia::new(local_peer_id, store);
         let mdns = task::block_on(Mdns::new(MdnsConfig::default()))?;
-        let behaviour = MyBehaviour { kademlia, mdns };
+        let behaviour = MyBehaviour::new(kademlia, mdns);
         Swarm::new(transport, behaviour, local_peer_id)
     };
 
@@ -90,14 +71,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Kick it off.
     loop {
         select! {
-        line = stdin.select_next_some() => handle_input_line(&mut swarm.behaviour_mut().kademlia, line.expect("Stdin not to close")),
+        line = stdin.select_next_some() => handle_input_line(get_kademlia_behaviour_mut_reference(&mut swarm), line.expect("Stdin not to close")),
         event = swarm.select_next_some() => match event {
             SwarmEvent::NewListenAddr { address, .. } => {
                 println!("Listening in {:?}", address);
             },
-            SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(MdnsEvent::Discovered(list))) => {
-                for (peer_id, multiaddr) in list {
-                    swarm.behaviour_mut().kademlia.add_address(&peer_id, multiaddr);
+            SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(MdnsEvent::Discovered(peers))) => {
+                for (peer_id, multiaddr) in peers {
+                    println!("{}, {}", &peer_id, &multiaddr);
+                    get_kademlia_behaviour_mut_reference(&mut swarm).add_address(&peer_id, multiaddr);
                 }
             }
             SwarmEvent::Behaviour(MyBehaviourEvent::Kademlia(KademliaEvent::OutboundQueryCompleted { result, ..})) => {
