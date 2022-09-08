@@ -6,7 +6,7 @@ pub mod networking {
         stream::SelectNextSome,
     };
     use libp2p::{
-        floodsub::{self, Floodsub, FloodsubEvent, Topic},
+        floodsub::{Floodsub, FloodsubEvent, Topic},
         identity::Keypair,
         mdns::{Mdns, MdnsConfig, MdnsEvent},
         swarm::SwarmEvent,
@@ -54,11 +54,11 @@ pub mod networking {
             let local_peer_id = PeerId::from(local_key.public());
             println!("Local peer id: {:?}", local_peer_id);
 
-            // Set up an encrypted DNS-enabled TCP Transport over the Mplex and Yamux protocols
+            // Set up an encrypted DNS-enabled TCP Transport
             let transport = libp2p::development_transport(local_key).await.unwrap();
 
             // Create a Floodsub topic
-            let floodsub_topic = floodsub::Topic::new(topic);
+            let floodsub_topic = Topic::new(topic);
 
             // Create a Swarm to manage peers and events
             Self {
@@ -81,7 +81,7 @@ pub mod networking {
         pub fn dial_peer(&mut self, to_dial:String) {
             let addr: Multiaddr = to_dial.parse().unwrap();
             self.swarm.dial(addr).unwrap();
-            println!("Dialed {:?}", to_dial);
+            println!("Dialed peer {:?}", to_dial);
         }
 
         pub fn listen_for_dialing(&mut self) {
