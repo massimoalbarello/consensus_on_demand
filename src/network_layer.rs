@@ -1,6 +1,6 @@
 pub mod networking {
 
-    use async_std::task;
+    use async_std::{fs::File, prelude::*, task};
     use futures::{
         prelude::stream::StreamExt,
         stream::SelectNextSome,
@@ -12,6 +12,8 @@ pub mod networking {
         swarm::SwarmEvent,
         Multiaddr, NetworkBehaviour, PeerId, Swarm,
     };
+
+    use serde::{Deserialize, Serialize};
 
     // We create a custom network behaviour that combines floodsub and mDNS.
     // Use the derive to generate delegating NetworkBehaviour impl.
@@ -42,9 +44,9 @@ pub mod networking {
     }
 
     pub struct Peer {
+        local_sn: usize,
         floodsub_topic: Topic,
         swarm:  Swarm<MyBehaviour>,
-
     }
 
     impl Peer {
@@ -62,6 +64,7 @@ pub mod networking {
 
             // Create a Swarm to manage peers and events
             Self {
+                local_sn: 0,
                 floodsub_topic: floodsub_topic.clone(),
                 swarm: {
                     let mdns = task::block_on(Mdns::new(MdnsConfig::default())).unwrap();
@@ -85,14 +88,24 @@ pub mod networking {
         }
 
         pub fn listen_for_dialing(&mut self) {
-            self.swarm.listen_on("/ip4/0.0.0.0/tcp/0".parse().unwrap()).unwrap();
+            self.swarm.listen_on("/ip4/0.0.0.0/tcp/0"
+                .parse().expect("can get a local socket")
+            ).expect("swarm can be started");
         }
 
-        pub fn broadcast(&mut self, line: &[u8]) {
-            self.swarm
-                .behaviour_mut()
-                .floodsub
-                .publish(self.floodsub_topic.clone(), line)
+        pub async fn broadcast_block(&mut self) {
+            match get_next_block(self.local_sn).await {
+                Some(block) => {
+                    println!("Sent block with sequence number {}", self.local_sn);
+                    self.local_sn += 1;
+                    self.swarm
+                        .behaviour_mut()
+                        .floodsub
+                        .publish(self.floodsub_topic.clone(), serde_json::to_string(&block).unwrap())
+                },
+                None => println!("No more input blocks"),
+            }
+           
         }
 
         pub fn get_next_event(&mut self) -> SelectNextSome<'_, Swarm<MyBehaviour>> {
@@ -138,5 +151,44 @@ pub mod networking {
                 _ => {}
             }
         }
+    }
+
+    
+    #[derive(Serialize, Deserialize)]
+    struct InputBlocks {
+        blocks: Vec<Block>
+    }
+
+    #[derive(Clone, Serialize, Deserialize)]
+    struct Block {
+        transactions: Vec<Transaction>,
+    }
+
+    #[derive(Clone, Serialize, Deserialize)]
+    struct Transaction {
+        sender: String,
+        receiver: String,
+        amount: u32,
+    }
+
+    async fn get_next_block(local_sn: usize) -> Option<Block> {
+        let input_blocks = read_file("blocks_pool.txt").await;
+        let next_block = if local_sn < input_blocks.blocks.len() {
+            Some(input_blocks.blocks[local_sn].clone())
+        }
+        else {
+            None
+        };
+        next_block
+    }
+            
+
+    async fn read_file(path: &str) -> InputBlocks {
+        let mut file = File::open(path).await.expect("txt file in path");
+        let mut content = String::new();
+        file.read_to_string(&mut content).await.expect("read content as string");
+
+        let input_blocks: InputBlocks = serde_json::from_str(&content).expect("invalid json");
+        input_blocks
     }
 }

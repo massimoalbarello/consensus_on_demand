@@ -25,7 +25,7 @@ async fn main() {
     // Process events
     loop {
         select! {
-            line = stdin.select_next_some() => my_peer.broadcast(line.unwrap().as_bytes()),
+            _ = stdin.select_next_some() => my_peer.broadcast_block().await,
             event = my_peer.get_next_event() => my_peer.match_event(event),
         }
     }
