@@ -119,13 +119,7 @@ pub mod networking {
                 }
                 SwarmEvent::Behaviour(OutEvent::Floodsub(
                     FloodsubEvent::Message(message)
-                )) => {
-                    println!(
-                        "Received: '{:?}' from {:?}",
-                        String::from_utf8_lossy(&message.data),
-                        message.source
-                    );
-                }
+                )) => handle_incoming_block(&String::from_utf8_lossy(&message.data), message.source),
                 SwarmEvent::Behaviour(OutEvent::Mdns(
                     MdnsEvent::Discovered(list)
                 )) => {
@@ -181,7 +175,6 @@ pub mod networking {
         };
         next_block
     }
-            
 
     async fn read_file(path: &str) -> InputBlocks {
         let mut file = File::open(path).await.expect("txt file in path");
@@ -190,5 +183,9 @@ pub mod networking {
 
         let input_blocks: InputBlocks = serde_json::from_str(&content).expect("invalid json");
         input_blocks
+    }
+
+    fn handle_incoming_block(content: &str, source: PeerId) {
+        println!("{}: {}", source, content);
     }
 }
