@@ -7,6 +7,8 @@ use futures::{
 pub mod network_layer;
 use crate::network_layer::networking::Peer;
 
+pub mod consensus_layer;
+
 #[async_std::main]
 async fn main() {
     let mut my_peer = Peer::new("gossip_blocks").await;

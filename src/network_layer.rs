@@ -1,6 +1,6 @@
 pub mod networking {
 
-    use async_std::{fs::File, prelude::*, task};
+    use async_std::task;
     use futures::{
         prelude::stream::StreamExt,
         stream::SelectNextSome,
@@ -12,14 +12,15 @@ pub mod networking {
         swarm::SwarmEvent,
         Multiaddr, NetworkBehaviour, PeerId, Swarm,
     };
+    use tokio::sync::mpsc;
 
-    use serde::{Deserialize, Serialize};
+    use crate::consensus_layer::blockchain::{handle_incoming_block, get_next_block};
 
     // We create a custom network behaviour that combines floodsub and mDNS.
     // Use the derive to generate delegating NetworkBehaviour impl.
     #[derive(NetworkBehaviour)]
     #[behaviour(out_event = "OutEvent")]
-    pub struct MyBehaviour {
+    pub struct AppBehaviour {
         floodsub: Floodsub,
         mdns: Mdns,
     }
@@ -46,7 +47,7 @@ pub mod networking {
     pub struct Peer {
         local_sn: usize,
         floodsub_topic: Topic,
-        swarm:  Swarm<MyBehaviour>,
+        swarm:  Swarm<AppBehaviour>,
     }
 
     impl Peer {
@@ -68,7 +69,7 @@ pub mod networking {
                 floodsub_topic: floodsub_topic.clone(),
                 swarm: {
                     let mdns = task::block_on(Mdns::new(MdnsConfig::default())).unwrap();
-                    let mut behaviour = MyBehaviour {
+                    let mut behaviour = AppBehaviour {
                         floodsub: Floodsub::new(local_peer_id),
                         mdns,
                     };
@@ -108,7 +109,7 @@ pub mod networking {
            
         }
 
-        pub fn get_next_event(&mut self) -> SelectNextSome<'_, Swarm<MyBehaviour>> {
+        pub fn get_next_event(&mut self) -> SelectNextSome<'_, Swarm<AppBehaviour>> {
             self.swarm.select_next_some()
         }
 
@@ -145,47 +146,5 @@ pub mod networking {
                 _ => {}
             }
         }
-    }
-
-    
-    #[derive(Serialize, Deserialize)]
-    struct InputBlocks {
-        blocks: Vec<Block>
-    }
-
-    #[derive(Clone, Serialize, Deserialize)]
-    struct Block {
-        transactions: Vec<Transaction>,
-    }
-
-    #[derive(Clone, Serialize, Deserialize)]
-    struct Transaction {
-        sender: String,
-        receiver: String,
-        amount: u32,
-    }
-
-    async fn get_next_block(local_sn: usize) -> Option<Block> {
-        let input_blocks = read_file("blocks_pool.txt").await;
-        let next_block = if local_sn < input_blocks.blocks.len() {
-            Some(input_blocks.blocks[local_sn].clone())
-        }
-        else {
-            None
-        };
-        next_block
-    }
-
-    async fn read_file(path: &str) -> InputBlocks {
-        let mut file = File::open(path).await.expect("txt file in path");
-        let mut content = String::new();
-        file.read_to_string(&mut content).await.expect("read content as string");
-
-        let input_blocks: InputBlocks = serde_json::from_str(&content).expect("invalid json");
-        input_blocks
-    }
-
-    fn handle_incoming_block(content: &str, source: PeerId) {
-        println!("{}: {}", source, content);
     }
 }
