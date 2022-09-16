@@ -23,7 +23,7 @@ pub mod networking {
     // Use the derive to generate delegating NetworkBehaviour impl.
     #[derive(NetworkBehaviour)]
     #[behaviour(out_event = "OutEvent")]
-    pub struct NetworkBehaviour {
+    pub struct P2PBehaviour {
         floodsub: Floodsub,
         mdns: Mdns,
     }
@@ -50,7 +50,7 @@ pub mod networking {
     pub struct Peer {
         local_sn: usize,
         floodsub_topic: Topic,
-        swarm:  Swarm<NetworkBehaviour>,
+        swarm:  Swarm<P2PBehaviour>,
         blockchain: Blockchain,
     }
 
@@ -73,7 +73,7 @@ pub mod networking {
                 floodsub_topic: floodsub_topic.clone(),
                 swarm: {
                     let mdns = task::block_on(Mdns::new(MdnsConfig::default())).unwrap();
-                    let mut behaviour = NetworkBehaviour {
+                    let mut behaviour = P2PBehaviour {
                         floodsub: Floodsub::new(local_peer_id),
                         mdns,
                     };
@@ -114,7 +114,7 @@ pub mod networking {
            
         }
 
-        pub fn get_next_event(&mut self) -> SelectNextSome<'_, Swarm<NetworkBehaviour>> {
+        pub fn get_next_event(&mut self) -> SelectNextSome<'_, Swarm<P2PBehaviour>> {
             self.swarm.select_next_some()
         }
 
@@ -193,7 +193,7 @@ pub mod networking {
     }
 
     pub fn handle_incoming_block(local_peer: &mut Peer, block_content: &str, block_source: PeerId) {
-        println!("{}: {}", block_source, block_content);
+        println!("\nPeer: {} sent block: {}", block_source, block_content);
         let block = serde_json::from_str::<Block>(block_content).expect("can parse block");
         local_peer.blockchain.try_add_block(block);
     }
