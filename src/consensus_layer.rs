@@ -1,12 +1,12 @@
 pub mod blockchain {
 
-    use async_std::{fs::File, prelude::*};
     use chrono::prelude::Utc;
-    use libp2p::PeerId;
     use serde::{Deserialize, Serialize};
     use sha2::{Digest, Sha256};
 
-    type InputPayloads = Vec<String>;
+    pub type InputPayloads = Vec<String>;
+
+    const DIFFICULTY_PREFIX: &str = "0";
 
     #[derive(Serialize, Deserialize, Debug, Clone)]
     pub struct Block {
@@ -40,12 +40,10 @@ pub mod blockchain {
         loop {
             let hash = calculate_hash(id, timestamp, previous_hash, data, nonce);
             let binary_hash = hash_to_binary_representation(&hash);
-            if binary_hash.starts_with("00") {
+            if binary_hash.starts_with(DIFFICULTY_PREFIX) {
                 println!(
-                    "mined! nonce: {}, hash: {}, binary hash: {}",
-                    nonce,
-                    hex::encode(&hash),
-                    binary_hash
+                    "Mined block with nonce: {} and hash: {}",
+                    nonce, hex::encode(&hash)
                 );
                 return (nonce, hex::encode(hash));
             }
@@ -80,38 +78,73 @@ pub mod blockchain {
         res
     }
 
-    pub async fn get_next_block(local_sn: usize) -> Option<Block> {
-        match get_next_payload(local_sn).await {
-            Some(payload) => Some(Block::new(local_sn as u64, String::from("aaa"), payload)),
-            None => None,
+    pub struct Blockchain {
+        pub blocks: Vec<Block>,
+    }
+
+    impl Blockchain {
+        pub fn new() -> Self {
+            let genesis_id: u64 = 0;
+            let genesis_timestamp: i64 = 0;
+            let genesis_previous_hash = String::from("Genesis block has no previous hash");
+            let genesis_data = String::from("This is the genesis block!");
+            let (genesis_nonce, genesis_hash) = mine_block(
+                genesis_id,
+                genesis_timestamp,
+                &genesis_previous_hash,
+                &genesis_data,
+            );
+            let genesis_block = Block {
+                id: genesis_id,
+                hash: genesis_hash,
+                timestamp: genesis_timestamp,
+                previous_hash: genesis_previous_hash,
+                data: genesis_data,
+                nonce: genesis_nonce
+            };
+            println!("Local blockchain initialized with genesis block");
+            Self { blocks: vec![genesis_block] }
         }
-    }
 
-    async fn get_next_payload(local_sn: usize) -> Option<String> {
-        let input_payloads: InputPayloads = read_file("payloads_pool.txt").await;
-        let next_payload = if local_sn < input_payloads.len() {
-            Some(input_payloads[local_sn].clone())
-        } else {
-            None
-        };
-        next_payload
-    }
-
-    async fn read_file(path: &str) -> InputPayloads {
-        let mut file = File::open(path).await.expect("txt file in path");
-        let mut content = String::new();
-        file.read_to_string(&mut content)
-            .await
-            .expect("read content as string");
-
-        let mut input_payloads: InputPayloads = vec![];
-        for line in content.lines() {
-            input_payloads.push(String::from(line));
+        pub fn try_add_block(&mut self, block: Block) {
+            let latest_block = self.blocks.last().expect("there is at least one block");
+            if self.is_block_valid(&block, latest_block) {
+                println!("Received block added to local blockchain");
+                self.blocks.push(block);
+            } else {
+                println!("Could not add block - invalid");
+            }
         }
-        input_payloads
-    }
 
-    pub fn handle_incoming_block(content: &str, source: PeerId) {
-        println!("{}: {}", source, content);
+        fn is_block_valid(&self, block: &Block, previous_block: &Block) -> bool {
+            if block.previous_hash != previous_block.hash {
+                println!("Block with id: {} has wrong previous hash", block.id);
+                return false;
+            } else if !hash_to_binary_representation(
+                &hex::decode(&block.hash).expect("can decode from hex"),
+            )
+            .starts_with(DIFFICULTY_PREFIX)
+            {
+                println!("Block with id: {} has invalid difficulty", block.id);
+                return false;
+            } else if block.id != previous_block.id + 1 {
+                println!(
+                    "Block with id: {} is not the next block after the latest: {}",
+                    block.id, previous_block.id
+                );
+                return false;
+            } else if hex::encode(calculate_hash(
+                block.id,
+                block.timestamp,
+                &block.previous_hash,
+                &block.data,
+                block.nonce,
+            )) != block.hash
+            {
+                println!("Block with id: {} has invalid hash", block.id);
+                return false;
+            }
+            true
+        }
     }
 }

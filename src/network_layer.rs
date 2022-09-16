@@ -1,6 +1,6 @@
 pub mod networking {
 
-    use async_std::task;
+    use async_std::{fs::File, prelude::*, task};
     use futures::{
         prelude::stream::StreamExt,
         stream::SelectNextSome,
@@ -12,15 +12,18 @@ pub mod networking {
         swarm::SwarmEvent,
         Multiaddr, NetworkBehaviour, PeerId, Swarm,
     };
-    use tokio::sync::mpsc;
 
-    use crate::consensus_layer::blockchain::{handle_incoming_block, get_next_block};
+    use crate::consensus_layer::blockchain::{
+        Blockchain,
+        Block,
+        InputPayloads,
+    };
 
     // We create a custom network behaviour that combines floodsub and mDNS.
     // Use the derive to generate delegating NetworkBehaviour impl.
     #[derive(NetworkBehaviour)]
     #[behaviour(out_event = "OutEvent")]
-    pub struct AppBehaviour {
+    pub struct NetworkBehaviour {
         floodsub: Floodsub,
         mdns: Mdns,
     }
@@ -47,7 +50,8 @@ pub mod networking {
     pub struct Peer {
         local_sn: usize,
         floodsub_topic: Topic,
-        swarm:  Swarm<AppBehaviour>,
+        swarm:  Swarm<NetworkBehaviour>,
+        blockchain: Blockchain,
     }
 
     impl Peer {
@@ -65,11 +69,11 @@ pub mod networking {
 
             // Create a Swarm to manage peers and events
             Self {
-                local_sn: 0,
+                local_sn: 0,    // used to read next payload from local pool
                 floodsub_topic: floodsub_topic.clone(),
                 swarm: {
                     let mdns = task::block_on(Mdns::new(MdnsConfig::default())).unwrap();
-                    let mut behaviour = AppBehaviour {
+                    let mut behaviour = NetworkBehaviour {
                         floodsub: Floodsub::new(local_peer_id),
                         mdns,
                     };
@@ -77,6 +81,7 @@ pub mod networking {
                     behaviour.floodsub.subscribe(floodsub_topic);
                     Swarm::new(transport, behaviour, local_peer_id)
                 },
+                blockchain: Blockchain::new(),
             }
 
 
@@ -95,9 +100,9 @@ pub mod networking {
         }
 
         pub async fn broadcast_block(&mut self) {
-            match get_next_block(self.local_sn).await {
+            match get_next_block(self).await {
                 Some(block) => {
-                    println!("Sent block with sequence number {}", self.local_sn);
+                    println!("Sent block with sequence number {}", block.id);
                     self.local_sn += 1;
                     self.swarm
                         .behaviour_mut()
@@ -109,7 +114,7 @@ pub mod networking {
            
         }
 
-        pub fn get_next_event(&mut self) -> SelectNextSome<'_, Swarm<AppBehaviour>> {
+        pub fn get_next_event(&mut self) -> SelectNextSome<'_, Swarm<NetworkBehaviour>> {
             self.swarm.select_next_some()
         }
 
@@ -120,7 +125,7 @@ pub mod networking {
                 }
                 SwarmEvent::Behaviour(OutEvent::Floodsub(
                     FloodsubEvent::Message(message)
-                )) => handle_incoming_block(&String::from_utf8_lossy(&message.data), message.source),
+                )) => handle_incoming_block(self, &String::from_utf8_lossy(&message.data), message.source),
                 SwarmEvent::Behaviour(OutEvent::Mdns(
                     MdnsEvent::Discovered(list)
                 )) => {
@@ -142,9 +147,54 @@ pub mod networking {
                                 .remove_node_from_partial_view(&peer);
                         }
                     }
+                    // println!("Ignoring Mdns expired event");
                 },
-                _ => {}
+                _ => {
+                    // println!("Unhandled swarm event");
+                }
             }
         }
+    }
+    
+    pub async fn get_next_block(local_peer: &mut Peer) -> Option<Block> {
+        match get_next_payload(local_peer.local_sn).await {
+            Some(payload) => {
+                let previous_hash = local_peer.blockchain.blocks.last().expect("must have last block").hash.clone();
+                let new_block = Block::new(local_peer.blockchain.blocks.len() as u64, previous_hash, payload);
+                local_peer.blockchain.blocks.push(new_block.clone());
+                Some(new_block)
+            }
+            None => None,
+        }
+    }
+
+    async fn get_next_payload(local_sn: usize) -> Option<String> {
+        let input_payloads: InputPayloads = read_file("payloads_pool.txt").await;
+        let next_payload = if local_sn < input_payloads.len() {
+            Some(input_payloads[local_sn].clone())
+        } else {
+            None
+        };
+        next_payload
+    }
+
+    async fn read_file(path: &str) -> InputPayloads {
+        let mut file = File::open(path).await.expect("txt file in path");
+        let mut content = String::new();
+        file.read_to_string(&mut content)
+            .await
+            .expect("read content as string");
+
+        let mut input_payloads: InputPayloads = vec![];
+        for line in content.lines() {
+            input_payloads.push(String::from(line));
+        }
+        input_payloads
+    }
+
+    pub fn handle_incoming_block(local_peer: &mut Peer, block_content: &str, block_source: PeerId) {
+        println!("{}: {}", block_source, block_content);
+        let block = serde_json::from_str::<Block>(block_content).expect("can parse block");
+        local_peer.blockchain.try_add_block(block);
     }
 }

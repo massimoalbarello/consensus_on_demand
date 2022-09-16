@@ -1,7 +1,7 @@
 use async_std::io;
 use futures::{
+    prelude::{stream::StreamExt, *},
     select,
-    prelude::{stream::StreamExt, *}
 };
 
 pub mod network_layer;
