@@ -1,10 +1,7 @@
 pub mod networking {
 
     use async_std::{fs::File, prelude::*, task};
-    use futures::{
-        prelude::stream::StreamExt,
-        stream::SelectNextSome,
-    };
+    use futures::{prelude::stream::StreamExt, stream::SelectNextSome};
     use libp2p::{
         floodsub::{Floodsub, FloodsubEvent, Topic},
         identity::Keypair,
@@ -13,11 +10,7 @@ pub mod networking {
         Multiaddr, NetworkBehaviour, PeerId, Swarm,
     };
 
-    use crate::consensus_layer::blockchain::{
-        Blockchain,
-        Block,
-        InputPayloads,
-    };
+    use crate::consensus_layer::blockchain::{Block, Blockchain, InputPayloads};
 
     // We create a custom network behaviour that combines floodsub and mDNS.
     // Use the derive to generate delegating NetworkBehaviour impl.
@@ -27,7 +20,7 @@ pub mod networking {
         floodsub: Floodsub,
         mdns: Mdns,
     }
-    
+
     #[allow(clippy::large_enum_variant)]
     #[derive(Debug)]
     pub enum OutEvent {
@@ -50,7 +43,7 @@ pub mod networking {
     pub struct Peer {
         local_sn: usize,
         floodsub_topic: Topic,
-        swarm:  Swarm<P2PBehaviour>,
+        swarm: Swarm<P2PBehaviour>,
         blockchain: Blockchain,
     }
 
@@ -69,7 +62,7 @@ pub mod networking {
 
             // Create a Swarm to manage peers and events
             Self {
-                local_sn: 0,    // used to read next payload from local pool
+                local_sn: 0, // used to read next payload from local pool
                 floodsub_topic: floodsub_topic.clone(),
                 swarm: {
                     let mdns = task::block_on(Mdns::new(MdnsConfig::default())).unwrap();
@@ -83,20 +76,22 @@ pub mod networking {
                 },
                 blockchain: Blockchain::new(),
             }
-
-
         }
 
-        pub fn dial_peer(&mut self, to_dial:String) {
+        pub fn dial_peer(&mut self, to_dial: String) {
             let addr: Multiaddr = to_dial.parse().unwrap();
             self.swarm.dial(addr).unwrap();
             println!("Dialed peer {:?}", to_dial);
         }
 
         pub fn listen_for_dialing(&mut self) {
-            self.swarm.listen_on("/ip4/0.0.0.0/tcp/0"
-                .parse().expect("can get a local socket")
-            ).expect("swarm can be started");
+            self.swarm
+                .listen_on(
+                    "/ip4/0.0.0.0/tcp/0"
+                        .parse()
+                        .expect("can get a local socket"),
+                )
+                .expect("swarm can be started");
         }
 
         pub async fn broadcast_block(&mut self) {
@@ -104,14 +99,20 @@ pub mod networking {
                 Some(block) => {
                     println!("Sent block with sequence number {}", block.id);
                     self.local_sn += 1; // used to index the next local block to broadcast
-                    self.swarm
-                        .behaviour_mut()
-                        .floodsub
-                        .publish(self.floodsub_topic.clone(), serde_json::to_string(&block).unwrap())
-                },
+                    self.swarm.behaviour_mut().floodsub.publish(
+                        self.floodsub_topic.clone(),
+                        serde_json::to_string(&block).unwrap(),
+                    )
+                }
                 None => println!("No more input blocks"),
             }
-           
+        }
+
+        pub fn keep_alive(&mut self) {
+            self.swarm.behaviour_mut().floodsub.publish(
+                self.floodsub_topic.clone(),
+                serde_json::to_string("Keep alive!").unwrap(),
+            );
         }
 
         pub fn get_next_event(&mut self) -> SelectNextSome<'_, Swarm<P2PBehaviour>> {
@@ -123,12 +124,15 @@ pub mod networking {
                 SwarmEvent::NewListenAddr { address, .. } => {
                     println!("Listening on {:?}", address);
                 }
-                SwarmEvent::Behaviour(OutEvent::Floodsub(
-                    FloodsubEvent::Message(message)
-                )) => handle_incoming_block(self, &String::from_utf8_lossy(&message.data), message.source),
-                SwarmEvent::Behaviour(OutEvent::Mdns(
-                    MdnsEvent::Discovered(list)
-                )) => {
+                SwarmEvent::Behaviour(OutEvent::Floodsub(FloodsubEvent::Message(message))) => {
+                    let block_content = String::from_utf8_lossy(&message.data);
+                    if !block_content.eq("\"Keep alive!\"") {
+                        handle_incoming_block(self, &block_content, message.source)
+                    } else {
+                        println!("Keep connection alive");
+                    }
+                }
+                SwarmEvent::Behaviour(OutEvent::Mdns(MdnsEvent::Discovered(list))) => {
                     for (peer, _) in list {
                         self.swarm
                             .behaviour_mut()
@@ -136,9 +140,7 @@ pub mod networking {
                             .add_node_to_partial_view(peer);
                     }
                 }
-                SwarmEvent::Behaviour(OutEvent::Mdns(MdnsEvent::Expired(
-                    list
-                ))) => {
+                SwarmEvent::Behaviour(OutEvent::Mdns(MdnsEvent::Expired(list))) => {
                     for (peer, _) in list {
                         if !self.swarm.behaviour_mut().mdns.has_node(&peer) {
                             self.swarm
@@ -148,21 +150,31 @@ pub mod networking {
                         }
                     }
                     // println!("Ignoring Mdns expired event");
-                },
+                }
                 _ => {
                     // println!("Unhandled swarm event");
                 }
             }
         }
     }
-    
+
     async fn get_next_block(local_peer: &mut Peer) -> Option<Block> {
         match get_next_payload(local_peer.local_sn).await {
             Some(payload) => {
                 // attach new block to last block in local blockchain
-                let previous_hash = local_peer.blockchain.blocks.last().expect("must have last block").hash.clone();
+                let previous_hash = local_peer
+                    .blockchain
+                    .blocks
+                    .last()
+                    .expect("must have last block")
+                    .hash
+                    .clone();
                 // setting block id according to the length of the local blockchain
-                let new_block = Block::new(local_peer.blockchain.blocks.len() as u64, previous_hash, payload);
+                let new_block = Block::new(
+                    local_peer.blockchain.blocks.len() as u64,
+                    previous_hash,
+                    payload,
+                );
                 local_peer.blockchain.blocks.push(new_block.clone());
                 Some(new_block)
             }

@@ -43,7 +43,8 @@ pub mod blockchain {
             if binary_hash.starts_with(DIFFICULTY_PREFIX) {
                 println!(
                     "Mined block with nonce: {} and hash: {}",
-                    nonce, hex::encode(&hash)
+                    nonce,
+                    hex::encode(&hash)
                 );
                 return (nonce, hex::encode(hash));
             }
@@ -100,10 +101,12 @@ pub mod blockchain {
                 timestamp: genesis_timestamp,
                 previous_hash: genesis_previous_hash,
                 data: genesis_data,
-                nonce: genesis_nonce
+                nonce: genesis_nonce,
             };
             println!("Local blockchain initialized with genesis block");
-            Self { blocks: vec![genesis_block] }
+            Self {
+                blocks: vec![genesis_block],
+            }
         }
 
         pub fn try_add_block(&mut self, block: Block) {
