@@ -103,7 +103,7 @@ pub mod networking {
             match get_next_block(self).await {
                 Some(block) => {
                     println!("Sent block with sequence number {}", block.id);
-                    self.local_sn += 1;
+                    self.local_sn += 1; // used to index the next local block to broadcast
                     self.swarm
                         .behaviour_mut()
                         .floodsub
@@ -156,10 +156,12 @@ pub mod networking {
         }
     }
     
-    pub async fn get_next_block(local_peer: &mut Peer) -> Option<Block> {
+    async fn get_next_block(local_peer: &mut Peer) -> Option<Block> {
         match get_next_payload(local_peer.local_sn).await {
             Some(payload) => {
+                // attach new block to last block in local blockchain
                 let previous_hash = local_peer.blockchain.blocks.last().expect("must have last block").hash.clone();
+                // setting block id according to the length of the local blockchain
                 let new_block = Block::new(local_peer.blockchain.blocks.len() as u64, previous_hash, payload);
                 local_peer.blockchain.blocks.push(new_block.clone());
                 Some(new_block)
