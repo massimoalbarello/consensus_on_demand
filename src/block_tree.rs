@@ -39,14 +39,28 @@ impl BlockTree {
            tip_ref: Rc::new(Block::new(None, String::from("Genesis"))),
         }
     }
+
+    fn create_child(&mut self, payload: String) {
+        self.tip_ref = Rc::new(Block::new(Some(Rc::clone(&self.tip_ref)), payload));
+    }
+
+    fn display_tree_from_tip(&self) {
+        let mut block = &self.tip_ref;
+        loop {
+            println!("{}", block.payload);
+            block = match block.parent_ref.as_ref() {
+                Some(parent) => parent,
+                None => break,
+            }
+        }
+    }
 }
 
 fn main() {
-    let block_tree = BlockTree::new();
-    let block1 = create_child(block_tree.tip_ref, String::from("Block 1"));
-    let block2 = create_child(block1, String::from("Block 2"));
-    let block3 = create_child(block2, String::from("Block 3"));
-
-    let block_tree_tip_ref = Rc::clone(&block3);
-    display_tree_from_tip(block_tree_tip_ref);
+    let mut block_tree = BlockTree::new();
+    block_tree.create_child(String::from("Block 1"));
+    block_tree.create_child(String::from("Block 2"));
+    block_tree.create_child(String::from("Block 3"));
+    block_tree.create_child(String::from("Block 4"));
+    block_tree.display_tree_from_tip();
 }
