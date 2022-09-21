@@ -1,7 +1,7 @@
 pub mod networking {
 
     use async_std::{fs::File, prelude::*, task};
-    use futures::{prelude::stream::StreamExt, stream::SelectNextSome};
+    use futures::{channel::mpsc::Sender, prelude::stream::StreamExt, stream::SelectNextSome};
     use libp2p::{
         floodsub::{Floodsub, FloodsubEvent, Topic},
         identity::Keypair,
@@ -74,7 +74,7 @@ pub mod networking {
                     behaviour.floodsub.subscribe(floodsub_topic);
                     Swarm::new(transport, behaviour, local_peer_id)
                 },
-                blockchain: Blockchain::new(),
+                blockchain: Blockchain::new().await,
             }
         }
 
@@ -94,17 +94,39 @@ pub mod networking {
                 .expect("swarm can be started");
         }
 
-        pub async fn broadcast_block(&mut self) {
-            match get_next_block(self).await {
+        pub fn create_block(&mut self, mut tx: Sender<Block>) {
+            // attach new block to last block in local blockchain
+            let previous_hash = self
+                .blockchain
+                .blocks
+                .last()
+                .expect("must have last block")
+                .hash
+                .clone();
+            let local_sn = self.local_sn;
+            let local_blockchain_height = self.blockchain.blocks.len();
+            task::spawn(async move {
+                // mine block in a separate non-blocking task
+                match get_next_block(local_sn, previous_hash, local_blockchain_height as u64).await
+                {
+                    Some(block) => tx.try_send(block).expect("can push into channel"),  // push block into channel so that it can later be broadcasted
+                    None => (),
+                };
+            });
+        }
+
+        pub fn broadcast_block(&mut self, block: Option<Block>) {
+            match block {
                 Some(block) => {
                     println!("Sent block with sequence number {}", block.id);
                     self.local_sn += 1; // used to index the next local block to broadcast
                     self.swarm.behaviour_mut().floodsub.publish(
                         self.floodsub_topic.clone(),
                         serde_json::to_string(&block).unwrap(),
-                    )
+                    );
+                    self.blockchain.blocks.push(block);
                 }
-                None => println!("No more input blocks"),
+                None => (),
             }
         }
 
@@ -129,7 +151,7 @@ pub mod networking {
                     if !block_content.eq("\"Keep alive!\"") {
                         handle_incoming_block(self, &block_content, message.source)
                     } else {
-                        println!("Keep connection alive");
+                        // println!("Keep connection alive");
                     }
                 }
                 SwarmEvent::Behaviour(OutEvent::Mdns(MdnsEvent::Discovered(list))) => {
@@ -158,24 +180,15 @@ pub mod networking {
         }
     }
 
-    async fn get_next_block(local_peer: &mut Peer) -> Option<Block> {
-        match get_next_payload(local_peer.local_sn).await {
+    async fn get_next_block(
+        local_sn: usize,
+        previous_hash: String,
+        local_blockchain_height: u64,
+    ) -> Option<Block> {
+        match get_next_payload(local_sn).await {
             Some(payload) => {
-                // attach new block to last block in local blockchain
-                let previous_hash = local_peer
-                    .blockchain
-                    .blocks
-                    .last()
-                    .expect("must have last block")
-                    .hash
-                    .clone();
                 // setting block id according to the length of the local blockchain
-                let new_block = Block::new(
-                    local_peer.blockchain.blocks.len() as u64,
-                    previous_hash,
-                    payload,
-                );
-                local_peer.blockchain.blocks.push(new_block.clone());
+                let new_block = Block::new(local_blockchain_height, previous_hash, payload).await;
                 Some(new_block)
             }
             None => None,

@@ -6,7 +6,7 @@ pub mod blockchain {
 
     pub type InputPayloads = Vec<String>;
 
-    const DIFFICULTY_PREFIX: &str = "0";
+    const DIFFICULTY_PREFIX: &str = "00";
 
     #[derive(Serialize, Deserialize, Debug, Clone)]
     pub struct Block {
@@ -19,9 +19,9 @@ pub mod blockchain {
     }
 
     impl Block {
-        pub fn new(id: u64, previous_hash: String, data: String) -> Self {
+        pub async fn new(id: u64, previous_hash: String, data: String) -> Self {
             let current_timestamp = Utc::now().timestamp();
-            let (nonce, hash) = mine_block(id, current_timestamp, &previous_hash, &data);
+            let (nonce, hash) = mine_block(id, current_timestamp, &previous_hash, &data).await;
             Self {
                 id,
                 hash,
@@ -33,7 +33,7 @@ pub mod blockchain {
         }
     }
 
-    fn mine_block(id: u64, timestamp: i64, previous_hash: &str, data: &str) -> (u64, String) {
+    async fn mine_block(id: u64, timestamp: i64, previous_hash: &str, data: &str) -> (u64, String) {
         println!("Mining block...");
         let mut nonce = 0;
 
@@ -84,7 +84,7 @@ pub mod blockchain {
     }
 
     impl Blockchain {
-        pub fn new() -> Self {
+        pub async fn new() -> Self {
             let genesis_id: u64 = 0;
             let genesis_timestamp: i64 = 0;
             let genesis_previous_hash = String::from("Genesis block has no previous hash");
@@ -94,7 +94,8 @@ pub mod blockchain {
                 genesis_timestamp,
                 &genesis_previous_hash,
                 &genesis_data,
-            );
+            )
+            .await;
             let genesis_block = Block {
                 id: genesis_id,
                 hash: genesis_hash,
