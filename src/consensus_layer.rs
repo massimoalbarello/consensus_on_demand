@@ -14,31 +14,36 @@ pub mod blockchain {
         pub hash: String,
         pub previous_hash: String,
         pub timestamp: i64,
-        pub data: String,
+        pub payload: String,
         pub nonce: u64,
     }
 
     impl Block {
-        pub async fn new(id: u64, previous_hash: String, data: String) -> Self {
+        pub async fn new(id: u64, previous_hash: String, payload: String) -> Self {
             let current_timestamp = Utc::now().timestamp();
-            let (nonce, hash) = mine_block(id, current_timestamp, &previous_hash, &data).await;
+            let (nonce, hash) = mine_block(id, current_timestamp, &previous_hash, &payload).await;
             Self {
                 id,
                 hash,
                 timestamp: current_timestamp,
                 previous_hash,
-                data,
+                payload,
                 nonce,
             }
         }
     }
 
-    async fn mine_block(id: u64, timestamp: i64, previous_hash: &str, data: &str) -> (u64, String) {
+    async fn mine_block(
+        id: u64,
+        timestamp: i64,
+        previous_hash: &str,
+        payload: &str,
+    ) -> (u64, String) {
         println!("Mining block...");
         let mut nonce = 0;
 
         loop {
-            let hash = calculate_hash(id, timestamp, previous_hash, data, nonce);
+            let hash = calculate_hash(id, timestamp, previous_hash, payload, nonce);
             let binary_hash = hash_to_binary_representation(&hash);
             if binary_hash.starts_with(DIFFICULTY_PREFIX) {
                 println!(
@@ -56,18 +61,18 @@ pub mod blockchain {
         id: u64,
         timestamp: i64,
         previous_hash: &str,
-        data: &str,
+        payload: &str,
         nonce: u64,
     ) -> Vec<u8> {
-        let data = serde_json::json!({
+        let payload = serde_json::json!({
             "id": id,
             "previous_hash": previous_hash,
-            "data": data,
+            "payload": payload,
             "timestamp": timestamp,
             "nonce": nonce
         });
         let mut hasher = Sha256::new();
-        hasher.update(data.to_string().as_bytes());
+        hasher.update(payload.to_string().as_bytes());
         hasher.finalize().as_slice().to_owned()
     }
 
@@ -88,12 +93,12 @@ pub mod blockchain {
             let genesis_id: u64 = 0;
             let genesis_timestamp: i64 = 0;
             let genesis_previous_hash = String::from("Genesis block has no previous hash");
-            let genesis_data = String::from("This is the genesis block!");
+            let genesis_payload = String::from("This is the genesis block!");
             let (genesis_nonce, genesis_hash) = mine_block(
                 genesis_id,
                 genesis_timestamp,
                 &genesis_previous_hash,
-                &genesis_data,
+                &genesis_payload,
             )
             .await;
             let genesis_block = Block {
@@ -101,7 +106,7 @@ pub mod blockchain {
                 hash: genesis_hash,
                 timestamp: genesis_timestamp,
                 previous_hash: genesis_previous_hash,
-                data: genesis_data,
+                payload: genesis_payload,
                 nonce: genesis_nonce,
             };
             println!("Local blockchain initialized with genesis block");
@@ -116,7 +121,7 @@ pub mod blockchain {
                 println!("Received block added to local blockchain");
                 self.blocks.push(block);
             } else {
-                println!("Could not add block - invalid");
+                println!("Could not add block: invalid");
             }
         }
 
@@ -141,7 +146,7 @@ pub mod blockchain {
                 block.id,
                 block.timestamp,
                 &block.previous_hash,
-                &block.data,
+                &block.payload,
                 block.nonce,
             )) != block.hash
             {

@@ -109,7 +109,7 @@ pub mod networking {
                 // mine block in a separate non-blocking task
                 match get_next_block(local_sn, previous_hash, local_blockchain_height as u64).await
                 {
-                    Some(block) => tx.try_send(block).expect("can push into channel"),  // push block into channel so that it can later be broadcasted
+                    Some(block) => tx.try_send(block).expect("can push into channel"), // push block into channel so that it can later be broadcasted
                     None => (),
                 };
             });
@@ -191,7 +191,10 @@ pub mod networking {
                 let new_block = Block::new(local_blockchain_height, previous_hash, payload).await;
                 Some(new_block)
             }
-            None => None,
+            None => {
+                println!("No more payloads");
+                None
+            }
         }
     }
 
