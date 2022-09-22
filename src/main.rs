@@ -9,8 +9,8 @@ use std::time::Duration;
 
 pub mod network_layer;
 use crate::network_layer::networking::Peer;
-pub mod consensus_layer;
 pub mod block_tree;
+pub mod consensus_layer;
 
 async fn keep_alive_future() {
     sleep(Duration::new(1, 0)).await;
@@ -33,15 +33,20 @@ async fn main() {
 
     let (tx, mut rx) = mpsc::channel(1);
 
+    let mut next_proposed_block_height: u32 = 1; // HP: each peer will not propose two blocks at the same height
+
     // Process events
     loop {
         select! {
-            _ = stdin.select_next_some() => my_peer.create_block(tx.clone()),
+            _ = stdin.select_next_some() => my_peer.create_block(next_proposed_block_height, tx.clone()),
             _ = keep_alive_future().fuse() => {
                 // if there is a block in the channel, broadcast it
                 // otherwise, send keep alive message
                 match rx.try_next() {
-                    Ok(block) => my_peer.broadcast_block(block),
+                    Ok(block) => {
+                        my_peer.broadcast_block(next_proposed_block_height, block);
+                        next_proposed_block_height += 1;
+                    },
                     Err(_) => my_peer.keep_alive(), // prevent Mdns expiration event by periodically sending keep alive messages to peers,
                 }
             },

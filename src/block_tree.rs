@@ -33,7 +33,45 @@ impl BlockTree {
         }
     }
 
-    fn create_child_at_height(
+    pub fn get_current_height(&self) -> u32 {
+        self.current_height
+    }
+
+    pub fn get_parent_hash(
+        &mut self,
+        child_height: u32,
+        index_in_tips_refs: usize,
+    ) -> Option<String> {
+        if child_height == self.current_height + 1 {
+            match self.previous_tips_refs.get(index_in_tips_refs) {
+                Some(parent_ref) => Some(parent_ref.block.hash.to_owned()),
+                None => {
+                    println!(
+                        "No parent at height {} and width {}",
+                        child_height - 1,
+                        index_in_tips_refs
+                    );
+                    None
+                }
+            }
+        } else if child_height == self.current_height + 2 {
+            match self.tips_refs.get(index_in_tips_refs) {
+                Some(parent_ref) => Some(parent_ref.block.hash.to_owned()),
+                None => {
+                    println!(
+                        "No parent at height {} and width {}",
+                        child_height, index_in_tips_refs
+                    );
+                    None
+                }
+            }
+        } else {
+            println!("Invalid child height");
+            None
+        }
+    }
+
+    pub fn create_child_at_height(
         &mut self,
         child_height: u32,
         index_in_tips_refs: usize,
@@ -79,14 +117,17 @@ impl BlockTree {
         match self.tips_refs.get(index_in_tips_refs) {
             Some(mut block_with_ref) => {
                 loop {
-                    println!("Block with payload: '{}' at height: {}", block_with_ref.block.payload, block_with_ref.height);
+                    println!(
+                        "Block with payload: '{}' at height: {}",
+                        block_with_ref.block.payload, block_with_ref.height
+                    );
                     block_with_ref = match block_with_ref.parent_ref.as_ref() {
                         Some(parent) => parent,
                         None => break,
                     }
                 }
                 println!("");
-            },
+            }
             None => println!("Invalid tip index"),
         }
     }

@@ -4,7 +4,7 @@ pub mod blockchain {
     use serde::{Deserialize, Serialize};
     use sha2::{Digest, Sha256};
 
-    use crate::block_tree::{BlockWithRef, BlockTree};
+    use crate::block_tree::{BlockTree, BlockWithRef};
 
     pub type InputPayloads = Vec<String>;
 
@@ -88,6 +88,7 @@ pub mod blockchain {
 
     pub struct Blockchain {
         pub block_tree: BlockTree,
+        pub finalized_chain_index: usize,
     }
 
     impl Blockchain {
@@ -114,6 +115,7 @@ pub mod blockchain {
             println!("Local blockchain initialized with genesis block");
             Self {
                 block_tree: BlockTree::new(genesis_block),
+                finalized_chain_index: 0,
             }
         }
 

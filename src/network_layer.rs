@@ -94,40 +94,45 @@ pub mod networking {
                 .expect("swarm can be started");
         }
 
-        pub fn create_block(&mut self, mut tx: Sender<Block>) {
-            // // attach new block to last block in local blockchain
-            // let parent_hash = self
-            //     .blockchain
-            //     .blocks
-            //     .last()
-            //     .expect("must have last block")
-            //     .hash
-            //     .clone();
-            // let local_sn = self.local_sn;
-            // let local_blockchain_height = self.blockchain.blocks.len();
-            // task::spawn(async move {
-            //     // mine block in a separate non-blocking task
-            //     match get_next_block(local_sn, parent_hash, local_blockchain_height as u64).await
-            //     {
-            //         Some(block) => tx.try_send(block).expect("can push into channel"), // push block into channel so that it can later be broadcasted
-            //         None => (),
-            //     };
-            // });
+        pub fn create_block(&mut self, next_proposed_block_height: u32, mut tx: Sender<Block>) {
+            // attach new block to last block in vinalized blockchain
+            let parent_hash = self
+                .blockchain
+                .block_tree
+                .get_parent_hash(
+                    next_proposed_block_height,
+                    self.blockchain.finalized_chain_index,
+                )
+                .expect("can get parent hash");
+            println!("Appending block to parent with hash: {}", parent_hash);
+            let local_sn = self.local_sn;
+            task::spawn(async move {
+                // mine block in a separate non-blocking task
+                match get_next_block(local_sn, parent_hash, next_proposed_block_height as u64).await
+                {
+                    Some(block) => tx.try_send(block).expect("can push into channel"), // push block into channel so that it can later be broadcasted
+                    None => (),
+                };
+            });
         }
 
-        pub fn broadcast_block(&mut self, block: Option<Block>) {
-            // match block {
-            //     Some(block) => {
-            //         println!("Sent block with sequence number {}", block.id);
-            //         self.local_sn += 1; // used to index the next local block to broadcast
-            //         self.swarm.behaviour_mut().floodsub.publish(
-            //             self.floodsub_topic.clone(),
-            //             serde_json::to_string(&block).unwrap(),
-            //         );
-            //         self.blockchain.blocks.push(block);
-            //     }
-            //     None => (),
-            // }
+        pub fn broadcast_block(&mut self, next_proposed_block_height: u32, block: Option<Block>) {
+            match block {
+                Some(block) => {
+                    println!("Sent block with sequence number {}", block.id);
+                    self.local_sn += 1; // used to index the next local block to broadcast
+                    self.swarm.behaviour_mut().floodsub.publish(
+                        self.floodsub_topic.clone(),
+                        serde_json::to_string(&block).unwrap(),
+                    );
+                    self.blockchain.block_tree.create_child_at_height(
+                        next_proposed_block_height,
+                        self.blockchain.finalized_chain_index,
+                        block,
+                    )
+                }
+                None => (),
+            }
         }
 
         pub fn keep_alive(&mut self) {
