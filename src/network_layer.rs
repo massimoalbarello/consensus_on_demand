@@ -95,39 +95,39 @@ pub mod networking {
         }
 
         pub fn create_block(&mut self, mut tx: Sender<Block>) {
-            // attach new block to last block in local blockchain
-            let previous_hash = self
-                .blockchain
-                .blocks
-                .last()
-                .expect("must have last block")
-                .hash
-                .clone();
-            let local_sn = self.local_sn;
-            let local_blockchain_height = self.blockchain.blocks.len();
-            task::spawn(async move {
-                // mine block in a separate non-blocking task
-                match get_next_block(local_sn, previous_hash, local_blockchain_height as u64).await
-                {
-                    Some(block) => tx.try_send(block).expect("can push into channel"), // push block into channel so that it can later be broadcasted
-                    None => (),
-                };
-            });
+            // // attach new block to last block in local blockchain
+            // let parent_hash = self
+            //     .blockchain
+            //     .blocks
+            //     .last()
+            //     .expect("must have last block")
+            //     .hash
+            //     .clone();
+            // let local_sn = self.local_sn;
+            // let local_blockchain_height = self.blockchain.blocks.len();
+            // task::spawn(async move {
+            //     // mine block in a separate non-blocking task
+            //     match get_next_block(local_sn, parent_hash, local_blockchain_height as u64).await
+            //     {
+            //         Some(block) => tx.try_send(block).expect("can push into channel"), // push block into channel so that it can later be broadcasted
+            //         None => (),
+            //     };
+            // });
         }
 
         pub fn broadcast_block(&mut self, block: Option<Block>) {
-            match block {
-                Some(block) => {
-                    println!("Sent block with sequence number {}", block.id);
-                    self.local_sn += 1; // used to index the next local block to broadcast
-                    self.swarm.behaviour_mut().floodsub.publish(
-                        self.floodsub_topic.clone(),
-                        serde_json::to_string(&block).unwrap(),
-                    );
-                    self.blockchain.blocks.push(block);
-                }
-                None => (),
-            }
+            // match block {
+            //     Some(block) => {
+            //         println!("Sent block with sequence number {}", block.id);
+            //         self.local_sn += 1; // used to index the next local block to broadcast
+            //         self.swarm.behaviour_mut().floodsub.publish(
+            //             self.floodsub_topic.clone(),
+            //             serde_json::to_string(&block).unwrap(),
+            //         );
+            //         self.blockchain.blocks.push(block);
+            //     }
+            //     None => (),
+            // }
         }
 
         pub fn keep_alive(&mut self) {
@@ -182,13 +182,13 @@ pub mod networking {
 
     async fn get_next_block(
         local_sn: usize,
-        previous_hash: String,
+        parent_hash: String,
         local_blockchain_height: u64,
     ) -> Option<Block> {
         match get_next_payload(local_sn).await {
             Some(payload) => {
                 // setting block id according to the length of the local blockchain
-                let new_block = Block::new(local_blockchain_height, previous_hash, payload).await;
+                let new_block = Block::new(local_blockchain_height, parent_hash, payload).await;
                 Some(new_block)
             }
             None => {

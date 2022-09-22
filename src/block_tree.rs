@@ -1,31 +1,33 @@
 use std::rc::Rc;
 
-pub struct Block {
-    parent_ref: Option<Rc<Block>>,
-    payload: String,
+use crate::consensus_layer::blockchain::Block;
+
+pub struct BlockWithRef {
+    parent_ref: Option<Rc<BlockWithRef>>,
+    block: Block,
     height: u32,
 }
 
-impl Block {
-    fn new(parent_ref: Option<Rc<Block>>, payload: String, height: u32) -> Self {
+impl BlockWithRef {
+    fn new(parent_ref: Option<Rc<BlockWithRef>>, block: Block, height: u32) -> Self {
         Self {
             parent_ref,
-            payload,
+            block,
             height,
         }
     }
 }
 
-struct BlockTree {
-    previous_tips_refs: Vec<Rc<Block>>,
-    tips_refs: Vec<Rc<Block>>,
+pub struct BlockTree {
+    previous_tips_refs: Vec<Rc<BlockWithRef>>,
+    tips_refs: Vec<Rc<BlockWithRef>>,
     current_height: u32,
 }
 
 impl BlockTree {
-    fn new() -> Self {
+    pub fn new(genesis: Block) -> Self {
         Self {
-            previous_tips_refs: vec![Rc::new(Block::new(None, String::from("Genesis"), 0))],
+            previous_tips_refs: vec![Rc::new(BlockWithRef::new(None, genesis, 0))],
             tips_refs: vec![],
             current_height: 0,
         }
@@ -35,14 +37,14 @@ impl BlockTree {
         &mut self,
         child_height: u32,
         index_in_tips_refs: usize,
-        payload: String,
+        block: Block,
     ) {
         if child_height == self.current_height + 1 {
             match self.previous_tips_refs.get(index_in_tips_refs) {
                 Some(parent_ref) => {
-                    self.tips_refs.push(Rc::new(Block::new(
+                    self.tips_refs.push(Rc::new(BlockWithRef::new(
                         Some(Rc::clone(parent_ref)),
-                        payload,
+                        block,
                         child_height,
                     )));
                 }
@@ -56,9 +58,9 @@ impl BlockTree {
             match self.tips_refs.get(index_in_tips_refs) {
                 Some(parent_ref) => {
                     self.previous_tips_refs = self.tips_refs.to_owned();
-                    self.tips_refs = vec![Rc::new(Block::new(
+                    self.tips_refs = vec![Rc::new(BlockWithRef::new(
                         Some(Rc::clone(parent_ref)),
-                        payload,
+                        block,
                         child_height,
                     ))];
                     self.current_height += 1;
@@ -73,12 +75,12 @@ impl BlockTree {
         }
     }
 
-    fn display_chain_from_tip(&self, index_in_tips_refs: usize) {
+    pub fn display_chain_from_tip(&self, index_in_tips_refs: usize) {
         match self.tips_refs.get(index_in_tips_refs) {
-            Some(mut block) => {
+            Some(mut block_with_ref) => {
                 loop {
-                    println!("{} at height {}", block.payload, block.height);
-                    block = match block.parent_ref.as_ref() {
+                    println!("Block with payload: '{}' at height: {}", block_with_ref.block.payload, block_with_ref.height);
+                    block_with_ref = match block_with_ref.parent_ref.as_ref() {
                         Some(parent) => parent,
                         None => break,
                     }
@@ -90,21 +92,25 @@ impl BlockTree {
     }
 }
 
-fn main() {
-    let mut block_tree = BlockTree::new();
+// fn main() {
+//     let mut block_tree = BlockTree::new();
 
-    block_tree.create_child_at_height(1, 0, String::from("Block 1_a"));
-    block_tree.create_child_at_height(1, 0, String::from("Block 1_b"));
-    block_tree.create_child_at_height(1, 0, String::from("Block 1_c"));
+//     block_tree.create_child_at_height(1, 0, String::from("Block 1_a"));
+//     block_tree.create_child_at_height(1, 0, String::from("Block 1_b"));
+//     block_tree.create_child_at_height(1, 0, String::from("Block 1_c"));
 
-    block_tree.create_child_at_height(2, 0, String::from("Block 2_a_a"));
-    block_tree.create_child_at_height(2, 0, String::from("Block 2_a_b"));
+//     block_tree.display_chain_from_tip(0);
+//     block_tree.display_chain_from_tip(1);
+//     block_tree.display_chain_from_tip(2);
 
-    block_tree.create_child_at_height(2, 1, String::from("Block 2_b_a"));
-    block_tree.create_child_at_height(2, 1, String::from("Block 2_b_b"));
+//     block_tree.create_child_at_height(2, 0, String::from("Block 2_a_a"));
+//     block_tree.create_child_at_height(2, 0, String::from("Block 2_a_b"));
 
-    block_tree.display_chain_from_tip(0);
-    block_tree.display_chain_from_tip(1);
-    block_tree.display_chain_from_tip(2);
-    block_tree.display_chain_from_tip(3);
-}
+//     block_tree.create_child_at_height(2, 1, String::from("Block 2_b_a"));
+//     block_tree.create_child_at_height(2, 1, String::from("Block 2_b_b"));
+
+//     block_tree.display_chain_from_tip(0);
+//     block_tree.display_chain_from_tip(1);
+//     block_tree.display_chain_from_tip(2);
+//     block_tree.display_chain_from_tip(3);
+// }

@@ -9,8 +9,8 @@ use std::time::Duration;
 
 pub mod network_layer;
 use crate::network_layer::networking::Peer;
-
 pub mod consensus_layer;
+pub mod block_tree;
 
 async fn keep_alive_future() {
     sleep(Duration::new(1, 0)).await;

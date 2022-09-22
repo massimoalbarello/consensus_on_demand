@@ -4,6 +4,8 @@ pub mod blockchain {
     use serde::{Deserialize, Serialize};
     use sha2::{Digest, Sha256};
 
+    use crate::block_tree::{BlockWithRef, BlockTree};
+
     pub type InputPayloads = Vec<String>;
 
     const DIFFICULTY_PREFIX: &str = "00";
@@ -12,21 +14,21 @@ pub mod blockchain {
     pub struct Block {
         pub id: u64,
         pub hash: String,
-        pub previous_hash: String,
+        pub parent_hash: String,
         pub timestamp: i64,
         pub payload: String,
         pub nonce: u64,
     }
 
     impl Block {
-        pub async fn new(id: u64, previous_hash: String, payload: String) -> Self {
+        pub async fn new(id: u64, parent_hash: String, payload: String) -> Self {
             let current_timestamp = Utc::now().timestamp();
-            let (nonce, hash) = mine_block(id, current_timestamp, &previous_hash, &payload).await;
+            let (nonce, hash) = mine_block(id, current_timestamp, &parent_hash, &payload).await;
             Self {
                 id,
                 hash,
                 timestamp: current_timestamp,
-                previous_hash,
+                parent_hash,
                 payload,
                 nonce,
             }
@@ -36,14 +38,14 @@ pub mod blockchain {
     async fn mine_block(
         id: u64,
         timestamp: i64,
-        previous_hash: &str,
+        parent_hash: &str,
         payload: &str,
     ) -> (u64, String) {
         println!("Mining block...");
         let mut nonce = 0;
 
         loop {
-            let hash = calculate_hash(id, timestamp, previous_hash, payload, nonce);
+            let hash = calculate_hash(id, timestamp, parent_hash, payload, nonce);
             let binary_hash = hash_to_binary_representation(&hash);
             if binary_hash.starts_with(DIFFICULTY_PREFIX) {
                 println!(
@@ -60,13 +62,13 @@ pub mod blockchain {
     fn calculate_hash(
         id: u64,
         timestamp: i64,
-        previous_hash: &str,
+        parent_hash: &str,
         payload: &str,
         nonce: u64,
     ) -> Vec<u8> {
         let payload = serde_json::json!({
             "id": id,
-            "previous_hash": previous_hash,
+            "parent_hash": parent_hash,
             "payload": payload,
             "timestamp": timestamp,
             "nonce": nonce
@@ -85,19 +87,19 @@ pub mod blockchain {
     }
 
     pub struct Blockchain {
-        pub blocks: Vec<Block>,
+        pub block_tree: BlockTree,
     }
 
     impl Blockchain {
         pub async fn new() -> Self {
             let genesis_id: u64 = 0;
             let genesis_timestamp: i64 = 0;
-            let genesis_previous_hash = String::from("Genesis block has no previous hash");
+            let genesis_parent_hash = String::from("Genesis block has no previous hash");
             let genesis_payload = String::from("This is the genesis block!");
             let (genesis_nonce, genesis_hash) = mine_block(
                 genesis_id,
                 genesis_timestamp,
-                &genesis_previous_hash,
+                &genesis_parent_hash,
                 &genesis_payload,
             )
             .await;
@@ -105,28 +107,28 @@ pub mod blockchain {
                 id: genesis_id,
                 hash: genesis_hash,
                 timestamp: genesis_timestamp,
-                previous_hash: genesis_previous_hash,
+                parent_hash: genesis_parent_hash,
                 payload: genesis_payload,
                 nonce: genesis_nonce,
             };
             println!("Local blockchain initialized with genesis block");
             Self {
-                blocks: vec![genesis_block],
+                block_tree: BlockTree::new(genesis_block),
             }
         }
 
         pub fn try_add_block(&mut self, block: Block) {
-            let latest_block = self.blocks.last().expect("there is at least one block");
-            if self.is_block_valid(&block, latest_block) {
-                println!("Received block added to local blockchain");
-                self.blocks.push(block);
-            } else {
-                println!("Could not add block: invalid");
-            }
+            // let latest_block = self.blocks.last().expect("there is at least one block");
+            // if self.is_block_valid(&block, latest_block) {
+            //     println!("Received block added to local blockchain");
+            //     self.blocks.push(block);
+            // } else {
+            //     println!("Could not add block: invalid");
+            // }
         }
 
         fn is_block_valid(&self, block: &Block, previous_block: &Block) -> bool {
-            if block.previous_hash != previous_block.hash {
+            if block.parent_hash != previous_block.hash {
                 println!("Block with id: {} has wrong previous hash", block.id);
                 return false;
             } else if !hash_to_binary_representation(
@@ -145,7 +147,7 @@ pub mod blockchain {
             } else if hex::encode(calculate_hash(
                 block.id,
                 block.timestamp,
-                &block.previous_hash,
+                &block.parent_hash,
                 &block.payload,
                 block.nonce,
             )) != block.hash
