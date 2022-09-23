@@ -41,18 +41,20 @@ pub mod networking {
     }
 
     pub struct Peer {
-        local_sn: usize,
+        node_number: u8,
+        round: usize,
+        rank: u8,
         floodsub_topic: Topic,
         swarm: Swarm<P2PBehaviour>,
         blockchain: Blockchain,
     }
 
     impl Peer {
-        pub async fn new(topic: &str) -> Self {
+        pub async fn new(node_number: u8, topic: &str) -> Self {
+            let starting_round = 1;
             // Create a random PeerId
             let local_key = Keypair::generate_ed25519();
             let local_peer_id = PeerId::from(local_key.public());
-            println!("Local peer id: {:?}", local_peer_id);
 
             // Set up an encrypted DNS-enabled TCP Transport
             let transport = libp2p::development_transport(local_key).await.unwrap();
@@ -61,8 +63,10 @@ pub mod networking {
             let floodsub_topic = Topic::new(topic);
 
             // Create a Swarm to manage peers and events
-            Self {
-                local_sn: 0, // used to read next payload from local pool
+            let local_peer = Self {
+                node_number,
+                round: starting_round,
+                rank: (starting_round as u8 + node_number - 2) % 4,
                 floodsub_topic: floodsub_topic.clone(),
                 swarm: {
                     let mdns = task::block_on(Mdns::new(MdnsConfig::default())).unwrap();
@@ -75,13 +79,10 @@ pub mod networking {
                     Swarm::new(transport, behaviour, local_peer_id)
                 },
                 blockchain: Blockchain::new(),
-            }
-        }
-
-        pub fn dial_peer(&mut self, to_dial: String) {
-            let addr: Multiaddr = to_dial.parse().unwrap();
-            self.swarm.dial(addr).unwrap();
-            println!("Dialed peer {:?}", to_dial);
+            };
+            println!("Local node initialized with number: {} and peer id: {:?}", local_peer.node_number, local_peer_id);
+            println!("Local node has rank: {} in round: {}", local_peer.rank, local_peer.round);
+            local_peer
         }
 
         pub fn listen_for_dialing(&mut self) {
@@ -105,10 +106,10 @@ pub mod networking {
                 )
                 .expect("can get parent hash");
             println!("Appending block to parent with hash: {}", parent_hash);
-            let local_sn = self.local_sn;
+            let round = self.round;
             task::spawn(async move {
                 // mine block in a separate non-blocking task
-                match get_next_block(local_sn, parent_hash, next_proposed_block_height as u64).await
+                match get_next_block(round, parent_hash, next_proposed_block_height as u64).await
                 {
                     Some(block) => tx.try_send(block).expect("can push into channel"), // push block into channel so that it can later be broadcasted
                     None => (),
@@ -120,7 +121,7 @@ pub mod networking {
             match block {
                 Some(block) => {
                     println!("Sent block with sequence number {}", block.id);
-                    self.local_sn += 1; // used to index the next local block to broadcast
+                    self.round += 1; // used to index the next local block to broadcast
                     self.swarm.behaviour_mut().floodsub.publish(
                         self.floodsub_topic.clone(),
                         serde_json::to_string(&block).unwrap(),
@@ -186,11 +187,11 @@ pub mod networking {
     }
 
     async fn get_next_block(
-        local_sn: usize,
+        round: usize,   // used to read next payload from local pool
         parent_hash: String,
         local_blockchain_height: u64,
     ) -> Option<Block> {
-        match get_next_payload(local_sn).await {
+        match get_next_payload(round).await {
             Some(payload) => {
                 // setting block id according to the length of the local blockchain
                 let new_block = Block::new(local_blockchain_height, parent_hash, payload);
@@ -203,10 +204,10 @@ pub mod networking {
         }
     }
 
-    async fn get_next_payload(local_sn: usize) -> Option<String> {
+    async fn get_next_payload(round: usize) -> Option<String> {
         let input_payloads: InputPayloads = read_file("payloads_pool.txt").await;
-        let next_payload = if local_sn < input_payloads.len() {
-            Some(input_payloads[local_sn].clone())
+        let next_payload = if round < input_payloads.len() {
+            Some(input_payloads[round].clone())
         } else {
             None
         };
