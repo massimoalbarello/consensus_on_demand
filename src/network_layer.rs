@@ -74,7 +74,7 @@ pub mod networking {
                     behaviour.floodsub.subscribe(floodsub_topic);
                     Swarm::new(transport, behaviour, local_peer_id)
                 },
-                blockchain: Blockchain::new().await,
+                blockchain: Blockchain::new(),
             }
         }
 
@@ -193,7 +193,7 @@ pub mod networking {
         match get_next_payload(local_sn).await {
             Some(payload) => {
                 // setting block id according to the length of the local blockchain
-                let new_block = Block::new(local_blockchain_height, parent_hash, payload).await;
+                let new_block = Block::new(local_blockchain_height, parent_hash, payload);
                 Some(new_block)
             }
             None => {
