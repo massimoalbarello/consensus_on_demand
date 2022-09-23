@@ -95,39 +95,44 @@ pub mod networking {
                 .expect("swarm can be started");
         }
 
-        pub fn create_block(&mut self, next_proposed_block_height: u32, mut tx: Sender<Block>) {
-            // attach new block to last block in vinalized blockchain
-            let parent_hash = self
-                .blockchain
-                .block_tree
-                .get_parent_hash(
-                    next_proposed_block_height,
-                    self.blockchain.finalized_chain_index,
-                )
-                .expect("can get parent hash");
-            println!("Appending block to parent with hash: {}", parent_hash);
-            let round = self.round;
-            task::spawn(async move {
-                // mine block in a separate non-blocking task
-                match get_next_block(round, parent_hash, next_proposed_block_height as u64).await
-                {
-                    Some(block) => tx.try_send(block).expect("can push into channel"), // push block into channel so that it can later be broadcasted
-                    None => (),
-                };
-            });
+        pub fn create_block(&mut self, mut tx: Sender<Block>) {
+            // attach new block to last block in finalized blockchain
+            if self.rank == 0 {
+                let parent_hash = self
+                    .blockchain
+                    .block_tree
+                    .get_parent_hash(
+                        self.round as u32,
+                        self.blockchain.finalized_chain_index,
+                    )
+                    .expect("can get parent hash");
+                println!("Appending block to parent with hash: {}", parent_hash);
+                let round = self.round;
+                task::spawn(async move {
+                    // mine block in a separate non-blocking task
+                    match get_next_block(round, parent_hash).await
+                    {
+                        Some(block) => tx.try_send(block).expect("can push into channel"), // push block into channel so that it can later be broadcasted
+                        None => (),
+                    };
+                });
+            }
+            else {
+                println!("Cannot propose in round: {} as local peer has rank: {}", self.round, self.rank);
+            }
+
         }
 
-        pub fn broadcast_block(&mut self, next_proposed_block_height: u32, block: Option<Block>) {
+        pub fn broadcast_block(&mut self, block: Option<Block>) {
             match block {
                 Some(block) => {
-                    println!("Sent block with sequence number {}", block.id);
-                    self.round += 1; // used to index the next local block to broadcast
+                    println!("Sent block with sequence number {}", block.height);
                     self.swarm.behaviour_mut().floodsub.publish(
                         self.floodsub_topic.clone(),
                         serde_json::to_string(&block).unwrap(),
                     );
                     self.blockchain.block_tree.create_child_at_height(
-                        next_proposed_block_height,
+                        self.round as u32,
                         self.blockchain.finalized_chain_index,
                         block,
                     )
@@ -187,14 +192,13 @@ pub mod networking {
     }
 
     async fn get_next_block(
-        round: usize,   // used to read next payload from local pool
+        height: usize,
         parent_hash: String,
-        local_blockchain_height: u64,
     ) -> Option<Block> {
-        match get_next_payload(round).await {
+        match get_next_payload(height).await {
             Some(payload) => {
                 // setting block id according to the length of the local blockchain
-                let new_block = Block::new(local_blockchain_height, parent_hash, payload);
+                let new_block = Block::new(height as u64, parent_hash, payload);
                 Some(new_block)
             }
             None => {

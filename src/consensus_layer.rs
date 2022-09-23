@@ -10,7 +10,7 @@ pub mod blockchain {
 
     #[derive(Serialize, Deserialize, Debug, Clone)]
     pub struct Block {
-        pub id: u64,
+        pub height: u64,
         pub hash: String,
         pub parent_hash: String,
         pub timestamp: i64,
@@ -18,12 +18,12 @@ pub mod blockchain {
     }
 
     impl Block {
-        pub fn new(id: u64, parent_hash: String, payload: String) -> Self {
+        pub fn new(height: u64, parent_hash: String, payload: String) -> Self {
             let current_timestamp = Utc::now().timestamp();
-            let hash = calculate_hash(id, current_timestamp, &parent_hash, &payload);
+            let hash = calculate_hash(height, current_timestamp, &parent_hash, &payload);
             println!("Created block with hash {}", &hash);
             Self {
-                id,
+                height,
                 hash,
                 timestamp: current_timestamp,
                 parent_hash,
@@ -33,13 +33,13 @@ pub mod blockchain {
     }
     
     fn calculate_hash(
-        id: u64,
+        height: u64,
         timestamp: i64,
         parent_hash: &str,
         payload: &str,
     ) -> String {
         let payload = serde_json::json!({
-            "id": id,
+            "height": height,
             "parent_hash": parent_hash,
             "payload": payload,
             "timestamp": timestamp,
@@ -56,13 +56,13 @@ pub mod blockchain {
 
     impl Blockchain {
         pub fn new() -> Self {
-            let genesis_id: u64 = 0;
+            let genesis_height: u64 = 0;
             let genesis_timestamp: i64 = 0;
             let genesis_parent_hash = String::from("Genesis block has no previous hash");
             let genesis_payload = String::from("This is the genesis block!");
-            let genesis_hash = calculate_hash(genesis_id, genesis_timestamp, &genesis_parent_hash, &genesis_payload);
+            let genesis_hash = calculate_hash(genesis_height, genesis_timestamp, &genesis_parent_hash, &genesis_payload);
             let genesis_block = Block {
-                id: genesis_id,
+                height: genesis_height,
                 hash: genesis_hash,
                 timestamp: genesis_timestamp,
                 parent_hash: genesis_parent_hash,
@@ -87,22 +87,22 @@ pub mod blockchain {
 
         fn is_block_valid(&self, block: &Block, previous_block: &Block) -> bool {
             if block.parent_hash != previous_block.hash {
-                println!("Block with id: {} has wrong previous hash", block.id);
+                println!("Block with height: {} has wrong previous hash", block.height);
                 return false;
-            } else if block.id != previous_block.id + 1 {
+            } else if block.height != previous_block.height + 1 {
                 println!(
-                    "Block with id: {} is not the next block after the latest: {}",
-                    block.id, previous_block.id
+                    "Block with height: {} is not the next block after the latest: {}",
+                    block.height, previous_block.height
                 );
                 return false;
             } else if calculate_hash(
-                block.id,
+                block.height,
                 block.timestamp,
                 &block.parent_hash,
                 &block.payload,
             ) != block.hash
             {
-                println!("Block with id: {} has invalid hash", block.id);
+                println!("Block with height: {} has invalid hash", block.height);
                 return false;
             }
             true
