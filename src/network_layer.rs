@@ -10,7 +10,9 @@ pub mod networking {
         Multiaddr, NetworkBehaviour, PeerId, Swarm,
     };
 
-    use crate::consensus_layer::blockchain::{Block, Blockchain, InputPayloads};
+    use crate::consensus_layer::blockchain::{
+        Artifact, Block, Blockchain, InputPayloads, NotarizationShare,
+    };
 
     // We create a custom network behaviour that combines floodsub and mDNS.
     // Use the derive to generate delegating NetworkBehaviour impl.
@@ -80,8 +82,14 @@ pub mod networking {
                 },
                 blockchain: Blockchain::new(),
             };
-            println!("Local node initialized with number: {} and peer id: {:?}", local_peer.node_number, local_peer_id);
-            println!("Local node has rank: {} in round: {}", local_peer.rank, local_peer.round);
+            println!(
+                "Local node initialized with number: {} and peer id: {:?}",
+                local_peer.node_number, local_peer_id
+            );
+            println!(
+                "Local node has rank: {} in round: {}",
+                local_peer.rank, local_peer.round
+            );
             local_peer
         }
 
@@ -101,41 +109,42 @@ pub mod networking {
                 let parent_hash = self
                     .blockchain
                     .block_tree
-                    .get_parent_hash(
-                        self.round as u32,
-                        self.blockchain.finalized_chain_index,
-                    )
+                    .get_parent_hash(self.round as u64, self.blockchain.finalized_chain_index)
                     .expect("can get parent hash");
                 println!("Appending block to parent with hash: {}", parent_hash);
                 let round = self.round;
+                let local_peer_rank = self.rank;
                 task::spawn(async move {
                     // mine block in a separate non-blocking task
-                    match get_next_block(round, parent_hash).await
-                    {
+                    match get_next_block(round, local_peer_rank, parent_hash).await {
                         Some(block) => tx.try_send(block).expect("can push into channel"), // push block into channel so that it can later be broadcasted
                         None => (),
                     };
                 });
+            } else {
+                println!(
+                    "Cannot propose in round: {} as local peer has rank: {}",
+                    self.round, self.rank
+                );
             }
-            else {
-                println!("Cannot propose in round: {} as local peer has rank: {}", self.round, self.rank);
-            }
-
         }
 
         pub fn broadcast_block(&mut self, block: Option<Block>) {
             match block {
                 Some(block) => {
-                    println!("Sent block with sequence number {}", block.height);
+                    println!("Sent block at height {}", block.height);
                     self.swarm.behaviour_mut().floodsub.publish(
                         self.floodsub_topic.clone(),
-                        serde_json::to_string(&block).unwrap(),
+                        serde_json::to_string::<Artifact>(&Artifact::Block(block.clone())).unwrap(),
                     );
+                    let block_height = block.height;
+                    let block_hash = block.hash.clone();
                     self.blockchain.block_tree.create_child_at_height(
-                        self.round as u32,
+                        self.round as u64,
                         self.blockchain.finalized_chain_index,
                         block,
-                    )
+                    );
+                    self.send_notarization_share(block_height, block_hash); // send notarization share for the block just broadcasted
                 }
                 None => (),
             }
@@ -144,7 +153,7 @@ pub mod networking {
         pub fn keep_alive(&mut self) {
             self.swarm.behaviour_mut().floodsub.publish(
                 self.floodsub_topic.clone(),
-                serde_json::to_string("Keep alive!").unwrap(),
+                serde_json::to_string::<Artifact>(&Artifact::KeepAliveMessage).unwrap(),
             );
         }
 
@@ -158,12 +167,10 @@ pub mod networking {
                     println!("Listening on {:?}", address);
                 }
                 SwarmEvent::Behaviour(OutEvent::Floodsub(FloodsubEvent::Message(message))) => {
-                    let block_content = String::from_utf8_lossy(&message.data);
-                    if !block_content.eq("\"Keep alive!\"") {
-                        handle_incoming_block(self, &block_content, message.source)
-                    } else {
-                        // println!("Keep connection alive");
-                    }
+                    let message_content = String::from_utf8_lossy(&message.data);
+                    let artifact = serde_json::from_str::<Artifact>(&message_content)
+                        .expect("can parse artifact");
+                    self.handle_incoming_artifact(artifact, message.source);
                 }
                 SwarmEvent::Behaviour(OutEvent::Mdns(MdnsEvent::Discovered(list))) => {
                     for (peer, _) in list {
@@ -189,16 +196,53 @@ pub mod networking {
                 }
             }
         }
+
+        pub fn handle_incoming_artifact(
+            &mut self,
+            artifact_content: Artifact,
+            artifact_source: PeerId,
+        ) {
+            match artifact_content {
+                Artifact::NotarizationShare(share) => {
+                    println!("\nPeer: {} with node number: {} sent notarization share for block with hash: {} at height {}", artifact_source, share.from_node_number, &share.block_hash, share.block_height);
+                    // self.blockchain.block_tree.update_recvd_notarization_shares(share.from_node_number, &share.block_hash, share.block_height);
+                }
+                Artifact::Block(block) => {
+                    println!(
+                        "\nPeer: {} with rank: {} sent block with hash: {} attached to: {}",
+                        artifact_source, block.from_rank, &block.hash, &block.parent_hash
+                    );
+                    // for now local peer sends notarization share only if if receives block from leader of current round
+                    // TODO: check if timer corresponding to rank has expired, if so broadcast notarization share
+                    if block.from_rank == 0 {
+                        self.send_notarization_share(block.height, block.hash.clone());
+                    }
+                    self.blockchain.try_add_block(block);
+                }
+                Artifact::KeepAliveMessage => (),
+            }
+        }
+
+        fn send_notarization_share(&mut self, block_height: u64, block_hash: String) {
+            let notarization_share =
+                NotarizationShare::new(self.node_number, block_height, block_hash);
+            self.swarm.behaviour_mut().floodsub.publish(
+                self.floodsub_topic.clone(),
+                serde_json::to_string::<Artifact>(&Artifact::NotarizationShare(notarization_share))
+                    .unwrap(),
+            );
+        }
     }
 
     async fn get_next_block(
         height: usize,
+        local_peer_rank: u8,
         parent_hash: String,
     ) -> Option<Block> {
         match get_next_payload(height).await {
             Some(payload) => {
                 // setting block id according to the length of the local blockchain
-                let new_block = Block::new(height as u64, parent_hash, payload);
+                let new_block = Block::new(height as u64, local_peer_rank, parent_hash, payload);
                 Some(new_block)
             }
             None => {
@@ -230,11 +274,5 @@ pub mod networking {
             input_payloads.push(String::from(line));
         }
         input_payloads
-    }
-
-    pub fn handle_incoming_block(local_peer: &mut Peer, block_content: &str, block_source: PeerId) {
-        println!("\nPeer: {} sent block: {}", block_source, block_content);
-        let block = serde_json::from_str::<Block>(block_content).expect("can parse block");
-        local_peer.blockchain.try_add_block(block);
     }
 }

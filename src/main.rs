@@ -51,7 +51,7 @@ async fn main() {
                     event = my_peer.get_next_event() => my_peer.match_event(event),
                 }
             }
-        },
+        }
         None => panic!("Must receive input from command line"),
     }
 }
