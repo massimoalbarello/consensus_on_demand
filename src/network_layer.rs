@@ -7,7 +7,7 @@ pub mod networking {
         identity::Keypair,
         mdns::{Mdns, MdnsConfig, MdnsEvent},
         swarm::SwarmEvent,
-        Multiaddr, NetworkBehaviour, PeerId, Swarm,
+        NetworkBehaviour, PeerId, Swarm,
     };
 
     use crate::consensus_layer::blockchain::{
@@ -114,9 +114,12 @@ pub mod networking {
                 println!("Appending block to parent with hash: {}", parent_hash);
                 let round = self.round;
                 let local_peer_rank = self.rank;
+                let local_node_number = self.node_number;
                 task::spawn(async move {
                     // mine block in a separate non-blocking task
-                    match get_next_block(round, local_peer_rank, parent_hash).await {
+                    match get_next_block(round, local_peer_rank, local_node_number, parent_hash)
+                        .await
+                    {
                         Some(block) => tx.try_send(block).expect("can push into channel"), // push block into channel so that it can later be broadcasted
                         None => (),
                     };
@@ -137,14 +140,9 @@ pub mod networking {
                         self.floodsub_topic.clone(),
                         serde_json::to_string::<Artifact>(&Artifact::Block(block.clone())).unwrap(),
                     );
-                    let block_height = block.height;
-                    let block_hash = block.hash.clone();
-                    self.blockchain.block_tree.create_child_at_height(
-                        self.round as u64,
-                        self.blockchain.finalized_chain_index,
-                        block,
-                    );
-                    self.send_notarization_share(block_height, block_hash); // send notarization share for the block just broadcasted
+                    self.blockchain
+                        .block_tree
+                        .create_child_at_index(self.blockchain.finalized_chain_index, block);
                 }
                 None => (),
             }
@@ -170,7 +168,7 @@ pub mod networking {
                     let message_content = String::from_utf8_lossy(&message.data);
                     let artifact = serde_json::from_str::<Artifact>(&message_content)
                         .expect("can parse artifact");
-                    self.handle_incoming_artifact(artifact, message.source);
+                    self.handle_incoming_artifact(artifact);
                 }
                 SwarmEvent::Behaviour(OutEvent::Mdns(MdnsEvent::Discovered(list))) => {
                     for (peer, _) in list {
@@ -197,27 +195,42 @@ pub mod networking {
             }
         }
 
-        pub fn handle_incoming_artifact(
-            &mut self,
-            artifact_content: Artifact,
-            artifact_source: PeerId,
-        ) {
+        pub fn handle_incoming_artifact(&mut self, artifact_content: Artifact) {
             match artifact_content {
                 Artifact::NotarizationShare(share) => {
-                    println!("\nPeer: {} with node number: {} sent notarization share for block with hash: {} at height {}", artifact_source, share.from_node_number, &share.block_hash, share.block_height);
-                    // self.blockchain.block_tree.update_recvd_notarization_shares(share.from_node_number, &share.block_hash, share.block_height);
+                    println!("\nReceived notarization share for block with hash: {} at height {} from peer with node number: {}", &share.block_hash, share.block_height, share.from_node_number);
+                    self.blockchain.block_tree.update_recvd_notarization_shares(
+                        share.from_node_number,
+                        &share.block_hash,
+                        share.block_height,
+                        self.round as u64,
+                    );
                 }
                 Artifact::Block(block) => {
+                    let block_height = block.height;
+                    let block_hash = block.hash.clone();
+                    let block_from_rank = block.from_rank;
                     println!(
-                        "\nPeer: {} with rank: {} sent block with hash: {} attached to: {}",
-                        artifact_source, block.from_rank, &block.hash, &block.parent_hash
+                        "\nReceived block with hash: {} attached to: {} from peer with rank: {}",
+                        &block_hash, &block.parent_hash, block.from_rank
                     );
+                    // local peer always adds block to its block tree as it might later send a notarization share for it (once corresponding timer has expired)
+                    self.blockchain
+                        .block_tree
+                        .create_child_at_index(self.blockchain.finalized_chain_index, block);
                     // for now local peer sends notarization share only if if receives block from leader of current round
                     // TODO: check if timer corresponding to rank has expired, if so broadcast notarization share
-                    if block.from_rank == 0 {
-                        self.send_notarization_share(block.height, block.hash.clone());
+                    if block_from_rank == 0 {
+                        // local peer updtates recvd_notarization_shares for the share it sends
+                        // required as local peer does not receive the share it broadcasts to others
+                        self.blockchain.block_tree.update_recvd_notarization_shares(
+                            self.node_number,
+                            &block_hash,
+                            block_height,
+                            self.round as u64,
+                        );
+                        self.send_notarization_share(block_height, block_hash);
                     }
-                    self.blockchain.try_add_block(block);
                 }
                 Artifact::KeepAliveMessage => (),
             }
@@ -225,11 +238,15 @@ pub mod networking {
 
         fn send_notarization_share(&mut self, block_height: u64, block_hash: String) {
             let notarization_share =
-                NotarizationShare::new(self.node_number, block_height, block_hash);
+                NotarizationShare::new(self.node_number, block_height, block_hash.clone());
             self.swarm.behaviour_mut().floodsub.publish(
                 self.floodsub_topic.clone(),
                 serde_json::to_string::<Artifact>(&Artifact::NotarizationShare(notarization_share))
                     .unwrap(),
+            );
+            println!(
+                "Sent notarization share for block with hash: {} at height: {}",
+                block_hash, block_height
             );
         }
     }
@@ -237,12 +254,19 @@ pub mod networking {
     async fn get_next_block(
         height: usize,
         local_peer_rank: u8,
+        local_node_number: u8,
         parent_hash: String,
     ) -> Option<Block> {
         match get_next_payload(height).await {
             Some(payload) => {
                 // setting block id according to the length of the local blockchain
-                let new_block = Block::new(height as u64, local_peer_rank, parent_hash, payload);
+                let new_block = Block::new(
+                    height as u64,
+                    local_peer_rank,
+                    local_node_number,
+                    parent_hash,
+                    payload,
+                );
                 Some(new_block)
             }
             None => {
