@@ -199,12 +199,15 @@ pub mod networking {
             match artifact_content {
                 Artifact::NotarizationShare(share) => {
                     println!("\nReceived notarization share for block with hash: {} at height {} from peer with node number: {}", &share.block_hash, share.block_height, share.from_node_number);
-                    self.blockchain.block_tree.update_recvd_notarization_shares(
+                    let must_update_round = self.blockchain.block_tree.update_block_with_ref(
                         share.from_node_number,
                         &share.block_hash,
                         share.block_height,
                         self.round as u64,
                     );
+                    if must_update_round {
+                        self.update_round();
+                    }
                 }
                 Artifact::Block(block) => {
                     let block_height = block.height;
@@ -223,13 +226,16 @@ pub mod networking {
                     if block_from_rank == 0 {
                         // local peer updtates recvd_notarization_shares for the share it sends
                         // required as local peer does not receive the share it broadcasts to others
-                        self.blockchain.block_tree.update_recvd_notarization_shares(
+                        let must_update_round = self.blockchain.block_tree.update_block_with_ref(
                             self.node_number,
                             &block_hash,
                             block_height,
                             self.round as u64,
                         );
                         self.send_notarization_share(block_height, block_hash);
+                        if must_update_round {
+                            self.update_round();
+                        }
                     }
                 }
                 Artifact::KeepAliveMessage => (),
@@ -248,6 +254,11 @@ pub mod networking {
                 "Sent notarization share for block with hash: {} at height: {}",
                 block_hash, block_height
             );
+        }
+
+        fn update_round(&mut self) {
+            self.round += 1;
+            println!("\n###### Round: {} ######", self.round);
         }
     }
 
