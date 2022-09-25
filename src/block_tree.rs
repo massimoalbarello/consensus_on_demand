@@ -15,7 +15,8 @@ impl BlockWithRef {
             parent_ref,
             recvd_notarization_shares: {
                 let mut recvd_notarization_shares = vec![false; N];
-                recvd_notarization_shares[block.from_node_number as usize] = true; // remote peer broadcasts its notarization share right after the block
+                recvd_notarization_shares[(block.from_node_number-1) as usize] = true; // remote peer broadcasts its notarization share right after the block
+                println!("Created block in block tree received from peer with node number: {} with notarization shares from: {:?}", block.from_node_number, recvd_notarization_shares);
                 recvd_notarization_shares
             },
             block,
@@ -137,6 +138,11 @@ impl BlockTree {
 
     fn count_blocks_notarized_at_same_height(&self) -> usize {
         self.current_round_tips_refs.iter().filter(|&block_with_ref| block_with_ref.borrow().is_notarized == true).count()
+    }
+
+    pub fn update_tips_refs(&mut self) {
+        self.previous_round_tips_refs = self.current_round_tips_refs.to_owned();
+        self.current_round_tips_refs = vec![];
     }
 
     // pub fn display_chain_from_tip(&self, index_in_tips_refs: usize) {

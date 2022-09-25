@@ -11,7 +11,7 @@ pub mod networking {
     };
 
     use crate::consensus_layer::blockchain::{
-        Artifact, Block, Blockchain, InputPayloads, NotarizationShare,
+        Artifact, Block, Blockchain, InputPayloads, NotarizationShare, N,
     };
 
     // We create a custom network behaviour that combines floodsub and mDNS.
@@ -68,7 +68,7 @@ pub mod networking {
             let local_peer = Self {
                 node_number,
                 round: starting_round,
-                rank: (starting_round as u8 + node_number - 2) % 4,
+                rank: (starting_round as u8 + node_number - 2) % (N as u8),
                 floodsub_topic: floodsub_topic.clone(),
                 swarm: {
                     let mdns = task::block_on(Mdns::new(MdnsConfig::default())).unwrap();
@@ -198,15 +198,22 @@ pub mod networking {
         pub fn handle_incoming_artifact(&mut self, artifact_content: Artifact) {
             match artifact_content {
                 Artifact::NotarizationShare(share) => {
-                    println!("\nReceived notarization share for block with hash: {} at height {} from peer with node number: {}", &share.block_hash, share.block_height, share.from_node_number);
-                    let must_update_round = self.blockchain.block_tree.update_block_with_ref(
-                        share.from_node_number,
-                        &share.block_hash,
-                        share.block_height,
-                        self.round as u64,
-                    );
-                    if must_update_round {
-                        self.update_round();
+                    // ignoring share from previous round (works as we are considering only the chain of blocks that were notarized first in each round)
+                    // TODO: add share to respective block_with_ref even if received in previous round as this block might also become notarized
+                    if share.block_height < self.round as u64 {
+                        println!("Ignoring received share for block with hash: {} as it is in height: {}", &share.block_hash, share.block_height);
+                    }
+                    else {
+                        println!("\nReceived notarization share for block with hash: {} at height {} from peer with node number: {}", &share.block_hash, share.block_height, share.from_node_number);
+                        let must_update_round = self.blockchain.block_tree.update_block_with_ref(
+                            share.from_node_number,
+                            &share.block_hash,
+                            share.block_height,
+                            self.round as u64,
+                        );
+                        if must_update_round {
+                            self.update_round();
+                        }
                     }
                 }
                 Artifact::Block(block) => {
@@ -257,8 +264,18 @@ pub mod networking {
         }
 
         fn update_round(&mut self) {
+            self.blockchain.block_tree.update_tips_refs();
             self.round += 1;
+            self.update_local_rank();
             println!("\n###### Round: {} ######", self.round);
+        }
+
+        fn update_local_rank(&mut self) {
+            self.rank = (self.round as u8 + self.node_number - 2) % (N as u8);
+            println!(
+                "Local node has rank: {} in round: {}",
+                self.rank, self.round
+            );
         }
     }
 

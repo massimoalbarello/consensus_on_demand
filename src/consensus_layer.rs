@@ -100,7 +100,7 @@ pub mod blockchain {
             let genesis_block = Block {
                 height: genesis_height,
                 from_rank: 0,        // irrelevant as genesis block is not broadcasted
-                from_node_number: 0, // irrelevant as genesis block does not receive notarization shares
+                from_node_number: 1, // irrelevant as genesis block does not receive notarization shares
                 hash: genesis_hash,
                 timestamp: genesis_timestamp,
                 parent_hash: genesis_parent_hash,
