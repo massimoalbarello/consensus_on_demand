@@ -198,22 +198,15 @@ pub mod networking {
         pub fn handle_incoming_artifact(&mut self, artifact_content: Artifact) {
             match artifact_content {
                 Artifact::NotarizationShare(share) => {
-                    // ignoring share from previous round (works as we are considering only the chain of blocks that were notarized first in each round)
-                    // TODO: add share to respective block_with_ref even if received in previous round as this block might also become notarized
-                    if share.block_height < self.round as u64 {
-                        println!("Ignoring received share for block with hash: {} as it is in height: {}", &share.block_hash, share.block_height);
-                    }
-                    else {
-                        println!("\nReceived notarization share for block with hash: {} at height {} from peer with node number: {}", &share.block_hash, share.block_height, share.from_node_number);
-                        let must_update_round = self.blockchain.block_tree.update_block_with_ref(
-                            share.from_node_number,
-                            &share.block_hash,
-                            share.block_height,
-                            self.round as u64,
-                        );
-                        if must_update_round {
-                            self.update_round();
-                        }
+                    println!("\nReceived notarization share for block with hash: {} at height {} from peer with node number: {}", &share.block_hash, share.block_height, share.from_node_number);
+                    let must_update_round = self.blockchain.block_tree.update_block_with_ref(
+                        share.from_node_number,
+                        &share.block_hash,
+                        share.block_height,
+                        self.round as u64,
+                    );
+                    if must_update_round {
+                        self.update_round();
                     }
                 }
                 Artifact::Block(block) => {
