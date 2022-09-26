@@ -16,7 +16,6 @@ impl BlockWithRef {
             recvd_notarization_shares: {
                 let mut recvd_notarization_shares = vec![false; N];
                 recvd_notarization_shares[(block.from_node_number - 1) as usize] = true; // remote peer broadcasts its notarization share right after the block
-                println!("Created block in block tree received from peer with node number: {} with notarization shares from: {:?}", block.from_node_number, recvd_notarization_shares);
                 recvd_notarization_shares
             },
             block,

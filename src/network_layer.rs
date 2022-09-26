@@ -259,8 +259,8 @@ pub mod networking {
         fn update_round(&mut self) {
             self.blockchain.block_tree.update_tips_refs();
             self.round += 1;
-            self.update_local_rank();
             println!("\n###### Round: {} ######", self.round);
+            self.update_local_rank();
         }
 
         fn update_local_rank(&mut self) {
