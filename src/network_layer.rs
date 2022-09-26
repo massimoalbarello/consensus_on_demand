@@ -108,7 +108,7 @@ pub mod networking {
             let parent_hash = self
                 .blockchain
                 .block_tree
-                .get_parent_hash(self.round as u64)
+                .get_previous_leader_hash()
                 .expect("can get parent hash");
             println!("Appending block to parent with hash: {}", parent_hash);
             let round = self.round;
@@ -116,9 +116,7 @@ pub mod networking {
             let local_node_number = self.node_number;
             task::spawn(async move {
                 // mine block in a separate non-blocking task
-                match get_next_block(round, local_peer_rank, local_node_number, parent_hash)
-                    .await
-                {
+                match get_next_block(round, local_peer_rank, local_node_number, parent_hash).await {
                     Some(block) => tx.try_send(block).expect("can push into channel"), // push block into channel so that it can later be broadcasted
                     None => (),
                 };

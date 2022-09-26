@@ -37,10 +37,7 @@ impl BlockTree {
         }
     }
 
-    pub fn get_parent_hash(
-        &mut self,
-        child_height: u64,
-    ) -> Option<String> {
+    pub fn get_previous_leader_hash(&mut self) -> Option<String> {
         for parent_ref in self.previous_round_tips_refs.iter() {
             if parent_ref.borrow().block.from_rank == 0 {
                 return Some(parent_ref.borrow().block.hash.to_owned());
@@ -56,7 +53,8 @@ impl BlockTree {
             if parent_ref.borrow().block.from_rank == 0 {
                 println!(
                     "\nBlock at height: {} appended to previous leader with hash: {}",
-                    block.height, parent_ref.borrow().block.hash
+                    block.height,
+                    parent_ref.borrow().block.hash
                 );
                 self.current_round_tips_refs
                     .push(Rc::new(RefCell::new(BlockWithRef::new(
@@ -158,21 +156,15 @@ impl BlockTree {
     pub fn display_block_tree(&self) {
         for tip_ref in self.current_round_tips_refs.iter() {
             let block = tip_ref.borrow().block.clone();
-            println!(
-                "\n{} --->",
-                block.hash
-            );
+            println!("\n{} --->", block.hash);
             let mut parent_ref = tip_ref.borrow().parent_ref.clone();
             loop {
                 parent_ref = match parent_ref {
                     Some(parent) => {
                         let block = parent.borrow().block.clone();
-                        println!(
-                            "{} --->",
-                            block.hash
-                        );
+                        println!("{} --->", block.hash);
                         parent.borrow().parent_ref.clone()
-                    },
+                    }
                     None => {
                         println!("()");
                         break;
