@@ -1,7 +1,7 @@
 pub mod networking {
 
-    use async_std::{fs::File, prelude::*, task};
-    use futures::{channel::mpsc::Sender, prelude::stream::StreamExt, stream::SelectNextSome};
+    use async_std::task;
+    use futures::{prelude::stream::StreamExt, stream::SelectNextSome};
     use libp2p::{
         floodsub::{Floodsub, FloodsubEvent, Topic},
         identity::Keypair,
@@ -11,7 +11,7 @@ pub mod networking {
     };
 
     use crate::consensus_layer::blockchain::{
-        Artifact, Block, Blockchain, InputPayloads, NotarizationShare, N,
+        Artifact, Block, Blockchain, NotarizationShare, N,
     };
 
     // We create a custom network behaviour that combines floodsub and mDNS.
@@ -103,7 +103,7 @@ pub mod networking {
                 .expect("swarm can be started");
         }
 
-        pub fn create_block(&mut self, mut tx: Sender<Block>) {
+        pub fn broadcast_block(&mut self) {
             // attach new block to last block in finalized blockchain
             let parent_hash = self
                 .blockchain
@@ -111,32 +111,21 @@ pub mod networking {
                 .get_previous_leader_hash()
                 .expect("can get parent hash");
             println!("Appending block to parent with hash: {}", parent_hash);
-            let round = self.round;
-            let local_peer_rank = self.rank;
-            let local_node_number = self.node_number;
-            task::spawn(async move {
-                // mine block in a separate non-blocking task
-                match get_next_block(round, local_peer_rank, local_node_number, parent_hash).await {
-                    Some(block) => tx.try_send(block).expect("can push into channel"), // push block into channel so that it can later be broadcasted
-                    None => (),
-                };
-            });
-        }
-
-        pub fn broadcast_block(&mut self, block: Option<Block>) {
-            match block {
-                Some(block) => {
-                    println!("Sent block at height {}", block.height);
-                    self.swarm.behaviour_mut().floodsub.publish(
-                        self.floodsub_topic.clone(),
-                        serde_json::to_string::<Artifact>(&Artifact::Block(block.clone())).unwrap(),
-                    );
-                    self.blockchain
-                        .block_tree
-                        .append_child_to_previous_leader(block);
-                }
-                None => (),
-            }
+            let block = Block::new(
+                self.round as u64,
+                self.rank,
+                self.node_number,
+                parent_hash,
+                format!("Block: {}_{}", self.round, self.node_number),
+            );
+            println!("Sent block at height {}", block.height);
+            self.swarm.behaviour_mut().floodsub.publish(
+                self.floodsub_topic.clone(),
+                serde_json::to_string::<Artifact>(&Artifact::Block(block.clone())).unwrap(),
+            );
+            self.blockchain
+                .block_tree
+                .append_child_to_previous_leader(block);
         }
 
         pub fn keep_alive(&mut self) {
@@ -261,54 +250,5 @@ pub mod networking {
                 self.rank, self.round
             );
         }
-    }
-
-    async fn get_next_block(
-        height: usize,
-        local_peer_rank: u8,
-        local_node_number: u8,
-        parent_hash: String,
-    ) -> Option<Block> {
-        match get_next_payload(height).await {
-            Some(payload) => {
-                // setting block id according to the length of the local blockchain
-                let new_block = Block::new(
-                    height as u64,
-                    local_peer_rank,
-                    local_node_number,
-                    parent_hash,
-                    payload,
-                );
-                Some(new_block)
-            }
-            None => {
-                println!("No more payloads");
-                None
-            }
-        }
-    }
-
-    async fn get_next_payload(round: usize) -> Option<String> {
-        let input_payloads: InputPayloads = read_file("payloads_pool.txt").await;
-        let next_payload = if round < input_payloads.len() {
-            Some(input_payloads[round].clone())
-        } else {
-            None
-        };
-        next_payload
-    }
-
-    async fn read_file(path: &str) -> InputPayloads {
-        let mut file = File::open(path).await.expect("txt file in path");
-        let mut content = String::new();
-        file.read_to_string(&mut content)
-            .await
-            .expect("read content as string");
-
-        let mut input_payloads: InputPayloads = vec![];
-        for line in content.lines() {
-            input_payloads.push(String::from(line));
-        }
-        input_payloads
     }
 }
