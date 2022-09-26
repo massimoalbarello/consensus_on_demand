@@ -148,6 +148,7 @@ impl BlockTree {
                 // if it is the first block being notarized at this height, trigger round update
                 if self.count_blocks_notarized_at_same_height() == 1 {
                     println!("Found first notarized block at height: {}", block.height);
+                    self.display_block_tree();
                     return true;
                 }
             }
@@ -167,22 +168,30 @@ impl BlockTree {
         self.current_round_tips_refs = vec![];
     }
 
-    // pub fn display_chain_from_tip(&self, index_in_tips_refs: usize) {
-    //     match self.current_round_tips_refs.get(index_in_tips_refs) {
-    //         Some(mut block_with_ref) => {
-    //             loop {
-    //                 println!(
-    //                     "Block with payload: '{}' at height: {}",
-    //                     block_with_ref.borrow().block.payload, block_with_ref.borrow().block.height
-    //                 );
-    //                 block_with_ref = match block_with_ref.parent_ref.as_ref() {
-    //                     Some(parent) => parent,
-    //                     None => break,
-    //                 }
-    //             }
-    //             println!("");
-    //         }
-    //         None => println!("Invalid tip index"),
-    //     }
-    // }
+    pub fn display_block_tree(&self) {
+        for tip_ref in self.current_round_tips_refs.iter() {
+            let block = tip_ref.borrow().block.clone();
+            println!(
+                "\n{} --->",
+                block.hash
+            );
+            let mut parent_ref = tip_ref.borrow().parent_ref.clone();
+            loop {
+                parent_ref = match parent_ref {
+                    Some(parent) => {
+                        let block = parent.borrow().block.clone();
+                        println!(
+                            "{} --->",
+                            block.hash
+                        );
+                        parent.borrow().parent_ref.clone()
+                    },
+                    None => {
+                        println!("()");
+                        break;
+                    }
+                }
+            }
+        }
+    }
 }

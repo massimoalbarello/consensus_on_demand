@@ -105,31 +105,24 @@ pub mod networking {
 
         pub fn create_block(&mut self, mut tx: Sender<Block>) {
             // attach new block to last block in finalized blockchain
-            if self.rank == 0 {
-                let parent_hash = self
-                    .blockchain
-                    .block_tree
-                    .get_parent_hash(self.round as u64, self.blockchain.finalized_chain_index)
-                    .expect("can get parent hash");
-                println!("Appending block to parent with hash: {}", parent_hash);
-                let round = self.round;
-                let local_peer_rank = self.rank;
-                let local_node_number = self.node_number;
-                task::spawn(async move {
-                    // mine block in a separate non-blocking task
-                    match get_next_block(round, local_peer_rank, local_node_number, parent_hash)
-                        .await
-                    {
-                        Some(block) => tx.try_send(block).expect("can push into channel"), // push block into channel so that it can later be broadcasted
-                        None => (),
-                    };
-                });
-            } else {
-                println!(
-                    "Cannot propose in round: {} as local peer has rank: {}",
-                    self.round, self.rank
-                );
-            }
+            let parent_hash = self
+                .blockchain
+                .block_tree
+                .get_parent_hash(self.round as u64, self.blockchain.finalized_chain_index)
+                .expect("can get parent hash");
+            println!("Appending block to parent with hash: {}", parent_hash);
+            let round = self.round;
+            let local_peer_rank = self.rank;
+            let local_node_number = self.node_number;
+            task::spawn(async move {
+                // mine block in a separate non-blocking task
+                match get_next_block(round, local_peer_rank, local_node_number, parent_hash)
+                    .await
+                {
+                    Some(block) => tx.try_send(block).expect("can push into channel"), // push block into channel so that it can later be broadcasted
+                    None => (),
+                };
+            });
         }
 
         pub fn broadcast_block(&mut self, block: Option<Block>) {
