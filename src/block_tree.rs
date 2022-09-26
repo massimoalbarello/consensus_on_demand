@@ -40,43 +40,30 @@ impl BlockTree {
     pub fn get_parent_hash(
         &mut self,
         child_height: u64,
-        index_in_tips_refs: usize,
     ) -> Option<String> {
-        match self.previous_round_tips_refs.get(index_in_tips_refs) {
-            Some(parent_ref) => Some(parent_ref.borrow().block.hash.to_owned()),
-            None => {
-                println!(
-                    "No parent at height {} and width {}",
-                    child_height - 1,
-                    index_in_tips_refs
-                );
-                None
+        for parent_ref in self.previous_round_tips_refs.iter() {
+            if parent_ref.borrow().block.from_rank == 0 {
+                return Some(parent_ref.borrow().block.hash.to_owned());
             }
         }
+        None
     }
 
-    pub fn create_child_at_index(&mut self, index_in_tips_refs: usize, block: Block) {
+    pub fn append_child_to_previous_leader(&mut self, block: Block) {
         // local peer receives only blocks at height corresponding to the current round
         // these have to be appended to blocks of the previous round (referenced by previous_round_tips_refs)
-        match self.previous_round_tips_refs.get(index_in_tips_refs) {
-            Some(parent_ref) => {
-                let height = block.height;
-                let parent_hash = block.parent_hash.clone();
+        for parent_ref in self.previous_round_tips_refs.iter() {
+            if parent_ref.borrow().block.from_rank == 0 {
+                println!(
+                    "\nBlock at height: {} appended to previous leader with hash: {}",
+                    block.height, parent_ref.borrow().block.hash
+                );
                 self.current_round_tips_refs
                     .push(Rc::new(RefCell::new(BlockWithRef::new(
                         Some(Rc::clone(parent_ref)),
-                        block,
+                        block.clone(),
                     ))));
-                println!(
-                    "\nBlock at height: {} appended to parent with hash: {}",
-                    height, parent_hash
-                );
             }
-            None => println!(
-                "No parent at height {} and width {}",
-                block.height - 1,
-                index_in_tips_refs
-            ),
         }
     }
 

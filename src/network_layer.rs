@@ -108,7 +108,7 @@ pub mod networking {
             let parent_hash = self
                 .blockchain
                 .block_tree
-                .get_parent_hash(self.round as u64, self.blockchain.finalized_chain_index)
+                .get_parent_hash(self.round as u64)
                 .expect("can get parent hash");
             println!("Appending block to parent with hash: {}", parent_hash);
             let round = self.round;
@@ -135,7 +135,7 @@ pub mod networking {
                     );
                     self.blockchain
                         .block_tree
-                        .create_child_at_index(self.blockchain.finalized_chain_index, block);
+                        .append_child_to_previous_leader(block);
                 }
                 None => (),
             }
@@ -213,7 +213,7 @@ pub mod networking {
                     // local peer always adds block to its block tree as it might later send a notarization share for it (once corresponding timer has expired)
                     self.blockchain
                         .block_tree
-                        .create_child_at_index(self.blockchain.finalized_chain_index, block);
+                        .append_child_to_previous_leader(block);
                     // for now local peer sends notarization share only if if receives block from leader of current round
                     // TODO: check if timer corresponding to rank has expired, if so broadcast notarization share
                     if block_from_rank == 0 {
