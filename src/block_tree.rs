@@ -94,8 +94,6 @@ impl BlockTree {
                     return self.update_recvd_notarization_shares(
                         Rc::clone(&self.current_round_tips_refs[index_of_tip_ref]),
                         from_node_number,
-                        block_hash,
-                        block_height,
                     );
                 }
             }
@@ -107,8 +105,6 @@ impl BlockTree {
                     return self.update_recvd_notarization_shares(
                         Rc::clone(&self.previous_round_tips_refs[index_of_tip_ref]),
                         from_node_number,
-                        block_hash,
-                        block_height,
                     );
                 }
             }
@@ -124,28 +120,24 @@ impl BlockTree {
 
     fn update_recvd_notarization_shares(
         &mut self,
-        block_with_ref_to_be_updated: Rc<RefCell<BlockWithRef>>,
+        block_with_ref: Rc<RefCell<BlockWithRef>>,
         from_node_number: u8,
-        block_hash: &str,
-        block_height: u64,
     ) -> bool {
-        block_with_ref_to_be_updated
-            .borrow_mut()
-            .recvd_notarization_shares[(from_node_number - 1) as usize] = true;
+        let block = block_with_ref.borrow().block.clone();
+        block_with_ref.borrow_mut().recvd_notarization_shares[(from_node_number - 1) as usize] =
+            true;
         println!(
             "Block with hash {} has received notarization shares from: {:?}",
-            block_hash,
-            block_with_ref_to_be_updated
-                .borrow()
-                .recvd_notarization_shares
+            block.hash,
+            block_with_ref.borrow().recvd_notarization_shares
         );
         // check if round has to be updated only if the block has not been already notarized (as the round would have already been updated then)
-        if !block_with_ref_to_be_updated.borrow().is_notarized {
+        if !block_with_ref.borrow().is_notarized {
             // if exactly N-1 notarization shares are received, check if there is another block at the same height which has already been notarized
             // if not, return true (trigger round update in network layer)
             // otherwise, return false (remain in current round)
             // upon receiving Nth share for a block, do not update the round as it has already been updated
-            if block_with_ref_to_be_updated
+            if block_with_ref
                 .borrow()
                 .recvd_notarization_shares
                 .iter()
@@ -153,10 +145,10 @@ impl BlockTree {
                 .count()
                 == N - 1
             {
-                block_with_ref_to_be_updated.borrow_mut().is_notarized = true;
+                block_with_ref.borrow_mut().is_notarized = true;
                 // if it is the first block being notarized at this height, trigger round update
                 if self.count_blocks_notarized_at_same_height() == 1 {
-                    println!("Found first notarized block at height: {}", block_height);
+                    println!("Found first notarized block at height: {}", block.height);
                     return true;
                 }
             }

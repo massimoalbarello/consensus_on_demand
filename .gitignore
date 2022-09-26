@@ -5,8 +5,3 @@
 
 # will have compiled files and executables
 /target
-
-blocks_pool.txt
-
-block_tree.exe
-block_tree.pdb
