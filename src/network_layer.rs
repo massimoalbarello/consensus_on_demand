@@ -121,7 +121,7 @@ pub mod networking {
             );
             self.blockchain
                 .block_tree
-                .append_child_to_previous_leader(block);
+                .append_child_to_previous_leader(block, self.round as u64);
         }
 
         pub fn keep_alive(&mut self) {
@@ -188,13 +188,13 @@ pub mod networking {
                     let block_hash = block.hash.clone();
                     let block_from_rank = block.from_rank;
                     println!(
-                        "\nReceived block with hash: {} attached to: {} from peer with rank: {}",
+                        "\nReceived block with hash: {} with parent: {} from peer with rank: {}",
                         &block_hash, &block.parent_hash, block.from_rank
                     );
                     // local peer always adds block to its block tree as it might later send a notarization share for it (once corresponding timer has expired)
                     self.blockchain
                         .block_tree
-                        .append_child_to_previous_leader(block);
+                        .append_child_to_previous_leader(block, self.round as u64);
                     // for now local peer sends notarization share only if if receives block from leader of current round
                     // TODO: check if timer corresponding to rank has expired, if so broadcast notarization share
                     if block_from_rank == 0 {
@@ -236,6 +236,9 @@ pub mod networking {
             self.blockchain.block_tree.update_tips_refs();
             self.round += 1;
             println!("\n################## Round: {} ##################", self.round);
+            // TODO: think when to call the following function
+            self.blockchain.block_tree.check_if_artifacts_already_received(self.round as u64);
+
             self.update_local_rank();
         }
 
