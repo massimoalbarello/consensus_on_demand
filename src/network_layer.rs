@@ -68,7 +68,7 @@ pub mod networking {
             let local_peer = Self {
                 node_number,
                 round: starting_round,
-                rank: (starting_round as u8 + node_number - 2) % (N as u8),
+                rank: 0,    // updated after Peer object is instantiated
                 floodsub_topic: floodsub_topic.clone(),
                 swarm: {
                     let mdns = task::block_on(Mdns::new(MdnsConfig::default())).unwrap();
@@ -85,10 +85,6 @@ pub mod networking {
             println!(
                 "Local node initialized with number: {} and peer id: {:?}",
                 local_peer.node_number, local_peer_id
-            );
-            println!(
-                "Local node has rank: {} in round: {}",
-                local_peer.rank, local_peer.round
             );
             local_peer
         }
@@ -239,16 +235,19 @@ pub mod networking {
         fn update_round(&mut self) {
             self.blockchain.block_tree.update_tips_refs();
             self.round += 1;
-            println!("\n###### Round: {} ######", self.round);
+            println!("\n################## Round: {} ##################", self.round);
             self.update_local_rank();
         }
 
-        fn update_local_rank(&mut self) {
+        pub fn update_local_rank(&mut self) {
             self.rank = (self.round as u8 + self.node_number - 2) % (N as u8);
             println!(
                 "Local node has rank: {} in round: {}",
                 self.rank, self.round
             );
+            if self.rank == 0 {
+                self.broadcast_block();
+            }
         }
     }
 }

@@ -2,18 +2,10 @@
 
 Use mDNS to find local peers and floodsub protocol to broadcast a message.
 
-Using different terminal windows, start multiple instances. If your local network allows mDNS, they will automatically connect.
-Type a message in either terminal and hit return: the message is sent and printed in the other terminals. Close with Ctrl-c.
-Dialing any of the other peers will propagate the new participant to all members and everyone will receive all messages.
+Using different terminal windows, start four instances and pass each of them a different number in [1,4]. This will identify the node number of each peer. If your local network allows mDNS, they will automatically connect.
 
-If the nodes don't automatically connect, take note of the listening addresses of one instance and start another with one of the addresses as the first argument. 
-In a terminal window, run:
 ```sh
-cargo run
+cargo run 1
 ```
-It will print the PeerId and the listening addresses, e.g. `Listening on "/ip4/0.0.0.0/tcp/24915"`.
 
-In another other terminal window, start a new instance with:
-```sh
-cargo run -- /ip4/127.0.0.1/tcp/24915
-```
+Repeat the same command in thre other terminals, each time passing a different number (2, 3, 4) as  a parameter. Once all four instances have started (each diplays the addresses it is listening on) press Enter in the instance started with parameter 1.
