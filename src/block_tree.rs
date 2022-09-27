@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use crate::consensus_layer::blockchain::{Block, N};
+use crate::consensus_layer::blockchain::{Block, N, NotarizationShare};
 
 pub struct BlockWithRef {
     parent_ref: Option<Rc<RefCell<BlockWithRef>>>,
@@ -67,36 +67,35 @@ impl BlockTree {
 
     pub fn update_block_with_ref(
         &mut self,
-        from_node_number: u8,
-        block_hash: &str,
-        block_height: u64,
+        share: NotarizationShare,
         current_round: u64,
     ) -> bool {
-        if block_height == current_round {
+        if share.block_height == current_round {
             for (index_of_tip_ref, tip_ref) in self.current_round_tips_refs.iter().enumerate() {
-                if tip_ref.borrow().block.hash.eq(block_hash) {
+                if tip_ref.borrow().block.hash.eq(&share.block_hash) {
                     return self.update_recvd_notarization_shares(
                         Rc::clone(&self.current_round_tips_refs[index_of_tip_ref]),
-                        from_node_number,
+                        share.from_node_number,
                     );
                 }
             }
             return false;
-        } else if block_height == current_round - 1 {
-            println!("Received share for block at height: {}", block_height);
+        } else if share.block_height == current_round - 1 {
+            println!("Received share for block at height: {}", share.block_height);
             for (index_of_tip_ref, tip_ref) in self.previous_round_tips_refs.iter().enumerate() {
-                if tip_ref.borrow().block.hash.eq(block_hash) {
+                if tip_ref.borrow().block.hash.eq(&share.block_hash) {
                     return self.update_recvd_notarization_shares(
                         Rc::clone(&self.previous_round_tips_refs[index_of_tip_ref]),
-                        from_node_number,
+                        share.from_node_number,
                     );
                 }
             }
             return false;
         } else {
+            // store share so that it can be added to respective block as soon as it arrives
             println!(
                 "Ignoring received notarization share for block with hash: {} at height: {}",
-                block_hash, block_height
+                share.block_hash, share.block_height
             );
         }
         false

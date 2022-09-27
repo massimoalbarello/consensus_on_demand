@@ -176,9 +176,7 @@ pub mod networking {
                 Artifact::NotarizationShare(share) => {
                     println!("\nReceived notarization share for block with hash: {} at height {} from peer with node number: {}", &share.block_hash, share.block_height, share.from_node_number);
                     let must_update_round = self.blockchain.block_tree.update_block_with_ref(
-                        share.from_node_number,
-                        &share.block_hash,
-                        share.block_height,
+                        share,
                         self.round as u64,
                     );
                     if must_update_round {
@@ -203,9 +201,11 @@ pub mod networking {
                         // local peer updtates recvd_notarization_shares for the share it sends
                         // required as local peer does not receive the share it broadcasts to others
                         let must_update_round = self.blockchain.block_tree.update_block_with_ref(
-                            self.node_number,
-                            &block_hash,
-                            block_height,
+                            NotarizationShare::new(
+                                self.node_number,
+                                block_height,
+                                block_hash.clone(),
+                            ),
                             self.round as u64,
                         );
                         self.send_notarization_share(block_height, block_hash);
