@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use crate::consensus_layer::blockchain::{Block, N, NotarizationShare, Artifact};
+use crate::consensus_layer::blockchain::{Artifact, Block, NotarizationShare, N};
 
 pub struct BlockWithRef {
     parent_ref: Option<Rc<RefCell<BlockWithRef>>>,
@@ -47,24 +47,27 @@ impl StoreArtifacts {
             Artifact::NotarizationShare(share) => {
                 if share.block_height == current_round {
                     self.current_round_shares.push(share);
-                }
-                else {
+                } else {
                     self.next_round_shares.push(share);
                 }
-            },
+            }
             Artifact::Block(block) => {
                 self.next_round_blocks.push(block);
-            },
+            }
             _ => (),
         }
         self.display_artifacts_store();
     }
 
     fn display_artifacts_store(&self) {
-        println!("------------- Artifacts pool contains: 
+        println!(
+            "------------- Artifacts pool contains: 
         - for current round: {} shares 
-        - for next round: {} shares and {} blocks", 
-        self.current_round_shares.len(), self.next_round_shares.len(), self.next_round_blocks.len());
+        - for next round: {} shares and {} blocks",
+            self.current_round_shares.len(),
+            self.next_round_shares.len(),
+            self.next_round_blocks.len()
+        );
     }
 
     fn get_current_round_shares_to_be_added(&mut self) -> Vec<NotarizationShare> {
@@ -129,13 +132,15 @@ impl BlockTree {
             if must_check_shares {
                 return self.check_if_shares_to_be_added(current_round);
             }
-        }
-        else if block.height > current_round {
+        } else if block.height > current_round {
             println!("Received block for next round");
-            self.artifacts_store.push(Artifact::Block(block), current_round);
-        }
-        else {
-            println!("============ Received block for previous round. Block for height {}", block.height);
+            self.artifacts_store
+                .push(Artifact::Block(block), current_round);
+        } else {
+            println!(
+                "============ Received block for previous round. Block for height {}",
+                block.height
+            );
         }
         false
     }
@@ -153,11 +158,7 @@ impl BlockTree {
         block_is_notarized
     }
 
-    pub fn update_block_with_ref(
-        &mut self,
-        share: NotarizationShare,
-        current_round: u64,
-    ) -> bool {
+    pub fn update_block_with_ref(&mut self, share: NotarizationShare, current_round: u64) -> bool {
         if share.block_height == current_round {
             let mut block_found = false;
             for (index_of_tip_ref, tip_ref) in self.current_round_tips_refs.iter().enumerate() {
@@ -175,7 +176,8 @@ impl BlockTree {
                     "!!!!!!!!!!!!!!!!!!! Received notarization share for block with hash: {} at height: {}",
                     share.block_hash, share.block_height
                 );
-                self.artifacts_store.push(Artifact::NotarizationShare(share), current_round);
+                self.artifacts_store
+                    .push(Artifact::NotarizationShare(share), current_round);
             }
             return false;
         } else if share.block_height == current_round - 1 {
@@ -195,14 +197,14 @@ impl BlockTree {
                     "??????????????????? Ignoring notarization share for block with hash: {} at height: {}",
                     share.block_hash, share.block_height
                 );
-            }
-            else {
+            } else {
                 // store share so that it can be added to respective block once next round starts
                 println!(
                     "!!!!!!!!!!!!!!!!!!! Received notarization share for block with hash: {} at height: {}",
                     share.block_hash, share.block_height
                 );
-                self.artifacts_store.push(Artifact::NotarizationShare(share), current_round);
+                self.artifacts_store
+                    .push(Artifact::NotarizationShare(share), current_round);
             }
         }
         false
@@ -241,7 +243,10 @@ impl BlockTree {
                 block_with_ref.borrow_mut().is_notarized = true;
                 // if it is the first block being notarized at this height, trigger round update
                 if self.count_blocks_notarized_at_same_height() == 1 {
-                    println!("Found first notarized block at height: {}", block_with_ref.borrow().block.clone().height);
+                    println!(
+                        "Found first notarized block at height: {}",
+                        block_with_ref.borrow().block.clone().height
+                    );
                     self.display_block_tree();
                     return true;
                 }
@@ -251,12 +256,15 @@ impl BlockTree {
     }
 
     pub fn check_if_block_already_received_and_notarized(&mut self, current_round: u64) -> bool {
-        // current_round corresponds to height of blocks in next_round_blocks as this function is called after the round update 
+        // current_round corresponds to height of blocks in next_round_blocks as this function is called after the round update
         if self.artifacts_store.next_round_blocks.len() > 0 {
             // add blocks for next round (received the round before) to block tree
             // for now there can be only one such block as in each round only one peer broadcast a block for that height
             let block_to_be_appended = self.artifacts_store.next_round_blocks[0].clone();
-            println!("++++++++++++++ Adding previously received block for round: {} with hash: {}", block_to_be_appended.height, &block_to_be_appended.hash);
+            println!(
+                "++++++++++++++ Adding previously received block for round: {} with hash: {}",
+                block_to_be_appended.height, &block_to_be_appended.hash
+            );
             self.append_child_to_previous_leader(block_to_be_appended, current_round);
             self.artifacts_store.next_round_blocks = vec![];
         }

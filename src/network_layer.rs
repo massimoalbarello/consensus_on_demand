@@ -10,9 +10,7 @@ pub mod networking {
         NetworkBehaviour, PeerId, Swarm,
     };
 
-    use crate::consensus_layer::blockchain::{
-        Artifact, Block, Blockchain, NotarizationShare, N,
-    };
+    use crate::consensus_layer::blockchain::{Artifact, Block, Blockchain, NotarizationShare, N};
 
     // We create a custom network behaviour that combines floodsub and mDNS.
     // Use the derive to generate delegating NetworkBehaviour impl.
@@ -68,7 +66,7 @@ pub mod networking {
             let local_peer = Self {
                 node_number,
                 round: starting_round,
-                rank: 0,    // updated after Peer object is instantiated
+                rank: 0, // updated after Peer object is instantiated
                 floodsub_topic: floodsub_topic.clone(),
                 swarm: {
                     let mdns = task::block_on(Mdns::new(MdnsConfig::default())).unwrap();
@@ -175,10 +173,10 @@ pub mod networking {
             match artifact_content {
                 Artifact::NotarizationShare(share) => {
                     println!("\nReceived notarization share for block with hash: {} at height {} from peer with node number: {}", &share.block_hash, share.block_height, share.from_node_number);
-                    let must_update_round = self.blockchain.block_tree.update_block_with_ref(
-                        share,
-                        self.round as u64,
-                    );
+                    let must_update_round = self
+                        .blockchain
+                        .block_tree
+                        .update_block_with_ref(share, self.round as u64);
                     if must_update_round {
                         self.update_round();
                     }
@@ -192,9 +190,11 @@ pub mod networking {
                         &block_hash, &block.parent_hash, block.from_rank
                     );
                     // local peer always adds block to its block tree as it might later send a notarization share for it (once corresponding timer has expired)
-                    if self.blockchain
+                    if self
+                        .blockchain
                         .block_tree
-                        .append_child_to_previous_leader(block, self.round as u64) {
+                        .append_child_to_previous_leader(block, self.round as u64)
+                    {
                         self.update_round();
                     }
                     // for now local peer sends notarization share only if if receives block from leader of current round
@@ -237,9 +237,16 @@ pub mod networking {
         fn update_round(&mut self) {
             self.blockchain.block_tree.update_tips_refs();
             self.round += 1;
-            println!("\n################## Round: {} ##################", self.round);
+            println!(
+                "\n################## Round: {} ##################",
+                self.round
+            );
             self.update_local_rank();
-            if self.blockchain.block_tree.check_if_block_already_received_and_notarized(self.round as u64) {
+            if self
+                .blockchain
+                .block_tree
+                .check_if_block_already_received_and_notarized(self.round as u64)
+            {
                 self.update_round();
             }
         }
