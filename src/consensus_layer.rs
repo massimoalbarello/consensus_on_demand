@@ -17,7 +17,7 @@ pub mod blockchain {
         KeepAliveMessage,
     }
 
-    #[derive(Serialize, Deserialize)]
+    #[derive(Serialize, Deserialize, Clone)]
     pub struct NotarizationShare {
         pub from_node_number: u8,
         pub block_height: u64,

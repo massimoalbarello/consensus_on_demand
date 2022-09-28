@@ -192,9 +192,11 @@ pub mod networking {
                         &block_hash, &block.parent_hash, block.from_rank
                     );
                     // local peer always adds block to its block tree as it might later send a notarization share for it (once corresponding timer has expired)
-                    self.blockchain
+                    if self.blockchain
                         .block_tree
-                        .append_child_to_previous_leader(block, self.round as u64);
+                        .append_child_to_previous_leader(block, self.round as u64) {
+                        self.update_round();
+                    }
                     // for now local peer sends notarization share only if if receives block from leader of current round
                     // TODO: check if timer corresponding to rank has expired, if so broadcast notarization share
                     if block_from_rank == 0 {
@@ -236,10 +238,10 @@ pub mod networking {
             self.blockchain.block_tree.update_tips_refs();
             self.round += 1;
             println!("\n################## Round: {} ##################", self.round);
-            // TODO: think when to call the following function
-            self.blockchain.block_tree.check_if_artifacts_already_received(self.round as u64);
-
             self.update_local_rank();
+            if self.blockchain.block_tree.check_if_block_already_received_and_notarized(self.round as u64) {
+                self.update_round();
+            }
         }
 
         pub fn update_local_rank(&mut self) {
