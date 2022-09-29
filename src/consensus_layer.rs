@@ -37,7 +37,7 @@ pub mod blockchain {
     #[derive(Serialize, Deserialize, Debug, Clone)]
     pub struct Block {
         pub height: u64,
-        pub from_rank: u8,
+        pub from_rank: u64,
         pub from_node_number: u8,
         pub hash: String,
         pub parent_hash: String,
@@ -48,7 +48,7 @@ pub mod blockchain {
     impl Block {
         pub fn new(
             height: u64,
-            from_rank: u8,
+            from_rank: u64,
             from_node_number: u8,
             parent_hash: String,
             payload: String,

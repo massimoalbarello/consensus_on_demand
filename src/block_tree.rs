@@ -130,7 +130,9 @@ impl BlockTree {
                 }
             }
             if must_check_shares {
-                return self.check_if_shares_to_be_added(current_round);
+                // check if shares for block just appended were previously received
+                let shares_to_be_added = self.artifacts_store.get_current_round_shares_to_be_added();
+                return self.add_shares_and_check_if_notarized(current_round, shares_to_be_added);
             }
         } else if block.height > current_round {
             println!("Received block for next round");
@@ -143,19 +145,6 @@ impl BlockTree {
             );
         }
         false
-    }
-
-    fn check_if_shares_to_be_added(&mut self, current_round: u64) -> bool {
-        // check if shares for block just appended were previously received
-        let mut block_is_notarized = false;
-        let shares_to_be_added = self.artifacts_store.get_current_round_shares_to_be_added();
-        for share_to_be_added in shares_to_be_added {
-            println!("\n!************** Adding previously received notarization share for block with hash: {} at height {}", &share_to_be_added.block_hash, share_to_be_added.block_height);
-            if self.update_block_with_ref(share_to_be_added, current_round) {
-                block_is_notarized = true;
-            }
-        }
-        block_is_notarized
     }
 
     pub fn update_block_with_ref(&mut self, share: NotarizationShare, current_round: u64) -> bool {
@@ -247,7 +236,7 @@ impl BlockTree {
                         "Found first notarized block at height: {}",
                         block_with_ref.borrow().block.clone().height
                     );
-                    self.display_block_tree();
+                    // self.display_block_tree();
                     return true;
                 }
             }
@@ -268,11 +257,15 @@ impl BlockTree {
             self.append_child_to_previous_leader(block_to_be_appended, current_round);
             self.artifacts_store.next_round_blocks = vec![];
         }
-        let mut block_is_notarized = false;
+        // check if shares for block of current round were received in the previous round
         let shares_to_be_added = self.artifacts_store.get_next_round_shares_to_be_addded();
+        return self.add_shares_and_check_if_notarized(current_round, shares_to_be_added);
+    }
+
+    fn add_shares_and_check_if_notarized(&mut self, current_round: u64, shares_to_be_added: Vec<NotarizationShare>) -> bool {
+        let mut block_is_notarized = false;
         for share_to_be_added in shares_to_be_added {
-            println!("\n!++++++++++++++ Adding previously received notarization share for block with hash: {} at height {}", &share_to_be_added.block_hash, share_to_be_added.block_height);
-            // check if block that was just appended from artifacts store has already been notarized
+            println!("\n!************** Adding previously received notarization share for block with hash: {} at height {}", &share_to_be_added.block_hash, share_to_be_added.block_height);
             if self.update_block_with_ref(share_to_be_added, current_round) {
                 block_is_notarized = true;
             }

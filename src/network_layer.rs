@@ -43,7 +43,7 @@ pub mod networking {
     pub struct Peer {
         node_number: u8,
         round: usize,
-        rank: u8,
+        rank: u64,
         floodsub_topic: Topic,
         swarm: Swarm<P2PBehaviour>,
         blockchain: Blockchain,
@@ -252,7 +252,7 @@ pub mod networking {
         }
 
         pub fn update_local_rank(&mut self) {
-            self.rank = (self.round as u8 + self.node_number - 2) % (N as u8);
+            self.rank = ((self.round + self.node_number as usize - 2) % N) as u64;
             println!(
                 "Local node has rank: {} in round: {}",
                 self.rank, self.round
