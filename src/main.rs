@@ -7,7 +7,7 @@ use futures::{
 use std::time::Duration;
 
 pub mod network_layer;
-use crate::network_layer::networking::Peer;
+use crate::network_layer::Peer;
 pub mod artifact_manager;
 pub mod consensus_layer;
 
