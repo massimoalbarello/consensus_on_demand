@@ -8,11 +8,14 @@ pub mod blockchain {
 
     use crate::artifact_manager::processor::ProcessingResult;
 
-    pub const N: usize = 4;
+    type ChangeSet = Vec<ChangeAction>;
 
-    pub type InputPayloads = Vec<String>;
+    enum ChangeAction {
+        AddToValidated(String),
+        MoveToValidated(String),
+    }
 
-    #[derive(Serialize, Deserialize, Debug)]
+    #[derive(Serialize, Deserialize, Debug, Clone)]
     pub enum Artifact {
         NotarizationShare(NotarizationShare),
         Block(Block),
@@ -72,7 +75,7 @@ pub mod blockchain {
             payload: String,
         ) -> Self {
             let current_timestamp = Utc::now().timestamp();
-            let hash = calculate_hash(height, current_timestamp, &parent_hash, &payload);
+            let hash = String::from("Block hash");
             println!("Created block with hash {}", &hash);
             Self {
                 height,
@@ -86,13 +89,8 @@ pub mod blockchain {
         }
     }
 
-    fn calculate_hash(height: u64, timestamp: i64, parent_hash: &str, payload: &str) -> String {
-        let payload = serde_json::json!({
-            "height": height,
-            "parent_hash": parent_hash,
-            "payload": payload,
-            "timestamp": timestamp,
-        });
+    fn calculate_hash(artifact: UnvalidatedArtifact<Artifact>) -> String {
+        let payload = serde_json::json!(artifact);
         let mut hasher = Sha256::new();
         hasher.update(payload.to_string().as_bytes());
         hex::encode(hasher.finalize().as_slice().to_owned())
@@ -115,14 +113,18 @@ pub mod blockchain {
     impl ConsensusProcessor {
         pub fn process_changes(&self, artifacts: Vec<UnvalidatedArtifact<Artifact>>) -> ProcessingResult {
             if artifacts.len() != 0 {
-                println!("{:?}", artifacts);
+                let mut consensus_pool = self.consensus_pool.write().unwrap();
+                for artifact in artifacts {
+                    consensus_pool.insert(artifact)
+                }
+                return ProcessingResult::StateChanged;
             }
-            ProcessingResult::StateChanged
+            ProcessingResult::StateUnchanged
         }
     }
 
     pub struct InMemoryPoolSection {
-        artifacts: BTreeMap<String, Artifact>,
+        artifacts: BTreeMap<String, UnvalidatedArtifact<Artifact>>,
     }
 
     impl InMemoryPoolSection {
@@ -130,6 +132,20 @@ pub mod blockchain {
             InMemoryPoolSection {
                 artifacts: BTreeMap::new(),
             }
+        }
+
+        fn mutate(&mut self, ops: PoolSectionOps<UnvalidatedArtifact<Artifact>>) {
+            for op in ops.ops {
+                match op {
+                    PoolSectionOp::Insert(artifact) => self.insert(artifact),
+                }
+                println!("Inserted artifact in unvalidated section of consensus pool: {:?}", self.artifacts);
+            }
+        }
+
+        fn insert(&mut self, artifact: UnvalidatedArtifact<Artifact>) {
+            let hash = calculate_hash(artifact.clone());
+            self.artifacts.entry(hash).or_insert(artifact);
         }
     }
 
@@ -145,6 +161,46 @@ pub mod blockchain {
                 unvalidated: Box::new(InMemoryPoolSection::new()),
             }
         }
+
+        fn insert(&mut self, unvalidated_artifact: UnvalidatedArtifact<Artifact>) {
+            let mut ops = PoolSectionOps::new();
+            ops.insert(unvalidated_artifact);
+            self.apply_changes_unvalidated(ops);
+        }
+
+        fn apply_changes_unvalidated(&mut self, ops: PoolSectionOps<UnvalidatedArtifact<Artifact>>) {
+            if !ops.ops.is_empty() {
+                self.unvalidated.mutate(ops);
+            }
+        }
+
+    }
+
+    /// Consensus message identifier carries both a message hash and a height,
+    /// which is used by the consensus pool to help lookup.
+    #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+    pub struct ConsensusMessageId {
+        pub hash: String,
+        pub height: u64,
+    }
+
+    #[derive(Debug, Clone)]
+    pub enum PoolSectionOp<T> {
+        Insert(T),
+    }
+
+    #[derive(Clone, Debug, Default)]
+    pub struct PoolSectionOps<T> {
+        pub ops: Vec<PoolSectionOp<T>>,
+    }
+
+    impl<T> PoolSectionOps<T> {
+        pub fn new() -> PoolSectionOps<T> {
+            PoolSectionOps { ops: Vec::new() }
+        }
+        pub fn insert(&mut self, artifact: T) {
+            self.ops.push(PoolSectionOp::Insert(artifact));
+        }
     }
 
     pub struct ConsensusImpl {
@@ -156,6 +212,10 @@ pub mod blockchain {
             Self {
                 notary: String::from("notary"),
             }
+        }
+
+        fn on_state_change(&self, pool: &ConsensusPoolImpl) -> ChangeSet {
+            vec![ChangeAction::AddToValidated(String::from("Consensus message")), ChangeAction::MoveToValidated(String::from("Consensus message"))]
         }
     }
 }

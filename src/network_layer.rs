@@ -163,7 +163,7 @@ pub mod networking {
 
         pub fn handle_incoming_artifact(&mut self, artifact_variant: Artifact) {
             match artifact_variant {
-                Artifact::KeepAliveMessage => (),
+                Artifact::KeepAliveMessage => println!("Received keep alive message"),
                 _ => self.manager.on_artifact(UnvalidatedArtifact::new(artifact_variant)),
             }
         }

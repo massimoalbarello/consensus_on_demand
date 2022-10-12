@@ -6,7 +6,7 @@ pub mod processor {
     use crate::consensus_layer::blockchain::{ConsensusProcessor, Artifact, UnvalidatedArtifact};
 
     // Periodic duration of `PollEvent` in milliseconds.
-    const ARTIFACT_MANAGER_TIMER_DURATION_MSEC: u64 = 200;
+    const ARTIFACT_MANAGER_TIMER_DURATION_MSEC: u64 = 1000;
 
     struct ProcessRequest;
 
@@ -82,13 +82,14 @@ pub mod processor {
                                 .send(ProcessRequest)
                                 .unwrap_or_else(|err| panic!("Failed to send request: {:?}", err));
                         }
-                    }
+                    },
                     Err(RecvTimeoutError::Disconnected) => return,
                 }
             }
         }
 
         pub fn on_artifact(&self, artifact: UnvalidatedArtifact<Artifact>) {
+            println!("Received artifact added to pending artifacts");
             let mut pending_artifacts = self.pending_artifacts.lock().unwrap();
             pending_artifacts.push(artifact);
             self.sender.send(ProcessRequest);
