@@ -1,5 +1,7 @@
 pub mod blockchain {
 
+    use std::{collections::BTreeMap, sync::{RwLock, Arc}};
+
     use chrono::prelude::Utc;
     use serde::{Deserialize, Serialize};
     use sha2::{Digest, Sha256};
@@ -97,14 +99,14 @@ pub mod blockchain {
     }
 
     pub struct ConsensusProcessor {
-        consensus_pool: ConsensusPoolImpl,
+        consensus_pool: Arc<RwLock<ConsensusPoolImpl>>,
         client: Box<ConsensusImpl>,
     }
 
     impl ConsensusProcessor {
         pub fn new() -> Self {
             Self {
-                consensus_pool: ConsensusPoolImpl::new(),
+                consensus_pool: Arc::new(RwLock::new(ConsensusPoolImpl::new())),
                 client: Box::new(ConsensusImpl::new()),
             }
         }
@@ -119,14 +121,28 @@ pub mod blockchain {
         }
     }
 
+    pub struct InMemoryPoolSection {
+        artifacts: BTreeMap<String, Artifact>,
+    }
+
+    impl InMemoryPoolSection {
+        pub fn new() -> InMemoryPoolSection {
+            InMemoryPoolSection {
+                artifacts: BTreeMap::new(),
+            }
+        }
+    }
+
     pub struct ConsensusPoolImpl {
-        pool: String,
+        validated: Box<InMemoryPoolSection>,
+        unvalidated: Box<InMemoryPoolSection>,
     }
 
     impl ConsensusPoolImpl {
         pub fn new() -> Self {
             Self {
-                pool: String::from("pool"),
+                validated: Box::new(InMemoryPoolSection::new()),
+                unvalidated: Box::new(InMemoryPoolSection::new()),
             }
         }
     }
