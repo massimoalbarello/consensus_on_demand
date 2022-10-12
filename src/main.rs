@@ -8,7 +8,7 @@ use std::time::Duration;
 
 pub mod network_layer;
 use crate::network_layer::networking::Peer;
-pub mod block_tree;
+pub mod artifact_manager;
 pub mod consensus_layer;
 
 async fn keep_alive_future() {
@@ -34,7 +34,7 @@ async fn main() {
             // Process events
             loop {
                 select! {
-                    _ = stdin.select_next_some() => my_peer.update_local_rank(),
+                    // _ = stdin.select_next_some() => my_peer.update_local_rank(),
                     _ = keep_alive_future().fuse() => {
                         my_peer.keep_alive(); // prevent Mdns expiration event by periodically sending keep alive messages to peers,
                     },
