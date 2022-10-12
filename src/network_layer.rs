@@ -10,8 +10,8 @@ pub mod networking {
         NetworkBehaviour, PeerId, Swarm,
     };
 
-    use crate::{artifact_manager::processor::ArtifactProcessorManager, consensus_layer::blockchain::UnvalidatedArtifact};
-    use crate::consensus_layer::blockchain::{Artifact, Block, NotarizationShare, N};
+    use crate::artifact_manager::processor::ArtifactProcessorManager;
+    use crate::consensus_layer::blockchain::{Artifact, Block, UnvalidatedArtifact};
 
     // We create a custom network behaviour that combines floodsub and mDNS.
     // Use the derive to generate delegating NetworkBehaviour impl.
@@ -47,7 +47,6 @@ pub mod networking {
         rank: u64,
         floodsub_topic: Topic,
         swarm: Swarm<P2PBehaviour>,
-        // blockchain: Blockchain,
         manager: ArtifactProcessorManager,
     }
 
@@ -80,7 +79,6 @@ pub mod networking {
                     behaviour.floodsub.subscribe(floodsub_topic);
                     Swarm::new(transport, behaviour, local_peer_id)
                 },
-                // blockchain: Blockchain::new(),
                 manager: ArtifactProcessorManager::new(),
             };
             println!(
@@ -100,30 +98,21 @@ pub mod networking {
                 .expect("swarm can be started");
         }
 
-        // pub fn broadcast_block(&mut self) {
-        //     // attach new block to last block in finalized blockchain
-        //     let parent_hash = self
-        //         .blockchain
-        //         .block_tree
-        //         .get_previous_leader_hash()
-        //         .expect("can get parent hash");
-        //     println!("Appending block to parent with hash: {}", parent_hash);
-        //     let block = Block::new(
-        //         self.round as u64,
-        //         self.rank,
-        //         self.node_number,
-        //         parent_hash,
-        //         format!("Block: {}_{}", self.round, self.node_number),
-        //     );
-        //     println!("Sent block at height {}", block.height);
-        //     self.swarm.behaviour_mut().floodsub.publish(
-        //         self.floodsub_topic.clone(),
-        //         serde_json::to_string::<Artifact>(&Artifact::Block(block.clone())).unwrap(),
-        //     );
-        //     self.blockchain
-        //         .block_tree
-        //         .append_child_to_previous_leader(block, self.round as u64);
-        // }
+        pub fn broadcast_block(&mut self) {
+            
+            let block = Block::new(
+                self.round as u64,
+                self.rank,
+                self.node_number,
+                String::from("parent_hash"),
+                format!("Block: {}_{}", self.round, self.node_number),
+            );
+            println!("Sent block at height {}", block.height);
+            self.swarm.behaviour_mut().floodsub.publish(
+                self.floodsub_topic.clone(),
+                serde_json::to_string::<Artifact>(&Artifact::Block(block.clone())).unwrap(),
+            );
+        }
 
         pub fn keep_alive(&mut self) {
             self.swarm.behaviour_mut().floodsub.publish(
@@ -173,98 +162,10 @@ pub mod networking {
         }
 
         pub fn handle_incoming_artifact(&mut self, artifact_variant: Artifact) {
-            println!("Artifact received");
             match artifact_variant {
-            //     Artifact::NotarizationShare(share) => {
-            //         println!("\nReceived notarization share for block with hash: {} at height {} from peer with node number: {}", &share.block_hash, share.block_height, share.from_node_number);
-            //         let must_update_round = self
-            //             .blockchain
-            //             .block_tree
-            //             .update_block_with_ref(share, self.round as u64);
-            //         if must_update_round {
-            //             self.update_round();
-            //         }
-            //     }
-            //     Artifact::Block(block) => {
-            //         let block_height = block.height;
-            //         let block_hash = block.hash.clone();
-            //         let block_from_rank = block.from_rank;
-            //         println!(
-            //             "\nReceived block with hash: {} with parent: {} from peer with rank: {}",
-            //             &block_hash, &block.parent_hash, block.from_rank
-            //         );
-            //         // local peer always adds block to its block tree as it might later send a notarization share for it (once corresponding timer has expired)
-            //         if self
-            //             .blockchain
-            //             .block_tree
-            //             .append_child_to_previous_leader(block, self.round as u64)
-            //         {
-            //             self.update_round();
-            //         }
-            //         // for now local peer sends notarization share only if if receives block from leader of current round
-            //         // TODO: check if timer corresponding to rank has expired, if so broadcast notarization share
-            //         if block_from_rank == 0 {
-            //             // local peer updtates recvd_notarization_shares for the share it sends
-            //             // required as local peer does not receive the share it broadcasts to others
-            //             let must_update_round = self.blockchain.block_tree.update_block_with_ref(
-            //                 NotarizationShare::new(
-            //                     self.node_number,
-            //                     block_height,
-            //                     block_hash.clone(),
-            //                 ),
-                //             self.round as u64,
-                //         );
-                //         self.send_notarization_share(block_height, block_hash);
-                //         if must_update_round {
-                //             self.update_round();
-                //         }
-                //     }
-                // }
-                // Artifact::KeepAliveMessage => (),
+                Artifact::KeepAliveMessage => (),
                 _ => self.manager.on_artifact(UnvalidatedArtifact::new(artifact_variant)),
             }
         }
-
-        // fn send_notarization_share(&mut self, block_height: u64, block_hash: String) {
-        //     let notarization_share =
-        //         NotarizationShare::new(self.node_number, block_height, block_hash.clone());
-        //     self.swarm.behaviour_mut().floodsub.publish(
-        //         self.floodsub_topic.clone(),
-        //         serde_json::to_string::<Artifact>(&Artifact::NotarizationShare(notarization_share))
-        //             .unwrap(),
-        //     );
-        //     println!(
-        //         "Sent notarization share for block with hash: {} at height: {}",
-        //         block_hash, block_height
-        //     );
-        // }
-
-        // fn update_round(&mut self) {
-        //     self.blockchain.block_tree.update_tips_refs();
-        //     self.round += 1;
-        //     println!(
-        //         "\n################## Round: {} ##################",
-        //         self.round
-        //     );
-        //     self.update_local_rank();
-        //     if self
-        //         .blockchain
-        //         .block_tree
-        //         .check_if_block_already_received_and_notarized(self.round as u64)
-        //     {
-        //         self.update_round();
-        //     }
-        // }
-
-        // pub fn update_local_rank(&mut self) {
-        //     self.rank = ((self.round + self.node_number as usize - 2) % N) as u64;
-        //     println!(
-        //         "Local node has rank: {} in round: {}",
-        //         self.rank, self.round
-        //     );
-        //     if self.rank == 0 {
-        //         self.broadcast_block();
-        //     }
-        // }
     }
 }

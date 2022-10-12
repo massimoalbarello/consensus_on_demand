@@ -28,7 +28,7 @@ pub mod blockchain {
         pub fn new(artifact: T) -> Self {
             Self {
                 message: artifact,
-                peer_id: 1
+                peer_id: 0,
             }
         }
     }
@@ -142,40 +142,4 @@ pub mod blockchain {
             }
         }
     }
-    // pub struct Blockchain {
-    //     pub block_tree: BlockTree,
-    //     pub finalized_chain_index: usize,
-    // }
-
-    // impl Blockchain {
-    //     pub fn new() -> Self {
-    //         let genesis_height: u64 = 0;
-    //         let genesis_timestamp: i64 = 0;
-    //         let genesis_parent_hash = String::from("Genesis block has no previous hash");
-    //         let genesis_payload = String::from("This is the genesis block!");
-    //         let genesis_hash = calculate_hash(
-    //             genesis_height,
-    //             genesis_timestamp,
-    //             &genesis_parent_hash,
-    //             &genesis_payload,
-    //         );
-    //         let genesis_block = Block {
-    //             height: genesis_height,
-    //             from_rank: 0,        // irrelevant as genesis block is not broadcasted
-    //             from_node_number: 1, // irrelevant as genesis block does not receive notarization shares
-    //             hash: genesis_hash,
-    //             timestamp: genesis_timestamp,
-    //             parent_hash: genesis_parent_hash,
-    //             payload: genesis_payload,
-    //         };
-    //         println!(
-    //             "Local blockchain initialized with genesis block with hash {}",
-    //             &genesis_block.hash
-    //         );
-    //         Self {
-    //             block_tree: BlockTree::new(genesis_block),
-    //             finalized_chain_index: 0,
-    //         }
-    //     }
-    // }
 }

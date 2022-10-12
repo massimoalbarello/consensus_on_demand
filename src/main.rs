@@ -34,7 +34,7 @@ async fn main() {
             // Process events
             loop {
                 select! {
-                    // _ = stdin.select_next_some() => my_peer.update_local_rank(),
+                    _ = stdin.select_next_some() => my_peer.broadcast_block(),
                     _ = keep_alive_future().fuse() => {
                         my_peer.keep_alive(); // prevent Mdns expiration event by periodically sending keep alive messages to peers,
                     },
