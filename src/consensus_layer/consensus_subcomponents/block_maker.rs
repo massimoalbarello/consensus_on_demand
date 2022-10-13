@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize};
 
-use crate::consensus_layer::{pool_reader::PoolReader};
+use crate::consensus_layer::{pool_reader::PoolReader, artifacts::ConsensusMessage};
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub struct Payload {}
@@ -12,21 +12,21 @@ impl Payload {
 }
 
 // Block is the type that is used to create blocks out of which we build a
-/// block chain
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+// block chain
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct Block {
-    /// the parent block that this block extends, forming a block chain
+    // the parent block that this block extends, forming a block chain
     parent: String,
-    /// the payload of the block
+    // the payload of the block
     payload: Payload,
-    /// the height of the block, which is the height of the parent + 1
+    // the height of the block, which is the height of the parent + 1
     height: u64,
-    /// rank indicates the rank of the block maker that created this block
+    // rank indicates the rank of the block maker that created this block
     rank: u8,
 }
 
 impl Block {
-    /// Create a new block
+    // Create a new block
     pub fn new(
         parent: String,
         payload: Payload,
@@ -57,7 +57,7 @@ impl BlockMaker {
         }
     }
 
-    pub fn on_state_change(&self, pool: &PoolReader<'_>) -> Option<BlockProposal> {
+    pub fn on_state_change(&self, pool: &PoolReader<'_>) -> Option<ConsensusMessage> {
         let my_node_id = self.node_id;
         let (beacon, parent) = get_dependencies(pool).unwrap();
         let height: u64 = 0;
@@ -73,7 +73,7 @@ impl BlockMaker {
                     )
                 {
                     self.propose_block(pool, rank, parent).map(|proposal| {
-                        proposal
+                        ConsensusMessage::BlockProposal(proposal)
                     })
                 }
                 else {
@@ -96,7 +96,7 @@ impl BlockMaker {
         false
     }
 
-    /// Construct a block proposal
+    // Construct a block proposal
     fn propose_block(
         &self,
         pool: &PoolReader<'_>,
@@ -114,9 +114,9 @@ impl BlockMaker {
         )
     }
 
-    /// Construct a block proposal with specified validation context, parent
-    /// block, rank, and batch payload. This function completes the block by
-    /// adding a DKG payload and signs the block to obtain a block proposal.
+    // Construct a block proposal with specified validation context, parent
+    // block, rank, and batch payload. This function completes the block by
+    // adding a DKG payload and signs the block to obtain a block proposal.
     #[allow(clippy::too_many_arguments)]
     fn construct_block_proposal(
         &self,

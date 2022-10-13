@@ -48,7 +48,8 @@ impl ConsensusPoolImpl {
     }
     
     pub fn apply_changes(&mut self, change_set: ChangeSet) {
-        println!("Applied changes to consensus pool")
+        println!("Change set: {:?}", change_set);
+
     }
 
     fn apply_changes_unvalidated(&mut self, ops: PoolSectionOps<UnvalidatedArtifact<ConsensusMessage>>) {

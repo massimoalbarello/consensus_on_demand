@@ -1,11 +1,13 @@
 use serde::{Deserialize, Serialize};
 
+use super::consensus_subcomponents::{block_maker::BlockProposal, notary::NotarizationShare};
+
 pub type ChangeSet = Vec<ChangeAction>;
 
 #[derive(Debug)]
 pub enum ChangeAction {
-    AddToValidated(String),
-    MoveToValidated(String),
+    AddToValidated(ConsensusMessage),
+    MoveToValidated(ConsensusMessage),
 }
 
 impl From<ChangeAction> for ChangeSet {
@@ -32,5 +34,6 @@ impl<T> UnvalidatedArtifact<T> {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum ConsensusMessage {
-    BlockProposal,
+    BlockProposal(BlockProposal),
+    NotarizationShare(NotarizationShare),
 }

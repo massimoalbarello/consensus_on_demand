@@ -41,7 +41,6 @@ impl ConsensusProcessor {
                 let consensus_pool = self.consensus_pool.read().unwrap();
                 self.client.on_state_change(&*consensus_pool)
             };
-            println!("Change set: {:?}", change_set);
             let changed = if !change_set.is_empty() {
                 ProcessingResult::StateChanged
             } else {

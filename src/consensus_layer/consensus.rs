@@ -1,6 +1,6 @@
 use super::{
     pool::ConsensusPoolImpl, 
-    artifacts::{ChangeSet, ChangeAction},
+    artifacts::{ChangeSet, ChangeAction, ConsensusMessage},
     pool_reader::PoolReader,
     consensus_subcomponents::{notary::{Notary, NotarizationShare}, block_maker::{BlockMaker, BlockProposal}},
 };
@@ -91,14 +91,14 @@ impl ConsensusImpl {
 }
 
 
-fn add_all_to_validated(messages: Vec<NotarizationShare>) -> ChangeSet {
+fn add_all_to_validated(messages: Vec<ConsensusMessage>) -> ChangeSet {
     messages
         .into_iter()
-        .map(|msg| ChangeAction::AddToValidated(String::from("Notarization Share")))
+        .map(|msg| ChangeAction::AddToValidated(msg))
         .collect()
 }
 
-fn add_to_validated(msg: Option<BlockProposal>) -> ChangeSet {
-    msg.map(|msg| ChangeAction::AddToValidated(String::from("Block Proposal")).into())
+fn add_to_validated(msg: Option<ConsensusMessage>) -> ChangeSet {
+    msg.map(|msg| ChangeAction::AddToValidated(msg).into())
         .unwrap_or_default()
 }
