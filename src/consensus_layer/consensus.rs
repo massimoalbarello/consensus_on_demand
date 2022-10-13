@@ -11,7 +11,7 @@ impl ConsensusImpl {
         }
     }
 
-    fn on_state_change(&self, pool: &ConsensusPoolImpl) -> ChangeSet {
+    pub fn on_state_change(&self, pool: &ConsensusPoolImpl) -> ChangeSet {
         vec![ChangeAction::AddToValidated(String::from("Consensus message")), ChangeAction::MoveToValidated(String::from("Consensus message"))]
     }
 }

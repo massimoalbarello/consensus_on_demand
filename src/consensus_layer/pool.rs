@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap};
 
-use super::artifacts::{UnvalidatedArtifact, ConsensusMessage};
+use super::artifacts::{UnvalidatedArtifact, ConsensusMessage, ChangeSet};
 
 pub struct InMemoryPoolSection {
     artifacts: BTreeMap<String, UnvalidatedArtifact<ConsensusMessage>>,
@@ -45,6 +45,10 @@ impl ConsensusPoolImpl {
         let mut ops = PoolSectionOps::new();
         ops.insert(unvalidated_artifact);
         self.apply_changes_unvalidated(ops);
+    }
+    
+    pub fn apply_changes(&mut self, change_set: ChangeSet) {
+        println!("Applied changes to consensus pool")
     }
 
     fn apply_changes_unvalidated(&mut self, ops: PoolSectionOps<UnvalidatedArtifact<ConsensusMessage>>) {

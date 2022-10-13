@@ -160,7 +160,7 @@ impl Peer {
 
     pub fn handle_incoming_message(&mut self, message_variant: Message) {
         match message_variant {
-            Message::KeepAliveMessage => println!("Received keep alive message"),
+            Message::KeepAliveMessage => (),
             Message::ConsensusMessage(consensus_message) => self.manager.on_artifact(UnvalidatedArtifact::new(consensus_message)),
         }
     }

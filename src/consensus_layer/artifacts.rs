@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 pub type ChangeSet = Vec<ChangeAction>;
 
+#[derive(Debug)]
 pub enum ChangeAction {
     AddToValidated(String),
     MoveToValidated(String),
