@@ -9,8 +9,12 @@ use libp2p::{
 };
 use serde::{Serialize, Deserialize};
 
-use crate::artifact_manager::ArtifactProcessorManager;
-use crate::consensus_layer::artifacts::{ConsensusMessage, UnvalidatedArtifact};
+use crate::{
+    artifact_manager::ArtifactProcessorManager, consensus_layer::{
+        consensus_subcomponents::block_maker::{Block, Payload},
+        artifacts::{ConsensusMessage, UnvalidatedArtifact}
+    }
+};
 
 // We create a custom network behaviour that combines floodsub and mDNS.
 // Use the derive to generate delegating NetworkBehaviour impl.
@@ -107,7 +111,9 @@ impl Peer {
         println!("Sent block");
         self.swarm.behaviour_mut().floodsub.publish(
             self.floodsub_topic.clone(),
-            serde_json::to_string::<Message>(&Message::ConsensusMessage(ConsensusMessage::BlockProposal)).unwrap(),
+            serde_json::to_string::<Message>(&Message::ConsensusMessage(ConsensusMessage::BlockProposal(
+                Block::new(String::from("Parent hash"), Payload::new(), 0, 0)
+            ))).unwrap(),
         );
     }
 

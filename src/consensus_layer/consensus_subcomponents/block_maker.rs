@@ -6,7 +6,7 @@ use crate::consensus_layer::{pool_reader::PoolReader, artifacts::ConsensusMessag
 pub struct Payload {}
 
 impl Payload {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {}
     }
 }
