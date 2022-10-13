@@ -16,6 +16,17 @@ impl From<ChangeAction> for ChangeSet {
     }
 }
 
+/// A trait similar to Into, but without its restrictions.
+pub trait IntoInner<T>: AsRef<T> {
+    fn into_inner(self) -> T;
+}
+
+impl<T> AsRef<T> for UnvalidatedArtifact<T> {
+    fn as_ref(&self) -> &T {
+        &self.message
+    }
+}
+
 // Unvalidated artifact
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UnvalidatedArtifact<T> {
@@ -29,6 +40,30 @@ impl<T> UnvalidatedArtifact<T> {
             message: artifact,
             peer_id: 0,
         }
+    }
+}
+
+impl<T> IntoInner<T> for UnvalidatedArtifact<T> {
+    fn into_inner(self) -> T {
+        self.message
+    }
+}
+
+// Validated artifact
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ValidatedArtifact<T> {
+    pub msg: T,
+}
+
+impl<T> IntoInner<T> for ValidatedArtifact<T> {
+    fn into_inner(self) -> T {
+        self.msg
+    }
+}
+
+impl<T> AsRef<T> for ValidatedArtifact<T> {
+    fn as_ref(&self) -> &T {
+        &self.msg
     }
 }
 
