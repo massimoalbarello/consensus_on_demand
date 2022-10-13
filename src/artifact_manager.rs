@@ -6,7 +6,7 @@ use std::thread::{Builder as ThreadBuilder, JoinHandle};
 use crate::consensus_layer::{ConsensusProcessor, artifacts::{Artifact, UnvalidatedArtifact}};
 
 // Periodic duration of `PollEvent` in milliseconds.
-const ARTIFACT_MANAGER_TIMER_DURATION_MSEC: u64 = 1000;
+const ARTIFACT_MANAGER_TIMER_DURATION_MSEC: u64 = 200;
 
 struct ProcessRequest;
 
@@ -20,9 +20,13 @@ pub enum ProcessingResult {
     StateUnchanged,
 }
 
+// Manages the life cycle of the client specific artifact processor thread
 pub struct ArtifactProcessorManager {
+    // The list of unvalidated artifacts
     pending_artifacts: Arc<Mutex<Vec<UnvalidatedArtifact<Artifact>>>>,
+    // To send the process requests
     sender: Sender<ProcessRequest>,
+    // Handle for the processing thread
     handle: Option<JoinHandle<()>>,
 }
 
@@ -92,6 +96,6 @@ impl ArtifactProcessorManager {
         println!("Received artifact added to pending artifacts");
         let mut pending_artifacts = self.pending_artifacts.lock().unwrap();
         pending_artifacts.push(artifact);
-        self.sender.send(ProcessRequest);
+        self.sender.send(ProcessRequest).unwrap_or_else(|err| panic!("Failed to send request: {:?}", err));;
     }
 }
