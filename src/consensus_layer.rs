@@ -9,6 +9,10 @@ use crate::consensus_layer::consensus::ConsensusImpl;
 pub mod artifacts;
 use crate::consensus_layer::artifacts::{ConsensusMessage, UnvalidatedArtifact};
 
+pub mod pool_reader;
+
+pub mod consensus_subcomponents;
+
 use std::sync::{Arc, RwLock};
 
 pub struct ConsensusProcessor {
@@ -27,7 +31,7 @@ impl ConsensusProcessor {
     pub fn process_changes(&self, artifacts: Vec<UnvalidatedArtifact<ConsensusMessage>>) -> ProcessingResult {
         if artifacts.len() != 0 {
             {
-                println!("Addign artifacts to consensus pool");
+                println!("\nAddign artifacts to consensus pool");
                 let mut consensus_pool = self.consensus_pool.write().unwrap();
                 for artifact in artifacts {
                     consensus_pool.insert(artifact)
