@@ -7,7 +7,7 @@ pub mod consensus;
 use crate::consensus_layer::consensus::ConsensusImpl;
 
 pub mod artifacts;
-use crate::consensus_layer::artifacts::{Artifact, UnvalidatedArtifact};
+use crate::consensus_layer::artifacts::{ConsensusMessage, UnvalidatedArtifact};
 
 use std::sync::{Arc, RwLock};
 
@@ -24,7 +24,7 @@ impl ConsensusProcessor {
         }
     }
 
-    pub fn process_changes(&self, artifacts: Vec<UnvalidatedArtifact<Artifact>>) -> ProcessingResult {
+    pub fn process_changes(&self, artifacts: Vec<UnvalidatedArtifact<ConsensusMessage>>) -> ProcessingResult {
         if artifacts.len() != 0 {
             let mut consensus_pool = self.consensus_pool.write().unwrap();
             for artifact in artifacts {

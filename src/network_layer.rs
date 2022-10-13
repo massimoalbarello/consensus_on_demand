@@ -7,9 +7,10 @@ use libp2p::{
     swarm::SwarmEvent,
     NetworkBehaviour, PeerId, Swarm,
 };
+use serde::{Serialize, Deserialize};
 
 use crate::artifact_manager::ArtifactProcessorManager;
-use crate::consensus_layer::artifacts::{Artifact, Block, UnvalidatedArtifact};
+use crate::consensus_layer::artifacts::{ConsensusMessage, UnvalidatedArtifact};
 
 // We create a custom network behaviour that combines floodsub and mDNS.
 // Use the derive to generate delegating NetworkBehaviour impl.
@@ -37,6 +38,12 @@ impl From<FloodsubEvent> for OutEvent {
     fn from(v: FloodsubEvent) -> Self {
         Self::Floodsub(v)
     }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum Message {
+    ConsensusMessage(ConsensusMessage),
+    KeepAliveMessage,
 }
 
 pub struct Peer {
@@ -97,25 +104,17 @@ impl Peer {
     }
 
     pub fn broadcast_block(&mut self) {
-        
-        let block = Block::new(
-            self.round as u64,
-            self.rank,
-            self.node_number,
-            String::from("parent_hash"),
-            format!("Block: {}_{}", self.round, self.node_number),
-        );
-        println!("Sent block at height {}", block.height);
+        println!("Sent block");
         self.swarm.behaviour_mut().floodsub.publish(
             self.floodsub_topic.clone(),
-            serde_json::to_string::<Artifact>(&Artifact::Block(block.clone())).unwrap(),
+            serde_json::to_string::<Message>(&Message::ConsensusMessage(ConsensusMessage::BlockProposal)).unwrap(),
         );
     }
 
     pub fn keep_alive(&mut self) {
         self.swarm.behaviour_mut().floodsub.publish(
             self.floodsub_topic.clone(),
-            serde_json::to_string::<Artifact>(&Artifact::KeepAliveMessage).unwrap(),
+            serde_json::to_string::<Message>(&Message::KeepAliveMessage).unwrap(),
         );
     }
 
@@ -128,11 +127,11 @@ impl Peer {
             SwarmEvent::NewListenAddr { address, .. } => {
                 println!("Listening on {:?}", address);
             }
-            SwarmEvent::Behaviour(OutEvent::Floodsub(FloodsubEvent::Message(message))) => {
-                let message_content = String::from_utf8_lossy(&message.data);
-                let artifact = serde_json::from_str::<Artifact>(&message_content)
+            SwarmEvent::Behaviour(OutEvent::Floodsub(FloodsubEvent::Message(floodsub_message))) => {
+                let floodsub_content = String::from_utf8_lossy(&floodsub_message.data);
+                let message = serde_json::from_str::<Message>(&floodsub_content)
                     .expect("can parse artifact");
-                self.handle_incoming_artifact(artifact);
+                self.handle_incoming_message(message);
             }
             SwarmEvent::Behaviour(OutEvent::Mdns(MdnsEvent::Discovered(list))) => {
                 for (peer, _) in list {
@@ -159,10 +158,10 @@ impl Peer {
         }
     }
 
-    pub fn handle_incoming_artifact(&mut self, artifact_variant: Artifact) {
-        match artifact_variant {
-            Artifact::KeepAliveMessage => println!("Received keep alive message"),
-            _ => self.manager.on_artifact(UnvalidatedArtifact::new(artifact_variant)),
+    pub fn handle_incoming_message(&mut self, message_variant: Message) {
+        match message_variant {
+            Message::KeepAliveMessage => println!("Received keep alive message"),
+            Message::ConsensusMessage(consensus_message) => self.manager.on_artifact(UnvalidatedArtifact::new(consensus_message)),
         }
     }
 }

@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use crossbeam_channel::{Receiver, RecvTimeoutError, Sender};
 use std::thread::{Builder as ThreadBuilder, JoinHandle};
 
-use crate::consensus_layer::{ConsensusProcessor, artifacts::{Artifact, UnvalidatedArtifact}};
+use crate::consensus_layer::{ConsensusProcessor, artifacts::{ConsensusMessage, UnvalidatedArtifact}};
 
 // Periodic duration of `PollEvent` in milliseconds.
 const ARTIFACT_MANAGER_TIMER_DURATION_MSEC: u64 = 200;
@@ -23,7 +23,7 @@ pub enum ProcessingResult {
 // Manages the life cycle of the client specific artifact processor thread
 pub struct ArtifactProcessorManager {
     // The list of unvalidated artifacts
-    pending_artifacts: Arc<Mutex<Vec<UnvalidatedArtifact<Artifact>>>>,
+    pending_artifacts: Arc<Mutex<Vec<UnvalidatedArtifact<ConsensusMessage>>>>,
     // To send the process requests
     sender: Sender<ProcessRequest>,
     // Handle for the processing thread
@@ -60,7 +60,7 @@ impl ArtifactProcessorManager {
     }
 
     fn process_messages(
-        pending_artifacts: Arc<Mutex<Vec<UnvalidatedArtifact<Artifact>>>>,
+        pending_artifacts: Arc<Mutex<Vec<UnvalidatedArtifact<ConsensusMessage>>>>,
         client: Box<ConsensusProcessor>,
         sender: Sender<ProcessRequest>,
         receiver: Receiver<ProcessRequest>,
@@ -92,7 +92,7 @@ impl ArtifactProcessorManager {
         }
     }
 
-    pub fn on_artifact(&self, artifact: UnvalidatedArtifact<Artifact>) {
+    pub fn on_artifact(&self, artifact: UnvalidatedArtifact<ConsensusMessage>) {
         println!("Received artifact added to pending artifacts");
         let mut pending_artifacts = self.pending_artifacts.lock().unwrap();
         pending_artifacts.push(artifact);

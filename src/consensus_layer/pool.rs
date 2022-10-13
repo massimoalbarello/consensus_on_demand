@@ -1,9 +1,9 @@
 use std::{collections::BTreeMap};
 
-use super::artifacts::{UnvalidatedArtifact, Artifact, calculate_hash};
+use super::artifacts::{UnvalidatedArtifact, ConsensusMessage};
 
 pub struct InMemoryPoolSection {
-    artifacts: BTreeMap<String, UnvalidatedArtifact<Artifact>>,
+    artifacts: BTreeMap<String, UnvalidatedArtifact<ConsensusMessage>>,
 }
 
 impl InMemoryPoolSection {
@@ -13,7 +13,7 @@ impl InMemoryPoolSection {
         }
     }
 
-    fn mutate(&mut self, ops: PoolSectionOps<UnvalidatedArtifact<Artifact>>) {
+    fn mutate(&mut self, ops: PoolSectionOps<UnvalidatedArtifact<ConsensusMessage>>) {
         for op in ops.ops {
             match op {
                 PoolSectionOp::Insert(artifact) => self.insert(artifact),
@@ -22,8 +22,8 @@ impl InMemoryPoolSection {
         }
     }
 
-    fn insert(&mut self, artifact: UnvalidatedArtifact<Artifact>) {
-        let hash = calculate_hash(artifact.clone());
+    fn insert(&mut self, artifact: UnvalidatedArtifact<ConsensusMessage>) {
+        let hash = String::from("Hash");
         self.artifacts.entry(hash).or_insert(artifact);
     }
 }
@@ -41,13 +41,13 @@ impl ConsensusPoolImpl {
         }
     }
 
-    pub fn insert(&mut self, unvalidated_artifact: UnvalidatedArtifact<Artifact>) {
+    pub fn insert(&mut self, unvalidated_artifact: UnvalidatedArtifact<ConsensusMessage>) {
         let mut ops = PoolSectionOps::new();
         ops.insert(unvalidated_artifact);
         self.apply_changes_unvalidated(ops);
     }
 
-    fn apply_changes_unvalidated(&mut self, ops: PoolSectionOps<UnvalidatedArtifact<Artifact>>) {
+    fn apply_changes_unvalidated(&mut self, ops: PoolSectionOps<UnvalidatedArtifact<ConsensusMessage>>) {
         if !ops.ops.is_empty() {
             self.unvalidated.mutate(ops);
         }
