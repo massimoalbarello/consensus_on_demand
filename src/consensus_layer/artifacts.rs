@@ -8,6 +8,12 @@ pub enum ChangeAction {
     MoveToValidated(String),
 }
 
+impl From<ChangeAction> for ChangeSet {
+    fn from(action: ChangeAction) -> Self {
+        vec![action]
+    }
+}
+
 // Unvalidated artifact
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UnvalidatedArtifact<T> {

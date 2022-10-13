@@ -7,7 +7,7 @@ pub struct PoolReader<'a> {
 }
 
 impl<'a> PoolReader<'a> {
-    /// Create a PoolReader for a ConsensusPool.
+    // Create a PoolReader for a ConsensusPool.
     pub fn new(pool: &'a ConsensusPoolImpl) -> Self {
         Self {
             pool,

@@ -1,4 +1,6 @@
-use crate::consensus_layer::{pool_reader::PoolReader, artifacts::{ChangeSet, ChangeAction}};
+use crate::consensus_layer::{pool_reader::PoolReader};
+
+pub struct NotarizationShare {}
 
 pub struct Notary {
     time: u64,
@@ -11,7 +13,7 @@ impl Notary {
         }
     }
 
-    pub fn on_state_change(&self, pool: &PoolReader<'_>) -> ChangeSet {
-        vec![ChangeAction::AddToValidated(String::from("Noatrization Share"))]
+    pub fn on_state_change(&self, pool: &PoolReader<'_>) -> Vec<NotarizationShare> {
+        vec![]
     }
 }
