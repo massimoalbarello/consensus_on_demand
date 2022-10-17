@@ -75,8 +75,8 @@ impl ConsensusPoolImpl {
     }
     
     pub fn apply_changes(&mut self, change_set: ChangeSet) {
-        let mut unvalidated_ops: PoolSectionOps<UnvalidatedConsensusArtifact> = PoolSectionOps::new();
-        let mut validated_ops: PoolSectionOps<ValidatedConsensusArtifact> = PoolSectionOps::new();
+        let mut unvalidated_ops = PoolSectionOps::new();
+        let mut validated_ops = PoolSectionOps::new();
 
         // DO NOT Add a default nop. Explicitly mention all cases.
         // This helps with keeping this readable and obvious what
@@ -97,10 +97,13 @@ impl ConsensusPoolImpl {
                 }
             }
         }
+        self.apply_changes_unvalidated(unvalidated_ops);
+        self.apply_changes_validated(validated_ops);
     }
 
     fn apply_changes_validated(&mut self, ops: PoolSectionOps<ValidatedConsensusArtifact>) {
         if !ops.ops.is_empty() {
+            println!("Applying change to validated section of the consensus pool");
             self.validated.mutate(ops);
         }
     }
