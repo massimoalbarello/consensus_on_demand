@@ -24,7 +24,6 @@ impl<T: IntoInner<ConsensusMessage> + Clone + Debug> InMemoryPoolSection<T> {
             match op {
                 PoolSectionOp::Insert(artifact) => {
                     self.insert(artifact);
-                    println!("Inserted artifact in unvalidated section of consensus pool: {:?}", self.artifacts);
                 },
                 PoolSectionOp::Remove(msg_id) => {
                     if self.remove(&msg_id).is_none() {
@@ -76,7 +75,6 @@ impl ConsensusPoolImpl {
     }
     
     pub fn apply_changes(&mut self, change_set: ChangeSet) {
-        println!("Change set: {:?}", change_set);
         let mut unvalidated_ops: PoolSectionOps<UnvalidatedConsensusArtifact> = PoolSectionOps::new();
         let mut validated_ops: PoolSectionOps<ValidatedConsensusArtifact> = PoolSectionOps::new();
 
@@ -109,6 +107,7 @@ impl ConsensusPoolImpl {
 
     fn apply_changes_unvalidated(&mut self, ops: PoolSectionOps<UnvalidatedConsensusArtifact>) {
         if !ops.ops.is_empty() {
+            println!("Applying change to unvalidated section of the consensus pool");
             self.unvalidated.mutate(ops);
         }
     }

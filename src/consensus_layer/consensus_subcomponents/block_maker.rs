@@ -166,5 +166,5 @@ pub fn is_time_to_make_block(
     height: u64,
     rank: u8,
 ) -> bool {
-    true
+    false
 }
