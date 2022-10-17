@@ -1,5 +1,7 @@
 use std::collections::BTreeMap;
 
+use crate::crypto::CryptoHash;
+
 use super::artifacts::ConsensusMessage;
 
 pub struct HeightIndex<T: Eq> {
@@ -51,14 +53,14 @@ impl Indexes {
         }
     }
 
-    pub fn remove(&mut self, msg: &ConsensusMessage, hash: &String) {
+    pub fn remove(&mut self, msg: &ConsensusMessage, hash: &CryptoHash) {
         match msg {
             ConsensusMessage::NotarizationShare(artifact) => self
                 .notarization_share
                 .remove(artifact.height, hash),
             ConsensusMessage::BlockProposal(artifact) => self
                 .block_proposal
-                .remove(artifact.height, hash),
+                .remove(artifact.content.value.height, hash),
         };
     }
 }

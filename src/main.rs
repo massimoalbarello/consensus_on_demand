@@ -9,6 +9,7 @@ use std::time::Duration;
 pub mod network_layer;
 use crate::network_layer::Peer;
 pub mod artifact_manager;
+pub mod crypto;
 pub mod consensus_layer;
 
 async fn keep_alive_future() {

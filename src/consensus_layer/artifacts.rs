@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::crypto::ConsensusMessageHash;
+
 use super::consensus_subcomponents::{block_maker::BlockProposal, notary::NotarizationShare};
 
 pub type ChangeSet = Vec<ChangeAction>;
@@ -76,8 +78,15 @@ pub enum ConsensusMessage {
 impl ConsensusMessage {
     pub fn get_id(&self) -> ConsensusMessageId {
         ConsensusMessageId {
-            hash: String::from("Hash"),
+            hash: self.get_cm_hash(),
             height: 0,
+        }
+    }
+    
+    fn get_cm_hash(&self) -> ConsensusMessageHash {
+        match self {
+            ConsensusMessage::BlockProposal(artifact) => ConsensusMessageHash::BlockProposal(artifact.content.hash.clone()),
+            ConsensusMessage::NotarizationShare(value) => ConsensusMessageHash::Notarization(String::from("Notarization hash")),
         }
     }
 }
@@ -86,6 +95,6 @@ impl ConsensusMessage {
 /// which is used by the consensus pool to help lookup.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ConsensusMessageId {
-    pub hash: String,
+    pub hash: ConsensusMessageHash,
     pub height: u64,
 }

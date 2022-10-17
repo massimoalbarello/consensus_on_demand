@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize};
 
-use crate::consensus_layer::{pool_reader::PoolReader, artifacts::ConsensusMessage};
+use crate::{consensus_layer::{pool_reader::PoolReader, artifacts::ConsensusMessage}, crypto::{Signed, Hashed, ConsensusMessageHash}};
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub struct Payload {}
@@ -42,7 +42,10 @@ impl Block {
     }
 }
 
-pub type BlockProposal = Block;
+/// HashedBlock contains a Block together with its hash
+pub type HashedBlock = Hashed;
+
+pub type BlockProposal = Signed<HashedBlock, u8>;
 
 pub struct RandomBeacon {}
 
@@ -128,10 +131,13 @@ impl BlockMaker {
     ) -> Option<BlockProposal> {
         let payload = Payload::new();
         let block = Block::new(parent_hash, payload, height, rank);
-        let hashed_block = String::from("Block hash");
-        Some(block as BlockProposal)
+        Some(BlockProposal {
+            signature: self.node_id,
+            content: Hashed::new(block),
+        })
     }
 }
+
 
 // Return the parent random beacon and block of the latest round for which
 // this node might propose a block.

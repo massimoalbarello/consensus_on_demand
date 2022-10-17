@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, fmt::Debug};
 
-use crate::consensus_layer::artifacts::ChangeAction;
+use crate::{consensus_layer::artifacts::ChangeAction, crypto::CryptoHash};
 use super::{artifacts::{UnvalidatedArtifact, ValidatedArtifact, ConsensusMessage, ChangeSet, IntoInner, ConsensusMessageId}, height_index::Indexes};
 
 type UnvalidatedConsensusArtifact = UnvalidatedArtifact<ConsensusMessage>;
@@ -42,11 +42,11 @@ impl<T: IntoInner<ConsensusMessage> + Clone + Debug> InMemoryPoolSection<T> {
     }
 
     fn remove(&mut self, msg_id: &ConsensusMessageId) -> Option<T> {
-        self.remove_by_hash(&msg_id.hash)
+        self.remove_by_hash(&msg_id.hash.digest())
     }
 
     /// Get a consensus message by its hash
-    pub fn remove_by_hash(&mut self, hash: &String) -> Option<T> {
+    pub fn remove_by_hash(&mut self, hash: &CryptoHash) -> Option<T> {
         self.artifacts.remove(hash).map(|artifact| {
             self.indexes.remove(artifact.as_ref(), hash);
             artifact

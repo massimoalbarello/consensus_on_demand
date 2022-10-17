@@ -11,9 +11,9 @@ use serde::{Serialize, Deserialize};
 
 use crate::{
     artifact_manager::ArtifactProcessorManager, consensus_layer::{
-        consensus_subcomponents::block_maker::{Block, Payload},
+        consensus_subcomponents::block_maker::{Block, Payload, BlockProposal},
         artifacts::{ConsensusMessage, UnvalidatedArtifact}
-    }
+    }, crypto::Hashed
 };
 
 // We create a custom network behaviour that combines floodsub and mDNS.
@@ -112,7 +112,10 @@ impl Peer {
         self.swarm.behaviour_mut().floodsub.publish(
             self.floodsub_topic.clone(),
             serde_json::to_string::<Message>(&Message::ConsensusMessage(ConsensusMessage::BlockProposal(
-                Block::new(String::from("Parent hash"), Payload::new(), 0, 0)
+                BlockProposal {
+                    signature: self.node_number,
+                    content: Hashed::new(Block::new(String::from("Parent hash"), Payload::new(), 0, 0)),
+                }
             ))).unwrap(),
         );
     }
