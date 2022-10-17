@@ -11,6 +11,8 @@ use crate::consensus_layer::artifacts::{ConsensusMessage, UnvalidatedArtifact};
 
 pub mod pool_reader;
 
+pub mod height_index;
+
 pub mod consensus_subcomponents;
 
 use std::sync::{Arc, RwLock};

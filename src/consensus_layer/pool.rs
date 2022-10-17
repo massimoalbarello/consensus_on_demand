@@ -1,34 +1,56 @@
 use std::{collections::BTreeMap, fmt::Debug};
 
 use crate::consensus_layer::artifacts::ChangeAction;
-use super::artifacts::{UnvalidatedArtifact, ValidatedArtifact, ConsensusMessage, ChangeSet, IntoInner};
+use super::{artifacts::{UnvalidatedArtifact, ValidatedArtifact, ConsensusMessage, ChangeSet, IntoInner, ConsensusMessageId}, height_index::Indexes};
 
 type UnvalidatedConsensusArtifact = UnvalidatedArtifact<ConsensusMessage>;
 type ValidatedConsensusArtifact = ValidatedArtifact<ConsensusMessage>;
 
 pub struct InMemoryPoolSection<T: IntoInner<ConsensusMessage>> {
     artifacts: BTreeMap<String, T>,
+    indexes: Indexes,
 }
 
 impl<T: IntoInner<ConsensusMessage> + Clone + Debug> InMemoryPoolSection<T> {
     pub fn new() -> InMemoryPoolSection<T> {
         InMemoryPoolSection {
             artifacts: BTreeMap::new(),
+            indexes: Indexes::new(),
         }
     }
 
     fn mutate(&mut self, ops: PoolSectionOps<T>) {
         for op in ops.ops {
             match op {
-                PoolSectionOp::Insert(artifact) => self.insert(artifact),
+                PoolSectionOp::Insert(artifact) => {
+                    self.insert(artifact);
+                    println!("Inserted artifact in unvalidated section of consensus pool: {:?}", self.artifacts);
+                },
+                PoolSectionOp::Remove(msg_id) => {
+                    if self.remove(&msg_id).is_none() {
+                        println!("Error removing artifact {:?}", &msg_id);
+                    }
+                }
             }
-            println!("Inserted artifact in unvalidated section of consensus pool: {:?}", self.artifacts);
+            
         }
     }
 
     fn insert(&mut self, artifact: T) {
         let hash = String::from("Hash");
         self.artifacts.entry(hash).or_insert(artifact);
+    }
+
+    fn remove(&mut self, msg_id: &ConsensusMessageId) -> Option<T> {
+        self.remove_by_hash(&msg_id.hash)
+    }
+
+    /// Get a consensus message by its hash
+    pub fn remove_by_hash(&mut self, hash: &String) -> Option<T> {
+        self.artifacts.remove(hash).map(|artifact| {
+            self.indexes.remove(artifact.as_ref(), hash);
+            artifact
+        })
     }
 }
 
@@ -67,6 +89,8 @@ impl ConsensusPoolImpl {
                     });
                 }
                 ChangeAction::MoveToValidated(to_move) => {
+                    let msg_id = to_move.get_id();
+                    unvalidated_ops.remove(msg_id);
                     validated_ops.insert(ValidatedConsensusArtifact {
                         msg: to_move,
                     });
@@ -92,6 +116,7 @@ impl ConsensusPoolImpl {
 #[derive(Debug, Clone)]
 pub enum PoolSectionOp<T> {
     Insert(T),
+    Remove(ConsensusMessageId),
 }
 
 #[derive(Clone, Debug, Default)]
@@ -106,5 +131,9 @@ impl<T> PoolSectionOps<T> {
 
     pub fn insert(&mut self, artifact: T) {
         self.ops.push(PoolSectionOp::Insert(artifact));
+    }
+
+    pub fn remove(&mut self, msg_id: ConsensusMessageId) {
+        self.ops.push(PoolSectionOp::Remove(msg_id));
     }
 }

@@ -6,7 +6,7 @@ use super::block_maker::Block;
 // NotarizationContent holds the values that are signed in a notarization
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct NotarizationContent {
-    height: u64,
+    pub height: u64,
     block: Block
 }
 

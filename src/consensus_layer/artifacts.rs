@@ -72,3 +72,20 @@ pub enum ConsensusMessage {
     BlockProposal(BlockProposal),
     NotarizationShare(NotarizationShare),
 }
+
+impl ConsensusMessage {
+    pub fn get_id(&self) -> ConsensusMessageId {
+        ConsensusMessageId {
+            hash: String::from("Hash"),
+            height: 0,
+        }
+    }
+}
+
+/// Consensus message identifier carries both a message hash and a height,
+/// which is used by the consensus pool to help lookup.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ConsensusMessageId {
+    pub hash: String,
+    pub height: u64,
+}

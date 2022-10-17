@@ -2,7 +2,7 @@ use super::{
     pool::ConsensusPoolImpl, 
     artifacts::{ChangeSet, ChangeAction, ConsensusMessage},
     pool_reader::PoolReader,
-    consensus_subcomponents::{notary::{Notary, NotarizationShare}, block_maker::{BlockMaker, BlockProposal}},
+    consensus_subcomponents::{notary::Notary, block_maker::BlockMaker},
 };
 
 
