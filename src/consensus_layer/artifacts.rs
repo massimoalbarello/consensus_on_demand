@@ -6,7 +6,7 @@ use super::consensus_subcomponents::{block_maker::BlockProposal, notary::Notariz
 
 pub type ChangeSet = Vec<ChangeAction>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ChangeAction {
     AddToValidated(ConsensusMessage),
     MoveToValidated(ConsensusMessage),

@@ -79,13 +79,17 @@ impl ArtifactProcessorManager {
                         artifacts
                     };
 
-                    let result = client.process_changes(artifacts);
+                    let (adverts, result) = client.process_changes(artifacts);
 
                     if let ProcessingResult::StateChanged = result {
                         sender
                             .send(ProcessRequest)
                             .unwrap_or_else(|err| panic!("Failed to send request: {:?}", err));
                     }
+                    adverts.into_iter().for_each(|adv| {
+                        println!("Message to be broadcasted: {:?}", adv);
+                        // use a channel to send messages to network layer so that it can broadcast them
+                    });
                 },
                 Err(RecvTimeoutError::Disconnected) => return,
             }

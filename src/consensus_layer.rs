@@ -7,7 +7,7 @@ pub mod consensus;
 use crate::consensus_layer::consensus::ConsensusImpl;
 
 pub mod artifacts;
-use crate::consensus_layer::artifacts::{ConsensusMessage, UnvalidatedArtifact};
+use crate::consensus_layer::artifacts::{ConsensusMessage, UnvalidatedArtifact, ChangeAction};
 
 pub mod pool_reader;
 
@@ -30,13 +30,14 @@ impl ConsensusProcessor {
         }
     }
 
-    pub fn process_changes(&self, artifacts: Vec<UnvalidatedArtifact<ConsensusMessage>>) -> ProcessingResult {
+    pub fn process_changes(&self, artifacts: Vec<UnvalidatedArtifact<ConsensusMessage>>) -> (Vec<ConsensusMessage>, ProcessingResult) {
         {
             let mut consensus_pool = self.consensus_pool.write().unwrap();
             for artifact in artifacts {
                 consensus_pool.insert(artifact)
             }
         }
+        let mut adverts = Vec::new();
         let change_set = {
             let consensus_pool = self.consensus_pool.read().unwrap();
             self.client.on_state_change(&*consensus_pool)
@@ -48,12 +49,23 @@ impl ConsensusProcessor {
             ProcessingResult::StateUnchanged
         };
 
+        for change_action in change_set.iter() {
+            match change_action {
+                ChangeAction::AddToValidated(to_add) => {
+                    adverts.push(to_add.to_owned());
+                }
+                ChangeAction::MoveToValidated(to_move) => {
+                    adverts.push(to_move.to_owned());
+                }
+            }
+        }
+
         self.consensus_pool
             .write()
             .unwrap()
             .apply_changes(change_set);
 
-        changed
+        (adverts, changed)
     }
 }
 
