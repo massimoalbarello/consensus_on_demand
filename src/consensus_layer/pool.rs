@@ -37,7 +37,9 @@ impl<T: IntoInner<ConsensusMessage> + Clone + Debug> InMemoryPoolSection<T> {
     }
 
     fn insert(&mut self, artifact: T) {
-        let hash = String::from("Hash");
+        let msg = artifact.as_ref();
+        let hash = msg.get_cm_hash().digest().clone();
+        self.indexes.insert(msg, &hash);
         self.artifacts.entry(hash).or_insert(artifact);
     }
 

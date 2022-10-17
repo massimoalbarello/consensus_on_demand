@@ -83,7 +83,7 @@ impl ConsensusMessage {
         }
     }
     
-    fn get_cm_hash(&self) -> ConsensusMessageHash {
+    pub fn get_cm_hash(&self) -> ConsensusMessageHash {
         match self {
             ConsensusMessage::BlockProposal(artifact) => ConsensusMessageHash::BlockProposal(artifact.content.hash.clone()),
             ConsensusMessage::NotarizationShare(value) => ConsensusMessageHash::Notarization(String::from("Notarization hash")),

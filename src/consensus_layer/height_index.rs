@@ -23,6 +23,17 @@ impl<T: Eq + Clone> HeightIndex<T> {
         HeightIndex::default()
     }
 
+    /// Inserts `value` at `height`. Returns `true` if `value` was inserted,
+    /// `false` if already present.
+    pub fn insert(&mut self, height: u64, value: &T) -> bool {
+        let values = self.buckets.entry(height).or_insert_with(Vec::new);
+        if !values.contains(value) {
+            values.push(value.clone());
+            return true;
+        }
+        false
+    }
+
     /// Removes `value` from `height`. Returns `true` if `value` was removed,
     /// `false` if not present.
     pub fn remove(&mut self, height: u64, value: &T) -> bool {
@@ -51,6 +62,17 @@ impl Indexes {
             notarization_share: HeightIndex::new(),
             block_proposal: HeightIndex::new(),
         }
+    }
+
+    pub fn insert(&mut self, msg: &ConsensusMessage, hash: &CryptoHash) {
+        match msg {
+            ConsensusMessage::NotarizationShare(artifact) => self
+                .notarization_share
+                .insert(artifact.height, hash),
+            ConsensusMessage::BlockProposal(artifact) => self
+                .block_proposal
+                .insert(artifact.content.value.height, hash),
+        };
     }
 
     pub fn remove(&mut self, msg: &ConsensusMessage, hash: &CryptoHash) {
