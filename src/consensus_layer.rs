@@ -23,10 +23,10 @@ pub struct ConsensusProcessor {
 }
 
 impl ConsensusProcessor {
-    pub fn new() -> Self {
+    pub fn new(node_number: u8) -> Self {
         Self {
             consensus_pool: Arc::new(RwLock::new(ConsensusPoolImpl::new())),
-            client: Box::new(ConsensusImpl::new()),
+            client: Box::new(ConsensusImpl::new(node_number)),
         }
     }
 

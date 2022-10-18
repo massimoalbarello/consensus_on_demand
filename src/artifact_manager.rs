@@ -31,12 +31,12 @@ pub struct ArtifactProcessorManager {
 }
 
 impl ArtifactProcessorManager {
-    pub fn new() -> Self {
+    pub fn new(node_number: u8) -> Self {
 
         let pending_artifacts = Arc::new(Mutex::new(Vec::new()));
         let (sender, receiver) = crossbeam_channel::unbounded::<ProcessRequest>();
 
-        let client = Box::new(ConsensusProcessor::new());
+        let client = Box::new(ConsensusProcessor::new(node_number));
 
         // Spawn the processor thread
         let sender_cl = sender.clone();

@@ -7,8 +7,8 @@ type UnvalidatedConsensusArtifact = UnvalidatedArtifact<ConsensusMessage>;
 type ValidatedConsensusArtifact = ValidatedArtifact<ConsensusMessage>;
 
 pub struct InMemoryPoolSection<T: IntoInner<ConsensusMessage>> {
-    artifacts: BTreeMap<String, T>,
-    indexes: Indexes,
+    pub artifacts: BTreeMap<String, T>,
+    pub indexes: Indexes,
 }
 
 impl<T: IntoInner<ConsensusMessage> + Clone + Debug> InMemoryPoolSection<T> {
@@ -17,6 +17,10 @@ impl<T: IntoInner<ConsensusMessage> + Clone + Debug> InMemoryPoolSection<T> {
             artifacts: BTreeMap::new(),
             indexes: Indexes::new(),
         }
+    }
+
+    fn pool_section(&self) -> &InMemoryPoolSection<T> {
+        self
     }
 
     fn mutate(&mut self, ops: PoolSectionOps<T>) {
@@ -68,6 +72,14 @@ impl ConsensusPoolImpl {
         }
     }
 
+    pub fn validated(&self) -> &InMemoryPoolSection<ValidatedConsensusArtifact> {
+        self.validated.pool_section()
+    }
+
+    pub fn unvalidated(&self) -> &InMemoryPoolSection<UnvalidatedConsensusArtifact> {
+        self.unvalidated.pool_section()
+    }
+
     pub fn insert(&mut self, unvalidated_artifact: UnvalidatedConsensusArtifact) {
         let mut ops = PoolSectionOps::new();
         ops.insert(unvalidated_artifact);
@@ -114,7 +126,6 @@ impl ConsensusPoolImpl {
             self.unvalidated.mutate(ops);
         }
     }
-
 }
 
 #[derive(Debug, Clone)]

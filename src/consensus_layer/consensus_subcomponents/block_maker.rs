@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize};
 
-use crate::{consensus_layer::{pool_reader::PoolReader, artifacts::ConsensusMessage}, crypto::{Signed, Hashed, ConsensusMessageHash}};
+use crate::{consensus_layer::{pool_reader::PoolReader, artifacts::ConsensusMessage}, crypto::{Signed, Hashed}};
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub struct Payload {}
@@ -54,9 +54,9 @@ pub struct BlockMaker {
 }
 
 impl BlockMaker {
-    pub fn new() -> Self {
+    pub fn new(node_id: u8) -> Self {
         Self {
-            node_id: 0,
+            node_id,
         }
     }
 
@@ -73,6 +73,7 @@ impl BlockMaker {
                         pool,
                         height,
                         rank,
+                        my_node_id
                     )
                 {
                     self.propose_block(pool, rank, parent).map(|proposal| {
@@ -165,6 +166,8 @@ pub fn is_time_to_make_block(
     pool: &PoolReader<'_>,
     height: u64,
     rank: u8,
+    node_id: u8
 ) -> bool {
-    false
+    // node 1 proposes block only once (used for tests)
+    node_id == 1 && pool.pool().validated().artifacts.is_empty()
 }

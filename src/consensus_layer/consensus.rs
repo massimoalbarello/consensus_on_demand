@@ -40,9 +40,9 @@ pub struct ConsensusImpl {
 }
 
 impl ConsensusImpl {
-    pub fn new() -> Self {
+    pub fn new(node_number: u8) -> Self {
         Self {
-            block_maker: BlockMaker::new(),
+            block_maker: BlockMaker::new(node_number),
             notary: Notary::new(),
             schedule: RoundRobin::default(),
         }

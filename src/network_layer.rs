@@ -88,7 +88,7 @@ impl Peer {
                 behaviour.floodsub.subscribe(floodsub_topic);
                 Swarm::new(transport, behaviour, local_peer_id)
             },
-            manager: ArtifactProcessorManager::new(),
+            manager: ArtifactProcessorManager::new(node_number),
         };
         println!(
             "Local node initialized with number: {} and peer id: {:?}",

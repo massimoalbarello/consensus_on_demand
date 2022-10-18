@@ -13,4 +13,9 @@ impl<'a> PoolReader<'a> {
             pool,
         }
     }
+
+    /// Get the underlying pool.
+    pub fn pool(&self) -> &'a ConsensusPoolImpl {
+        self.pool
+    }
 }
