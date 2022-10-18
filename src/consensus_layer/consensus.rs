@@ -2,13 +2,13 @@ use super::{
     pool::ConsensusPoolImpl, 
     artifacts::{ChangeSet, ChangeAction, ConsensusMessage},
     pool_reader::PoolReader,
-    consensus_subcomponents::{notary::Notary, block_maker::BlockMaker},
+    consensus_subcomponents::{notary::Notary, block_maker::BlockMaker, validator::Validator},
 };
 
 
 // Rotate on_state_change calls with a round robin schedule to ensure fairness.
 #[derive(Default)]
-struct RoundRobin {
+pub struct RoundRobin {
     index: std::cell::RefCell<usize>,
 }
 
@@ -17,25 +17,27 @@ impl RoundRobin {
     // robin schedule. Return as soon as a call returns a non-empty ChangeSet.
     // Otherwise try calling the next one, and return empty ChangeSet if all
     // calls from the given list have been tried.
-    pub fn call_next<'a, T>(&self, calls: &[&'a dyn Fn() -> Vec<T>]) -> Vec<T> {
+    pub fn call_next<'a, T>(&self, calls: &[&'a dyn Fn() -> (Vec<T>, bool)]) -> (Vec<T>, bool) {
         let mut result;
+        let mut to_broadcast;
         let mut index = self.index.borrow_mut();
         let mut next = *index;
         loop {
-            result = calls[next]();
+            (result, to_broadcast) = calls[next]();
             next = (next + 1) % calls.len();
             if !result.is_empty() || *index == next {
                 break;
             };
         }
         *index = next;
-        result
+        (result, to_broadcast)
     }
 }
 
 pub struct ConsensusImpl {
     block_maker: BlockMaker,
     notary: Notary,
+    validator: Validator,
     schedule: RoundRobin,
 }
 
@@ -44,11 +46,12 @@ impl ConsensusImpl {
         Self {
             block_maker: BlockMaker::new(node_number),
             notary: Notary::new(),
+            validator: Validator::new(),
             schedule: RoundRobin::default(),
         }
     }
 
-    pub fn on_state_change(&self, pool: &ConsensusPoolImpl) -> ChangeSet {
+    pub fn on_state_change(&self, pool: &ConsensusPoolImpl) -> (ChangeSet, bool) {
         // Invoke `on_state_change` on each subcomponent in order.
         // Return the first non-empty [ChangeSet] as returned by a subcomponent.
         // Otherwise return an empty [ChangeSet] if all subcomponents return
@@ -70,23 +73,33 @@ impl ConsensusImpl {
         // a priority, but it should not affect liveness or correctness.
 
         let pool_reader = PoolReader::new(pool);
+        
+        let notarize = || {
+            let change_set = add_all_to_validated(self.notary.on_state_change(&pool_reader));
+            let to_broadcast = true;
+            (change_set, to_broadcast)
+        };
 
         let make_block = || {
-            add_to_validated(self.block_maker.on_state_change(&pool_reader))
+            let change_set = add_to_validated(self.block_maker.on_state_change(&pool_reader));
+            let to_broadcast = true;
+            (change_set, to_broadcast)
         };
 
-        let notarize = || {
-            add_all_to_validated(self.notary.on_state_change(&pool_reader))
+
+        let validate = || {
+            self.validator.on_state_change(&pool_reader)
         };
 
-        let calls: [&'_ dyn Fn() -> ChangeSet; 2] = [
+        let calls: [&'_ dyn Fn() -> (ChangeSet, bool); 3] = [
             &notarize,
             &make_block,
+            &validate,
         ];
 
-        let changeset = self.schedule.call_next(&calls);
+        let (changeset, to_broadcast) = self.schedule.call_next(&calls);
 
-        changeset
+        (changeset, to_broadcast)
     }
 }
 

@@ -38,24 +38,26 @@ impl ConsensusProcessor {
             }
         }
         let mut adverts = Vec::new();
-        let change_set = {
+        let (change_set, to_broadcast) = {
             let consensus_pool = self.consensus_pool.read().unwrap();
             self.client.on_state_change(&*consensus_pool)
         };
         let changed = if !change_set.is_empty() {
-            println!("Change set: {:?}", change_set);
+            println!("Change set: {:?} to broadcast: {}", change_set, to_broadcast);
             ProcessingResult::StateChanged
         } else {
             ProcessingResult::StateUnchanged
         };
 
-        for change_action in change_set.iter() {
-            match change_action {
-                ChangeAction::AddToValidated(to_add) => {
-                    adverts.push(to_add.to_owned());
-                }
-                ChangeAction::MoveToValidated(to_move) => {
-                    adverts.push(to_move.to_owned());
+        if to_broadcast == true {
+            for change_action in change_set.iter() {
+                match change_action {
+                    ChangeAction::AddToValidated(to_add) => {
+                        adverts.push(to_add.to_owned());
+                    }
+                    ChangeAction::MoveToValidated(to_move) => {
+                        adverts.push(to_move.to_owned());
+                    }
                 }
             }
         }
