@@ -12,15 +12,15 @@ impl Validator {
     }
 
     pub fn on_state_change(&self, pool_reader: &PoolReader<'_>) -> (ChangeSet, bool) {
-        let validate_blocks = || self.validate_blocks(pool_reader);
+        let validate_artifacts = || self.validate_artifacts(pool_reader);
 
         let calls: [&'_ dyn Fn() -> (ChangeSet, bool); 1] = [
-            &validate_blocks,
+            &validate_artifacts,
         ];
         self.schedule.call_next(&calls)
     }
 
-    fn validate_blocks(&self, pool_reader: &PoolReader<'_>) -> (ChangeSet, bool) {
+    fn validate_artifacts(&self, pool_reader: &PoolReader<'_>) -> (ChangeSet, bool) {
         let mut change_set = Vec::new();
         for (artifact_hash, unvalidated_artifact) in &pool_reader.pool().unvalidated().artifacts {
             println!("\n########## Validator ##########");
