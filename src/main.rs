@@ -12,8 +12,8 @@ pub mod artifact_manager;
 pub mod crypto;
 pub mod consensus_layer;
 
-async fn keep_alive_future() {
-    sleep(Duration::new(5, 0)).await;
+async fn broadcast_message_future() {
+    sleep(Duration::new(1, 0)).await;
 }
 
 #[async_std::main]
@@ -35,9 +35,11 @@ async fn main() {
             // Process events
             loop {
                 select! {
-                    _ = stdin.select_next_some() => my_peer.broadcast_block(),
-                    _ = keep_alive_future().fuse() => {
-                        my_peer.keep_alive(); // prevent Mdns expiration event by periodically sending keep alive messages to peers,
+                    _ = stdin.select_next_some() => (),
+                    _ = broadcast_message_future().fuse() => {
+                        // prevent Mdns expiration event by periodically broadcasting keep alive messages to peers
+                        // if any locally generated artifact, broadcast it
+                        my_peer.broadcast_message();
                     },
                     event = my_peer.get_next_event() => my_peer.match_event(event),
                 }

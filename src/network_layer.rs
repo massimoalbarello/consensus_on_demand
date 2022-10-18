@@ -1,4 +1,5 @@
 use async_std::task;
+use crossbeam_channel::Receiver;
 use futures::{prelude::stream::StreamExt, stream::SelectNextSome};
 use libp2p::{
     floodsub::{Floodsub, FloodsubEvent, Topic},
@@ -10,10 +11,8 @@ use libp2p::{
 use serde::{Serialize, Deserialize};
 
 use crate::{
-    artifact_manager::ArtifactProcessorManager, consensus_layer::{
-        consensus_subcomponents::block_maker::{Block, Payload, BlockProposal},
-        artifacts::{ConsensusMessage, UnvalidatedArtifact}
-    }, crypto::Hashed
+    artifact_manager::ArtifactProcessorManager, 
+    consensus_layer::artifacts::{ConsensusMessage, UnvalidatedArtifact}
 };
 
 // We create a custom network behaviour that combines floodsub and mDNS.
@@ -56,6 +55,7 @@ pub struct Peer {
     rank: u64,
     floodsub_topic: Topic,
     swarm: Swarm<P2PBehaviour>,
+    receiver_outgoing_artifact: Receiver<ConsensusMessage>,
     manager: ArtifactProcessorManager,
 }
 
@@ -71,6 +71,9 @@ impl Peer {
 
         // Create a Floodsub topic
         let floodsub_topic = Topic::new(topic);
+
+        // channel used to transmit locally generated artifacts from the consensus layer to the network layer so that they can be broadcasted to other peers
+        let (sender_outgoing_artifact, receiver_outgoing_artifact) = crossbeam_channel::unbounded::<ConsensusMessage>();
 
         // Create a Swarm to manage peers and events
         let local_peer = Self {
@@ -88,7 +91,8 @@ impl Peer {
                 behaviour.floodsub.subscribe(floodsub_topic);
                 Swarm::new(transport, behaviour, local_peer_id)
             },
-            manager: ArtifactProcessorManager::new(node_number),
+            receiver_outgoing_artifact,
+            manager: ArtifactProcessorManager::new(node_number, sender_outgoing_artifact),
         };
         println!(
             "Local node initialized with number: {} and peer id: {:?}",
@@ -107,24 +111,23 @@ impl Peer {
             .expect("swarm can be started");
     }
 
-    pub fn broadcast_block(&mut self) {
-        println!("Sent block");
-        self.swarm.behaviour_mut().floodsub.publish(
-            self.floodsub_topic.clone(),
-            serde_json::to_string::<Message>(&Message::ConsensusMessage(ConsensusMessage::BlockProposal(
-                BlockProposal {
-                    signature: self.node_number,
-                    content: Hashed::new(Block::new(String::from("Parent hash"), Payload::new(), 0, 0)),
-                }
-            ))).unwrap(),
-        );
-    }
-
-    pub fn keep_alive(&mut self) {
-        self.swarm.behaviour_mut().floodsub.publish(
-            self.floodsub_topic.clone(),
-            serde_json::to_string::<Message>(&Message::KeepAliveMessage).unwrap(),
-        );
+    pub fn broadcast_message(&mut self) {
+        match self.receiver_outgoing_artifact.try_recv() {
+            Ok(outgoing_artifact) => {
+                println!("Broadcasted locally generated artifact");
+                self.swarm.behaviour_mut().floodsub.publish(
+                    self.floodsub_topic.clone(),
+                    serde_json::to_string::<Message>(&Message::ConsensusMessage(outgoing_artifact)).unwrap(),
+                );
+            },
+            Err(_) => {
+                println!("No outgoing artifact to be broadcasted");
+                self.swarm.behaviour_mut().floodsub.publish(
+                    self.floodsub_topic.clone(),
+                    serde_json::to_string::<Message>(&Message::KeepAliveMessage).unwrap()
+                );
+            },
+        }
     }
 
     pub fn get_next_event(&mut self) -> SelectNextSome<'_, Swarm<P2PBehaviour>> {

@@ -25,36 +25,37 @@ pub struct ArtifactProcessorManager {
     // The list of unvalidated artifacts
     pending_artifacts: Arc<Mutex<Vec<UnvalidatedArtifact<ConsensusMessage>>>>,
     // To send the process requests
-    sender: Sender<ProcessRequest>,
+    sender_incoming_request: Sender<ProcessRequest>,
     // Handle for the processing thread
     handle: Option<JoinHandle<()>>,
 }
 
 impl ArtifactProcessorManager {
-    pub fn new(node_number: u8) -> Self {
+    pub fn new(node_number: u8, sender_outgoing_artifact: Sender<ConsensusMessage>) -> Self {
 
         let pending_artifacts = Arc::new(Mutex::new(Vec::new()));
-        let (sender, receiver) = crossbeam_channel::unbounded::<ProcessRequest>();
+        let (sender_incoming_request, receiver_incoming_request) = crossbeam_channel::unbounded::<ProcessRequest>();
 
         let client = Box::new(ConsensusProcessor::new(node_number));
 
         // Spawn the processor thread
-        let sender_cl = sender.clone();
+        let sender_incoming_request_cl = sender_incoming_request.clone();
         let pending_artifacts_cl = pending_artifacts.clone();
         let handle = ThreadBuilder::new()
             .spawn(move || {
                 Self::process_messages(
                     pending_artifacts_cl,
                     client,
-                    sender_cl,
-                    receiver,
+                    sender_incoming_request_cl,
+                    receiver_incoming_request,
+                    sender_outgoing_artifact,
                 );
             })
             .unwrap();
 
         Self {
             pending_artifacts,
-            sender,
+            sender_incoming_request,
             handle: Some(handle),
         }
     }
@@ -62,13 +63,14 @@ impl ArtifactProcessorManager {
     fn process_messages(
         pending_artifacts: Arc<Mutex<Vec<UnvalidatedArtifact<ConsensusMessage>>>>,
         client: Box<ConsensusProcessor>,
-        sender: Sender<ProcessRequest>,
-        receiver: Receiver<ProcessRequest>,
+        sender_incoming_request: Sender<ProcessRequest>,
+        receiver_incoming_request: Receiver<ProcessRequest>,
+        sender_outgoing_artifact: Sender<ConsensusMessage>,
     ) {
-        println!("Thread loop started");
+        println!("Incoming artifacts thread loop started");
         let recv_timeout = std::time::Duration::from_millis(ARTIFACT_MANAGER_TIMER_DURATION_MSEC);
         loop {
-            let ret = receiver.recv_timeout(recv_timeout);
+            let ret = receiver_incoming_request.recv_timeout(recv_timeout);
 
             match ret {
                 Ok(_) | Err(RecvTimeoutError::Timeout) => {
@@ -82,13 +84,14 @@ impl ArtifactProcessorManager {
                     let (adverts, result) = client.process_changes(artifacts);
 
                     if let ProcessingResult::StateChanged = result {
-                        sender
+                        sender_incoming_request
                             .send(ProcessRequest)
                             .unwrap_or_else(|err| panic!("Failed to send request: {:?}", err));
                     }
                     adverts.into_iter().for_each(|adv| {
                         println!("Message to be broadcasted: {:?}", adv);
-                        // use a channel to send messages to network layer so that it can broadcast them
+                        // use channel to send locally generated artifacts to network layer so that it can broadcast them
+                        sender_outgoing_artifact.send(adv).unwrap_or_else(|err| panic!("Failed to send artifact: {:?}", err));
                     });
                 },
                 Err(RecvTimeoutError::Disconnected) => return,
@@ -100,6 +103,6 @@ impl ArtifactProcessorManager {
         println!("Received artifact added to pending artifacts");
         let mut pending_artifacts = self.pending_artifacts.lock().unwrap();
         pending_artifacts.push(artifact);
-        self.sender.send(ProcessRequest).unwrap_or_else(|err| panic!("Failed to send request: {:?}", err));;
+        self.sender_incoming_request.send(ProcessRequest).unwrap_or_else(|err| panic!("Failed to send request: {:?}", err));
     }
 }
