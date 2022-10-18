@@ -169,5 +169,6 @@ pub fn is_time_to_make_block(
     node_id: u8
 ) -> bool {
     // node 1 proposes block only once (used for tests)
+    // after the first block proposed by node 1, the artifact is inserted in the validated section of node 1's pool and so it will not propose anymore
     node_id == 1 && pool.pool().validated().artifacts.is_empty()
 }
