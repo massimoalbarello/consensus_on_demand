@@ -76,9 +76,12 @@ impl BlockMaker {
                         my_node_id
                     )
                 {
-                    self.propose_block(pool, rank, parent).map(|proposal| {
+                    println!("\n########## Block maker ##########");
+                    let block_proposal = self.propose_block(pool, rank, parent).map(|proposal| {
                         ConsensusMessage::BlockProposal(proposal)
-                    })
+                    });
+                    println!("Block proposal: {:?}", block_proposal);
+                    block_proposal
                 }
                 else {
                     None

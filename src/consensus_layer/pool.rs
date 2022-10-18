@@ -116,31 +116,29 @@ impl ConsensusPoolImpl {
         self.apply_changes_unvalidated(unvalidated_ops);
         self.apply_changes_validated(validated_ops);
 
-        self.display_consensus_pool();
     }
 
     fn apply_changes_validated(&mut self, ops: PoolSectionOps<ValidatedConsensusArtifact>) {
         if !ops.ops.is_empty() {
+            println!("\n########## Consensus pool ##########");
             println!("Applying change to validated section of the consensus pool");
             self.validated.mutate(ops);
+            println!("Current state of the VALIDATED section:");
+            for (hash, artifact) in &self.validated.artifacts {
+                println!("{} -> {:?}", hash, artifact);
+            }
         }
     }
 
     fn apply_changes_unvalidated(&mut self, ops: PoolSectionOps<UnvalidatedConsensusArtifact>) {
         if !ops.ops.is_empty() {
+            println!("\n########## Consensus pool ##########");
             println!("Applying change to unvalidated section of the consensus pool");
             self.unvalidated.mutate(ops);
-        }
-    }
-
-    fn display_consensus_pool(&self) {
-        println!("\nCurrent state of the UNVALIDATED section:");
-        for (hash, artifact) in &self.unvalidated.artifacts {
-            println!("{} -> {:?}", hash, artifact);
-        }
-        println!("\nCurrent state of the VALIDATED section:");
-        for (hash, artifact) in &self.validated.artifacts {
-            println!("{} -> {:?}", hash, artifact);
+            println!("Current state of the UNVALIDATED section:");
+            for (hash, artifact) in &self.unvalidated.artifacts {
+                println!("{} -> {:?}", hash, artifact);
+            }
         }
     }
 }

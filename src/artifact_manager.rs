@@ -89,7 +89,6 @@ impl ArtifactProcessorManager {
                             .unwrap_or_else(|err| panic!("Failed to send request: {:?}", err));
                     }
                     adverts.into_iter().for_each(|adv| {
-                        println!("Message to be broadcasted: {:?}", adv);
                         // use channel to send locally generated artifacts to network layer so that it can broadcast them
                         sender_outgoing_artifact.send(adv).unwrap_or_else(|err| panic!("Failed to send artifact: {:?}", err));
                     });
@@ -100,7 +99,6 @@ impl ArtifactProcessorManager {
     }
 
     pub fn on_artifact(&self, artifact: UnvalidatedArtifact<ConsensusMessage>) {
-        println!("Received artifact added to pending artifacts");
         let mut pending_artifacts = self.pending_artifacts.lock().unwrap();
         pending_artifacts.push(artifact);
         self.sender_incoming_request.send(ProcessRequest).unwrap_or_else(|err| panic!("Failed to send request: {:?}", err));

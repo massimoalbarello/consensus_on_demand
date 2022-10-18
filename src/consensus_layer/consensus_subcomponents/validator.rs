@@ -23,6 +23,7 @@ impl Validator {
     fn validate_blocks(&self, pool_reader: &PoolReader<'_>) -> (ChangeSet, bool) {
         let mut change_set = Vec::new();
         for (artifact_hash, unvalidated_artifact) in &pool_reader.pool().unvalidated().artifacts {
+            println!("\n########## Validator ##########");
             println!("Found artifact {:?} in unvalidated section of the consensus pool", unvalidated_artifact);
             change_set.push(ChangeAction::MoveToValidated(unvalidated_artifact.to_owned().into_inner()));
         }

@@ -43,25 +43,28 @@ impl ConsensusProcessor {
             self.client.on_state_change(&*consensus_pool)
         };
         let changed = if !change_set.is_empty() {
-            println!("Change set: {:?} to broadcast: {}", change_set, to_broadcast);
             ProcessingResult::StateChanged
         } else {
             ProcessingResult::StateUnchanged
         };
 
+        println!("\n########## Processor ##########");
         if to_broadcast == true {
             for change_action in change_set.iter() {
                 match change_action {
                     ChangeAction::AddToValidated(to_add) => {
+                        println!("Broadcasting consensus message to be added: {:?}", to_add);
                         adverts.push(to_add.to_owned());
                     }
                     ChangeAction::MoveToValidated(to_move) => {
+                        println!("Broadcasting consensus message to be moved: {:?}", to_move);
                         adverts.push(to_move.to_owned());
                     }
                 }
             }
         }
 
+        println!("Applying change set: {:?}", change_set);
         self.consensus_pool
             .write()
             .unwrap()
