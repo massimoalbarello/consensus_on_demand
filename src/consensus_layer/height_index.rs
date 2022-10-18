@@ -70,7 +70,6 @@ impl Indexes {
                 .notarization_share
                 .insert(artifact.height, hash),
             ConsensusMessage::BlockProposal(artifact) => {
-                println!("Block proposal with hash: {} inserted in indexes with height: {}", hash, artifact.content.value.height);
                 self.block_proposal
                     .insert(artifact.content.value.height, hash)
             },
