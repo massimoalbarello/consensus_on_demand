@@ -42,14 +42,14 @@ pub type CryptoHash = String;
 /// contains only a hash instead of the full message in each variant.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ConsensusMessageHash {
-    Notarization(CryptoHash),
+    NotarizationShare(CryptoHash),
     BlockProposal(CryptoHash),
 }
 
 impl ConsensusMessageHash {
     pub fn digest(&self) -> &CryptoHash {
         match self {
-            ConsensusMessageHash::Notarization(hash) => hash,
+            ConsensusMessageHash::NotarizationShare(hash) => hash,
             ConsensusMessageHash::BlockProposal(hash) => hash,
         }
     }

@@ -68,7 +68,7 @@ impl Indexes {
         match msg {
             ConsensusMessage::NotarizationShare(artifact) => self
                 .notarization_share
-                .insert(artifact.height, hash),
+                .insert(artifact.content.height, hash),
             ConsensusMessage::BlockProposal(artifact) => {
                 self.block_proposal
                     .insert(artifact.content.value.height, hash)
@@ -80,7 +80,7 @@ impl Indexes {
         match msg {
             ConsensusMessage::NotarizationShare(artifact) => self
                 .notarization_share
-                .remove(artifact.height, hash),
+                .remove(artifact.content.height, hash),
             ConsensusMessage::BlockProposal(artifact) => self
                 .block_proposal
                 .remove(artifact.content.value.height, hash),
