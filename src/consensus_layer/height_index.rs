@@ -66,24 +66,38 @@ impl Indexes {
 
     pub fn insert(&mut self, msg: &ConsensusMessage, hash: &CryptoHash) {
         match msg {
-            ConsensusMessage::NotarizationShare(artifact) => self
+            ConsensusMessage::NotarizationShare(artifact) => {
+                self
                 .notarization_share
-                .insert(artifact.content.height, hash),
+                .insert(artifact.content.height, hash)
+            },
             ConsensusMessage::BlockProposal(artifact) => {
                 self.block_proposal
                     .insert(artifact.content.value.height, hash)
             },
+            ConsensusMessage::Notarization(artifact) => {
+                self.block_proposal
+                    .insert(artifact.content.height, hash)
+            }
         };
     }
 
     pub fn remove(&mut self, msg: &ConsensusMessage, hash: &CryptoHash) {
         match msg {
-            ConsensusMessage::NotarizationShare(artifact) => self
-                .notarization_share
-                .remove(artifact.content.height, hash),
-            ConsensusMessage::BlockProposal(artifact) => self
-                .block_proposal
-                .remove(artifact.content.value.height, hash),
+            ConsensusMessage::NotarizationShare(artifact) => {
+                self
+                    .notarization_share
+                    .remove(artifact.content.height, hash)
+            },
+            ConsensusMessage::BlockProposal(artifact) => {
+                self
+                    .block_proposal
+                    .remove(artifact.content.value.height, hash)
+            },
+            ConsensusMessage::Notarization(artifact) => {
+                self.block_proposal
+                    .remove(artifact.content.height, hash)
+            }
         };
     }
 }

@@ -10,7 +10,7 @@ pub struct NotarizationContent {
 }
 
 impl NotarizationContent {
-    fn new(block_height: u64, block_hash: String) -> Self {
+    pub fn new(block_height: u64, block_hash: String) -> Self {
         Self {
             height: block_height,
             block: block_hash,
@@ -49,7 +49,7 @@ impl Notary {
                         }
                     }
                 },
-                ConsensusMessage::NotarizationShare(_) => (),
+                _ => (),
             }
         }
         notarization_shares

@@ -2,7 +2,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::crypto::ConsensusMessageHash;
 
-use super::consensus_subcomponents::{block_maker::BlockProposal, notary::NotarizationShare};
+use super::consensus_subcomponents::{block_maker::BlockProposal, notary::NotarizationShare, aggregator::Notarization};
+
+pub const N: usize = 4;
 
 pub type ChangeSet = Vec<ChangeAction>;
 
@@ -73,6 +75,7 @@ impl<T> AsRef<T> for ValidatedArtifact<T> {
 pub enum ConsensusMessage {
     BlockProposal(BlockProposal),
     NotarizationShare(NotarizationShare),
+    Notarization(Notarization),
 }
 
 impl ConsensusMessage {
@@ -87,6 +90,7 @@ impl ConsensusMessage {
         match self {
             ConsensusMessage::BlockProposal(artifact) => ConsensusMessageHash::BlockProposal(artifact.content.hash.clone()),
             ConsensusMessage::NotarizationShare(artifact) => ConsensusMessageHash::NotarizationShare(artifact.content.block.clone()),
+            ConsensusMessage::Notarization(artifact) => ConsensusMessageHash::Notarization(artifact.content.block.clone()),
         }
     }
 }

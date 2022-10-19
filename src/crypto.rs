@@ -44,6 +44,7 @@ pub type CryptoHash = String;
 pub enum ConsensusMessageHash {
     NotarizationShare(CryptoHash),
     BlockProposal(CryptoHash),
+    Notarization(CryptoHash),
 }
 
 impl ConsensusMessageHash {
@@ -51,6 +52,7 @@ impl ConsensusMessageHash {
         match self {
             ConsensusMessageHash::NotarizationShare(hash) => hash,
             ConsensusMessageHash::BlockProposal(hash) => hash,
+            ConsensusMessageHash::Notarization(hash) => hash,
         }
     }
 }

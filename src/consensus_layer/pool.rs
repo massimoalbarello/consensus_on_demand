@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, fmt::Debug};
 
 use crate::{consensus_layer::artifacts::ChangeAction, crypto::CryptoHash};
-use super::{artifacts::{UnvalidatedArtifact, ValidatedArtifact, ConsensusMessage, ChangeSet, IntoInner, ConsensusMessageId}, height_index::Indexes};
+use super::{artifacts::{UnvalidatedArtifact, ValidatedArtifact, ConsensusMessage, ChangeSet, IntoInner, ConsensusMessageId}, height_index::Indexes, consensus_subcomponents::notary::NotarizationShare};
 
 type UnvalidatedConsensusArtifact = UnvalidatedArtifact<ConsensusMessage>;
 type ValidatedConsensusArtifact = ValidatedArtifact<ConsensusMessage>;

@@ -2,7 +2,7 @@ use super::{
     pool::ConsensusPoolImpl, 
     artifacts::{ChangeSet, ChangeAction, ConsensusMessage},
     pool_reader::PoolReader,
-    consensus_subcomponents::{notary::Notary, block_maker::BlockMaker, validator::Validator},
+    consensus_subcomponents::{notary::Notary, block_maker::BlockMaker, validator::Validator, aggregator::ShareAggregator},
 };
 
 
@@ -37,6 +37,7 @@ impl RoundRobin {
 pub struct ConsensusImpl {
     block_maker: BlockMaker,
     notary: Notary,
+    aggregator: ShareAggregator,
     validator: Validator,
     schedule: RoundRobin,
 }
@@ -46,6 +47,7 @@ impl ConsensusImpl {
         Self {
             block_maker: BlockMaker::new(node_number),
             notary: Notary::new(node_number),
+            aggregator: ShareAggregator::new(node_number),
             validator: Validator::new(),
             schedule: RoundRobin::default(),
         }
@@ -74,6 +76,13 @@ impl ConsensusImpl {
 
         let pool_reader = PoolReader::new(pool);
         
+        let aggregate = || {
+            let change_set = add_all_to_validated(self.aggregator.on_state_change(&pool_reader));
+            // aggregation of shares does not have to be broadcasted as each node can compute it locally based on its consensus pool
+            let to_broadcast = false;
+            (change_set, to_broadcast)
+        };
+
         let notarize = || {
             let change_set = add_all_to_validated(self.notary.on_state_change(&pool_reader));
             let to_broadcast = true;
@@ -91,7 +100,8 @@ impl ConsensusImpl {
             self.validator.on_state_change(&pool_reader)
         };
 
-        let calls: [&'_ dyn Fn() -> (ChangeSet, bool); 3] = [
+        let calls: [&'_ dyn Fn() -> (ChangeSet, bool); 4] = [
+            &aggregate,
             &notarize,
             &make_block,
             &validate,
