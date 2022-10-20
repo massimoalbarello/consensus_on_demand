@@ -1,8 +1,15 @@
 use std::collections::BTreeMap;
 
-use crate::crypto::CryptoHash;
+use crate::crypto::{CryptoHash, CryptoHashOf};
 
-use super::artifacts::ConsensusMessage;
+use super::{
+    artifacts::ConsensusMessage, 
+    consensus_subcomponents::{
+        aggregator::Notarization,
+        block_maker::BlockProposal,
+        notary::NotarizationShare
+    }
+};
 
 pub struct HeightIndex<T: Eq> {
     buckets: BTreeMap<u64, Vec<T>>,
@@ -51,8 +58,9 @@ impl<T: Eq + Clone> HeightIndex<T> {
 }
 
 pub struct Indexes {
-    pub notarization_share: HeightIndex<String>,
-    pub block_proposal: HeightIndex<String>,
+    pub notarization_share: HeightIndex<CryptoHashOf<NotarizationShare>>,
+    pub block_proposal: HeightIndex<CryptoHashOf<BlockProposal>>,
+    pub notarization: HeightIndex<CryptoHashOf<Notarization>>,
 }
 
 #[allow(clippy::new_without_default)]
@@ -61,43 +69,72 @@ impl Indexes {
         Indexes {
             notarization_share: HeightIndex::new(),
             block_proposal: HeightIndex::new(),
+            notarization: HeightIndex::new(),
         }
     }
 
-    pub fn insert(&mut self, msg: &ConsensusMessage, hash: &CryptoHash) {
+    pub fn insert(&mut self, msg: &ConsensusMessage, hash: CryptoHash) {
         match msg {
             ConsensusMessage::NotarizationShare(artifact) => {
-                self
-                .notarization_share
-                .insert(artifact.content.height, hash)
+                self.notarization_share
+                    .insert(artifact.content.height, &CryptoHashOf::from(hash))
             },
             ConsensusMessage::BlockProposal(artifact) => {
                 self.block_proposal
-                    .insert(artifact.content.value.height, hash)
+                    .insert(artifact.content.value.height, &CryptoHashOf::from(hash))
             },
             ConsensusMessage::Notarization(artifact) => {
-                self.block_proposal
-                    .insert(artifact.content.height, hash)
+                self.notarization
+                    .insert(artifact.content.height, &CryptoHashOf::from(hash))
             }
         };
     }
 
-    pub fn remove(&mut self, msg: &ConsensusMessage, hash: &CryptoHash) {
+    pub fn remove(&mut self, msg: &ConsensusMessage, hash: CryptoHash) {
         match msg {
             ConsensusMessage::NotarizationShare(artifact) => {
-                self
-                    .notarization_share
-                    .remove(artifact.content.height, hash)
+                self.notarization_share
+                    .remove(artifact.content.height, &CryptoHashOf::from(hash))
             },
             ConsensusMessage::BlockProposal(artifact) => {
-                self
-                    .block_proposal
-                    .remove(artifact.content.value.height, hash)
+                self.block_proposal
+                    .remove(artifact.content.value.height, &CryptoHashOf::from(hash))
             },
             ConsensusMessage::Notarization(artifact) => {
-                self.block_proposal
-                    .remove(artifact.content.height, hash)
+                self.notarization
+                    .remove(artifact.content.height, &CryptoHashOf::from(hash))
             }
         };
+    }
+}
+
+/// HeightIndexedPool provides a set of interfaces for the Consensus component
+/// to query artifacts. The same interface is applicable to both validated and
+/// unvalidated partitions of consensus artifacts in the overall ArtifactPool.
+pub trait HeightIndexedPool<T> {
+    /// Returns the max height across all artifacts of type T currently in the
+    /// pool.
+    fn max_height(&self) -> Option<u64>;
+}
+
+pub trait SelectIndex: Eq + Sized {
+    fn select_index(indexes: &Indexes) -> &HeightIndex<Self>;
+}
+
+impl SelectIndex for CryptoHashOf<Notarization> {
+    fn select_index(indexes: &Indexes) -> &HeightIndex<Self> {
+        &indexes.notarization
+    }
+}
+
+impl SelectIndex for CryptoHashOf<BlockProposal> {
+    fn select_index(indexes: &Indexes) -> &HeightIndex<Self> {
+        &indexes.block_proposal
+    }
+}
+
+impl SelectIndex for CryptoHashOf<NotarizationShare> {
+    fn select_index(indexes: &Indexes) -> &HeightIndex<Self> {
+        &indexes.notarization_share
     }
 }

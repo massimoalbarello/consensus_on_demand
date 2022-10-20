@@ -1,13 +1,13 @@
 use std::{collections::BTreeMap, fmt::Debug};
 
 use crate::{consensus_layer::artifacts::ChangeAction, crypto::CryptoHash};
-use super::{artifacts::{UnvalidatedArtifact, ValidatedArtifact, ConsensusMessage, ChangeSet, IntoInner, ConsensusMessageId}, height_index::Indexes, consensus_subcomponents::notary::NotarizationShare};
+use super::{artifacts::{UnvalidatedArtifact, ValidatedArtifact, ConsensusMessage, ChangeSet, IntoInner, ConsensusMessageId, ConsensusMessageHashable}, height_index::{Indexes, HeightIndexedPool}, consensus_subcomponents::{notary::NotarizationShare, aggregator::Notarization}};
 
 type UnvalidatedConsensusArtifact = UnvalidatedArtifact<ConsensusMessage>;
 type ValidatedConsensusArtifact = ValidatedArtifact<ConsensusMessage>;
 
 pub struct InMemoryPoolSection<T: IntoInner<ConsensusMessage>> {
-    pub artifacts: BTreeMap<String, T>,
+    pub artifacts: BTreeMap<CryptoHash, T>,
     pub indexes: Indexes,
 }
 
@@ -46,7 +46,7 @@ impl<T: IntoInner<ConsensusMessage> + Clone + Debug> InMemoryPoolSection<T> {
     fn insert(&mut self, artifact: T) {
         let msg = artifact.as_ref();
         let hash = msg.get_cm_hash().digest().clone();
-        self.indexes.insert(msg, &hash);
+        self.indexes.insert(msg, hash.clone());
         self.artifacts.entry(hash).or_insert(artifact);
     }
 
@@ -57,7 +57,7 @@ impl<T: IntoInner<ConsensusMessage> + Clone + Debug> InMemoryPoolSection<T> {
     /// Get a consensus message by its hash
     pub fn remove_by_hash(&mut self, hash: &CryptoHash) -> Option<T> {
         self.artifacts.remove(hash).map(|artifact| {
-            self.indexes.remove(artifact.as_ref(), hash);
+            self.indexes.remove(artifact.as_ref(), hash.to_string());
             artifact
         })
     }
@@ -115,7 +115,6 @@ impl ConsensusPoolImpl {
         }
         self.apply_changes_unvalidated(unvalidated_ops);
         self.apply_changes_validated(validated_ops);
-
     }
 
     fn apply_changes_validated(&mut self, ops: PoolSectionOps<ValidatedConsensusArtifact>) {
@@ -125,7 +124,7 @@ impl ConsensusPoolImpl {
             self.validated.mutate(ops);
             println!("Current state of the VALIDATED section:");
             for (hash, artifact) in &self.validated.artifacts {
-                println!("{} -> {:?}", hash, artifact);
+                println!("{:?} -> {:?}", hash, artifact);
             }
         }
     }
@@ -137,7 +136,7 @@ impl ConsensusPoolImpl {
             self.unvalidated.mutate(ops);
             println!("Current state of the UNVALIDATED section:");
             for (hash, artifact) in &self.unvalidated.artifacts {
-                println!("{} -> {:?}", hash, artifact);
+                println!("{:?} -> {:?}", hash, artifact);
             }
         }
     }

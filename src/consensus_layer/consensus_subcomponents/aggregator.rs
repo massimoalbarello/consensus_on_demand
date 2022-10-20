@@ -3,13 +3,31 @@
 //! from random beacon shares, Notarizations from notarization shares and
 //! Finalizations from finalization shares.
 
+use serde::{Deserialize, Serialize};
+
 use crate::consensus_layer::{
     artifacts::N,
     pool_reader::PoolReader,
     artifacts::ConsensusMessage,
-    consensus_subcomponents::notary::NotarizationContent
 };
 use crate::crypto::Signed;
+
+
+// NotarizationContent holds the values that are signed in a notarization
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct NotarizationContent {
+    pub height: u64,
+    pub block: String,
+}
+
+impl NotarizationContent {
+    pub fn new(block_height: u64, block_hash: String) -> Self {
+        Self {
+            height: block_height,
+            block: block_hash,
+        }
+    }
+}
 
 pub type Notarization = Signed<NotarizationContent, u8>;
 

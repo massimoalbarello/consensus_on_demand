@@ -1,5 +1,6 @@
 use serde::{Serialize, Deserialize};
 use sha2::{Digest, Sha256};
+use std::marker::PhantomData;
 
 use crate::consensus_layer::consensus_subcomponents::block_maker::Block;
 
@@ -37,6 +38,23 @@ impl Hashed {
 
 pub type CryptoHash = String;
 
+/// A cryptographic hash for content of type `T`
+pub type CryptoHashOf<T> = Id<T, CryptoHash>;
+
+#[derive(Eq, PartialEq, Clone)]
+pub struct Id<Entity, Repr>(Repr, PhantomData<Entity>);
+
+impl<Entity, Repr> Id<Entity, Repr> {
+    pub const fn new(repr: Repr) -> Id<Entity, Repr> {
+        Id(repr, PhantomData)
+    }
+}
+
+impl<Entity, Repr> From<Repr> for Id<Entity, Repr> {
+    fn from(repr: Repr) -> Self {
+        Self::new(repr)
+    }
+}
 
 /// ConsensusMessageHash has the same variants as [ConsensusMessage], but
 /// contains only a hash instead of the full message in each variant.

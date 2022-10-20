@@ -22,7 +22,6 @@ impl<'a> PoolReader<'a> {
         self.pool
     }
 
-    
     /// Get all valid notarization shares at the given height.
     pub fn get_notarization_shares(
         &self,

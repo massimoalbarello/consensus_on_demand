@@ -71,6 +71,11 @@ impl<T> AsRef<T> for ValidatedArtifact<T> {
     }
 }
 
+pub trait ConsensusMessageHashable: Clone {
+    fn get_id(&self) -> ConsensusMessageId;
+    fn get_cm_hash(&self) -> ConsensusMessageHash;
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum ConsensusMessage {
     BlockProposal(BlockProposal),
@@ -78,19 +83,19 @@ pub enum ConsensusMessage {
     Notarization(Notarization),
 }
 
-impl ConsensusMessage {
-    pub fn get_id(&self) -> ConsensusMessageId {
+impl ConsensusMessageHashable for ConsensusMessage {
+    fn get_id(&self) -> ConsensusMessageId {
         ConsensusMessageId {
             hash: self.get_cm_hash(),
             height: 0,
         }
     }
-    
-    pub fn get_cm_hash(&self) -> ConsensusMessageHash {
+
+    fn get_cm_hash(&self) -> ConsensusMessageHash {
         match self {
-            ConsensusMessage::BlockProposal(artifact) => ConsensusMessageHash::BlockProposal(artifact.content.hash.clone()),
-            ConsensusMessage::NotarizationShare(artifact) => ConsensusMessageHash::NotarizationShare(artifact.content.block.clone()),
-            ConsensusMessage::Notarization(artifact) => ConsensusMessageHash::Notarization(artifact.content.block.clone()),
+            ConsensusMessage::Notarization(value) => value.get_cm_hash(),
+            ConsensusMessage::BlockProposal(value) => value.get_cm_hash(),
+            ConsensusMessage::NotarizationShare(value) => value.get_cm_hash(),
         }
     }
 }
@@ -101,4 +106,43 @@ impl ConsensusMessage {
 pub struct ConsensusMessageId {
     pub hash: ConsensusMessageHash,
     pub height: u64,
+}
+
+impl ConsensusMessageHashable for BlockProposal {
+    fn get_id(&self) -> ConsensusMessageId {
+        ConsensusMessageId {
+            hash: self.get_cm_hash(),
+            height: self.content.value.height,
+        }
+    }
+    
+    fn get_cm_hash(&self) -> ConsensusMessageHash {
+        ConsensusMessageHash::BlockProposal(self.content.hash.clone())
+    }
+}
+
+impl ConsensusMessageHashable for NotarizationShare {
+    fn get_id(&self) -> ConsensusMessageId {
+        ConsensusMessageId {
+            hash: self.get_cm_hash(),
+            height: self.content.height,
+        }
+    }
+    
+    fn get_cm_hash(&self) -> ConsensusMessageHash {
+        ConsensusMessageHash::NotarizationShare(self.content.block.clone())
+    }
+}
+
+impl ConsensusMessageHashable for Notarization {
+    fn get_id(&self) -> ConsensusMessageId {
+        ConsensusMessageId {
+            hash: self.get_cm_hash(),
+            height: self.content.height,
+        }
+    }
+    
+    fn get_cm_hash(&self) -> ConsensusMessageHash {
+        ConsensusMessageHash::Notarization(self.content.block.clone())
+    }
 }
