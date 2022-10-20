@@ -11,6 +11,7 @@ use super::{
     }
 };
 
+#[derive(Debug)]
 pub struct HeightIndex<T: Eq> {
     buckets: BTreeMap<u64, Vec<T>>,
 }
@@ -112,6 +113,9 @@ impl Indexes {
 /// to query artifacts. The same interface is applicable to both validated and
 /// unvalidated partitions of consensus artifacts in the overall ArtifactPool.
 pub trait HeightIndexedPool<T> {
+    /// Returns the height range of artifacts of type T currently in the pool.
+    fn height_range(&self) -> Option<HeightRange>;
+
     /// Returns the max height across all artifacts of type T currently in the
     /// pool.
     fn max_height(&self) -> Option<u64>;
@@ -138,3 +142,16 @@ impl SelectIndex for CryptoHashOf<NotarizationShare> {
         &indexes.notarization_share
     }
 }
+
+pub struct HeightRange {
+    pub min: Height,
+    pub max: Height,
+}
+
+impl HeightRange {
+    pub fn new(min: Height, max: Height) -> HeightRange {
+        HeightRange { min, max }
+    }
+}
+
+pub type Height = u64;

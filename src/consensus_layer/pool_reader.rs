@@ -35,4 +35,14 @@ impl<'a> PoolReader<'a> {
         }
         shares
     }
+
+    // Get max height of valid notarized blocks.
+    pub fn get_notarized_height(&self) {
+        let notarized_height = self.pool
+            .validated()
+            .notarization_shares()
+            .max_height()
+            .unwrap();
+        println!("Notarized height: {}", notarized_height);
+    }
 }

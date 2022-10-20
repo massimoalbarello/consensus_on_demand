@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, fmt::Debug};
 
-use crate::{consensus_layer::artifacts::ChangeAction, crypto::CryptoHash};
-use super::{artifacts::{UnvalidatedArtifact, ValidatedArtifact, ConsensusMessage, ChangeSet, IntoInner, ConsensusMessageId, ConsensusMessageHashable}, height_index::{Indexes, HeightIndexedPool}, consensus_subcomponents::{notary::NotarizationShare, aggregator::Notarization}};
+use crate::{consensus_layer::artifacts::ChangeAction, crypto::{CryptoHash, CryptoHashOf}};
+use super::{artifacts::{UnvalidatedArtifact, ValidatedArtifact, ConsensusMessage, ChangeSet, IntoInner, ConsensusMessageId, ConsensusMessageHashable}, height_index::{Indexes, HeightIndexedPool, SelectIndex, HeightRange, Height}, consensus_subcomponents::notary::NotarizationShare};
 
 type UnvalidatedConsensusArtifact = UnvalidatedArtifact<ConsensusMessage>;
 type ValidatedConsensusArtifact = ValidatedArtifact<ConsensusMessage>;
@@ -60,6 +60,28 @@ impl<T: IntoInner<ConsensusMessage> + Clone + Debug> InMemoryPoolSection<T> {
             self.indexes.remove(artifact.as_ref(), hash.to_string());
             artifact
         })
+    }
+
+    pub fn notarization_shares(&self) -> &dyn HeightIndexedPool<NotarizationShare> {
+        self
+    }
+}
+
+impl<
+        T: ConsensusMessageHashable + 'static + Debug,
+        S: IntoInner<ConsensusMessage> + Clone + Debug,
+    > HeightIndexedPool<T> for InMemoryPoolSection<S>
+where
+    CryptoHashOf<T>: SelectIndex,
+{
+    fn height_range(&self) -> Option<HeightRange> {
+        let heights = CryptoHashOf::<T>::select_index(&self.indexes);
+        println!("{:?}", heights);
+        Some(HeightRange::new(0, 0))
+    }
+
+    fn max_height(&self) -> Option<Height> {
+        self.height_range().map(|range| range.max)
     }
 }
 

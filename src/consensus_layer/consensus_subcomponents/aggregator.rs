@@ -47,6 +47,7 @@ impl ShareAggregator {
     pub fn on_state_change(&self, pool: &PoolReader<'_>) -> Vec<ConsensusMessage> {
         let mut messages = Vec::new();
         messages.append(&mut self.aggregate_notarization_shares(pool));
+        pool.get_notarized_height();
         messages
     }
 

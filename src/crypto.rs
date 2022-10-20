@@ -41,7 +41,7 @@ pub type CryptoHash = String;
 /// A cryptographic hash for content of type `T`
 pub type CryptoHashOf<T> = Id<T, CryptoHash>;
 
-#[derive(Eq, PartialEq, Clone)]
+#[derive(Eq, PartialEq, Clone, Debug)]
 pub struct Id<Entity, Repr>(Repr, PhantomData<Entity>);
 
 impl<Entity, Repr> Id<Entity, Repr> {
