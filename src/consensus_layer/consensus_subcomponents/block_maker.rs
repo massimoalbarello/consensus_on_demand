@@ -1,6 +1,9 @@
 use serde::{Serialize, Deserialize};
 
-use crate::{consensus_layer::{pool_reader::PoolReader, artifacts::ConsensusMessage}, crypto::{Signed, Hashed}};
+use crate::{consensus_layer::{
+    pool_reader::PoolReader,
+    artifacts::ConsensusMessage
+}, crypto::{Signed, Hashed}};
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub struct Payload {}
@@ -147,15 +150,30 @@ impl BlockMaker {
 // this node might propose a block.
 // Return None otherwise.
 fn get_dependencies(pool: &PoolReader<'_>) -> Option<(RandomBeacon, Block)> {
-    Some((
-        RandomBeacon {},
-        Block {
-            parent: String::from("Parent hash"),
-            payload: Payload::new(),
-            height: 0,
-            rank: 0,
+    let notarized_height = pool.get_notarized_height();
+    let parent = pool
+        .get_notarized_blocks(notarized_height)
+        .min_by(|block1, block2| block1.rank.cmp(&block2.rank));
+    match parent {
+        Some(parent) => {
+            println!("Parent block: {:?}", parent);
+            Some((
+                RandomBeacon {},
+                parent
+            ))
+        },
+        None => {
+            Some((
+                RandomBeacon {},
+                Block {
+                    parent: String::from("Genesis has no parent"),
+                    payload: Payload::new(),
+                    height: 1,
+                    rank: 0,
+                }
+            ))
         }
-    ))
+    }
 }
 
 // Return true if this node has already made a proposal at the given height.

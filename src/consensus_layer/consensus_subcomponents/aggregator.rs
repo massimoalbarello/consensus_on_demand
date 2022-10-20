@@ -5,23 +5,26 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::consensus_layer::height_index::Height;
 use crate::consensus_layer::{
     artifacts::N,
     pool_reader::PoolReader,
     artifacts::ConsensusMessage,
 };
-use crate::crypto::Signed;
+use crate::crypto::{Signed, CryptoHashOf};
+
+use super::block_maker::Block;
 
 
 // NotarizationContent holds the values that are signed in a notarization
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct NotarizationContent {
-    pub height: u64,
-    pub block: String,
+    pub height: Height,
+    pub block: CryptoHashOf<Block>,
 }
 
 impl NotarizationContent {
-    pub fn new(block_height: u64, block_hash: String) -> Self {
+    pub fn new(block_height: Height, block_hash: CryptoHashOf<Block>) -> Self {
         Self {
             height: block_height,
             block: block_hash,
@@ -47,7 +50,6 @@ impl ShareAggregator {
     pub fn on_state_change(&self, pool: &PoolReader<'_>) -> Vec<ConsensusMessage> {
         let mut messages = Vec::new();
         messages.append(&mut self.aggregate_notarization_shares(pool));
-        pool.get_notarized_height();
         messages
     }
 
@@ -57,7 +59,7 @@ impl ShareAggregator {
         let mut notarizations  = vec![]; 
         let notarization_hash = String::from("Notarization hash");
         if notarization_shares.len() >= N-1 && !pool.pool().validated().artifacts.contains_key(&notarization_hash) {
-            let content = NotarizationContent::new(notarization_shares[0].content.height, notarization_hash);
+            let content = NotarizationContent::new(notarization_shares[0].content.height, CryptoHashOf::from(notarization_hash));
             let signature = self.node_id;
             notarizations.push(ConsensusMessage::Notarization(Notarization { content, signature }))
         }

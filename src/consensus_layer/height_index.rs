@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, fmt::Debug};
 
 use crate::crypto::{CryptoHash, CryptoHashOf};
 
@@ -12,11 +12,11 @@ use super::{
 };
 
 #[derive(Debug)]
-pub struct HeightIndex<T: Eq> {
+pub struct HeightIndex<T: Eq + Debug> {
     buckets: BTreeMap<u64, Vec<T>>,
 }
 
-impl<T: Eq> Default for HeightIndex<T> {
+impl<T: Eq + Debug> Default for HeightIndex<T> {
     fn default() -> Self {
         Self {
             buckets: BTreeMap::new(),
@@ -26,7 +26,7 @@ impl<T: Eq> Default for HeightIndex<T> {
 
 /// Provides a thin wrapper around a sorted map of buckets and provides
 /// height-indexed access to the buckets.
-impl<T: Eq + Clone> HeightIndex<T> {
+impl<T: Eq + Clone + Debug> HeightIndex<T> {
     pub fn new() -> HeightIndex<T> {
         HeightIndex::default()
     }
@@ -55,6 +55,19 @@ impl<T: Eq + Clone> HeightIndex<T> {
             return removed;
         }
         false
+    }
+
+    pub fn lookup(&self, height: Height) -> Box<dyn Iterator<Item = &T> + '_> {
+        match self.buckets.get(&height) {
+            Some(bucket) => Box::new(bucket.iter()),
+            None => Box::new(std::iter::empty()),
+        }
+    }
+
+    /// Returns all heights of the index, in sorted order.
+    pub fn heights(&self) -> Box<dyn Iterator<Item = &Height> + '_> {
+        println!("{:?}", self.buckets);
+        Box::new(self.buckets.keys())
     }
 }
 
@@ -119,9 +132,13 @@ pub trait HeightIndexedPool<T> {
     /// Returns the max height across all artifacts of type T currently in the
     /// pool.
     fn max_height(&self) -> Option<u64>;
+
+    /// Return an iterator over the artifacts of type T at height
+    /// 'h'.
+    fn get_by_height(&self, h: Height) -> Box<dyn Iterator<Item = T>>;
 }
 
-pub trait SelectIndex: Eq + Sized {
+pub trait SelectIndex: Eq + Sized + Debug {
     fn select_index(indexes: &Indexes) -> &HeightIndex<Self>;
 }
 

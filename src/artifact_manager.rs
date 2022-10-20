@@ -3,7 +3,10 @@ use std::sync::{Arc, Mutex};
 use crossbeam_channel::{Receiver, RecvTimeoutError, Sender};
 use std::thread::{Builder as ThreadBuilder, JoinHandle};
 
-use crate::consensus_layer::{ConsensusProcessor, artifacts::{ConsensusMessage, UnvalidatedArtifact}};
+use crate::consensus_layer::{
+    ConsensusProcessor,
+    artifacts::{ConsensusMessage, UnvalidatedArtifact}
+};
 
 // Periodic duration of `PollEvent` in milliseconds.
 const ARTIFACT_MANAGER_TIMER_DURATION_MSEC: u64 = 200;

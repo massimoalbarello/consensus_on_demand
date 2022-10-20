@@ -2,7 +2,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::crypto::ConsensusMessageHash;
 
-use super::consensus_subcomponents::{block_maker::BlockProposal, notary::NotarizationShare, aggregator::Notarization};
+use super::consensus_subcomponents::{
+    block_maker::BlockProposal,
+    notary::NotarizationShare,
+    aggregator::Notarization
+};
 
 pub const N: usize = 4;
 
@@ -74,6 +78,7 @@ impl<T> AsRef<T> for ValidatedArtifact<T> {
 pub trait ConsensusMessageHashable: Clone {
     fn get_id(&self) -> ConsensusMessageId;
     fn get_cm_hash(&self) -> ConsensusMessageHash;
+    fn assert(msg: &ConsensusMessage) -> Option<&Self>;
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
@@ -87,7 +92,7 @@ impl ConsensusMessageHashable for ConsensusMessage {
     fn get_id(&self) -> ConsensusMessageId {
         ConsensusMessageId {
             hash: self.get_cm_hash(),
-            height: 0,
+            height: 1,
         }
     }
 
@@ -97,6 +102,10 @@ impl ConsensusMessageHashable for ConsensusMessage {
             ConsensusMessage::BlockProposal(value) => value.get_cm_hash(),
             ConsensusMessage::NotarizationShare(value) => value.get_cm_hash(),
         }
+    }
+
+    fn assert(msg: &ConsensusMessage) -> Option<&Self> {
+        Some(msg)
     }
 }
 
@@ -119,6 +128,14 @@ impl ConsensusMessageHashable for BlockProposal {
     fn get_cm_hash(&self) -> ConsensusMessageHash {
         ConsensusMessageHash::BlockProposal(self.content.hash.clone())
     }
+
+    fn assert(msg: &ConsensusMessage) -> Option<&Self> {
+        if let ConsensusMessage::BlockProposal(value) = msg {
+            Some(value)
+        } else {
+            None
+        }
+    }
 }
 
 impl ConsensusMessageHashable for NotarizationShare {
@@ -130,7 +147,15 @@ impl ConsensusMessageHashable for NotarizationShare {
     }
     
     fn get_cm_hash(&self) -> ConsensusMessageHash {
-        ConsensusMessageHash::NotarizationShare(self.content.block.clone())
+        ConsensusMessageHash::NotarizationShare(self.content.block.get_ref().clone())
+    }
+
+    fn assert(msg: &ConsensusMessage) -> Option<&Self> {
+        if let ConsensusMessage::NotarizationShare(value) = msg {
+            Some(value)
+        } else {
+            None
+        }
     }
 }
 
@@ -143,6 +168,14 @@ impl ConsensusMessageHashable for Notarization {
     }
     
     fn get_cm_hash(&self) -> ConsensusMessageHash {
-        ConsensusMessageHash::Notarization(self.content.block.clone())
+        ConsensusMessageHash::Notarization(self.content.block.get_ref().clone())
+    }
+
+    fn assert(msg: &ConsensusMessage) -> Option<&Self> {
+        if let ConsensusMessage::Notarization(value) = msg {
+            Some(value)
+        } else {
+            None
+        }
     }
 }

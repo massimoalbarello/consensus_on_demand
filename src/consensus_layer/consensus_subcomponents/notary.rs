@@ -1,16 +1,24 @@
 use serde::{Serialize, Deserialize};
 
-use crate::{consensus_layer::{pool_reader::PoolReader, artifacts::{ConsensusMessage, IntoInner}}, crypto::{Signed, Hashed}};
+use crate::{
+    consensus_layer::{
+        pool_reader::PoolReader, 
+        artifacts::{ConsensusMessage, IntoInner}, 
+        height_index::Height
+    }, crypto::{Signed, Hashed, CryptoHashOf}
+};
+
+use super::block_maker::Block;
 
 // NotarizationContent holds the values that are signed in a notarization
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct NotarizationContent {
     pub height: u64,
-    pub block: String,
+    pub block: CryptoHashOf<Block>,
 }
 
 impl NotarizationContent {
-    pub fn new(block_height: u64, block_hash: String) -> Self {
+    pub fn new(block_height: Height, block_hash: CryptoHashOf<Block>) -> Self {
         Self {
             height: block_height,
             block: block_hash,
@@ -71,7 +79,7 @@ impl Notary {
     ) -> Option<NotarizationShare> {
         // concatenating the node id in order to distinguish the locally generated notarization share from the ones received from peers in the artifacts pool
         let block_hash = format!("{}{}", proposal.content.hash, self.node_id.to_string());
-        let content = NotarizationContent::new(proposal.content.value.height, block_hash);
+        let content = NotarizationContent::new(proposal.content.value.height, CryptoHashOf::from(block_hash));
         let signature = self.node_id;
         Some(NotarizationShare { content, signature })
     }

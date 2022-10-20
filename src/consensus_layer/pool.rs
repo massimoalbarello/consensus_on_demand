@@ -1,7 +1,23 @@
 use std::{collections::BTreeMap, fmt::Debug};
 
-use crate::{consensus_layer::artifacts::ChangeAction, crypto::{CryptoHash, CryptoHashOf}};
-use super::{artifacts::{UnvalidatedArtifact, ValidatedArtifact, ConsensusMessage, ChangeSet, IntoInner, ConsensusMessageId, ConsensusMessageHashable}, height_index::{Indexes, HeightIndexedPool, SelectIndex, HeightRange, Height}, consensus_subcomponents::notary::NotarizationShare};
+use crate::crypto::{CryptoHash, CryptoHashOf};
+
+use super::{
+    artifacts::{
+        UnvalidatedArtifact, ValidatedArtifact, ConsensusMessage, 
+        ChangeSet, ChangeAction, IntoInner, 
+        ConsensusMessageId, ConsensusMessageHashable
+    }, 
+    height_index::{
+        Indexes, HeightIndexedPool, SelectIndex,
+        HeightRange, Height, HeightIndex
+    },
+    consensus_subcomponents::{
+        notary::NotarizationShare,
+        aggregator::Notarization,
+        block_maker::BlockProposal
+    }
+};
 
 type UnvalidatedConsensusArtifact = UnvalidatedArtifact<ConsensusMessage>;
 type ValidatedConsensusArtifact = ValidatedArtifact<ConsensusMessage>;
@@ -54,6 +70,27 @@ impl<T: IntoInner<ConsensusMessage> + Clone + Debug> InMemoryPoolSection<T> {
         self.remove_by_hash(&msg_id.hash.digest())
     }
 
+    fn get_by_hashes<S: ConsensusMessageHashable>(&self, hashes: Vec<&CryptoHashOf<S>>) -> Vec<S> {
+        hashes
+            .iter()
+            .map(|hash| {
+                let artifact_opt = self.get_by_hash(hash.get_ref());
+                match artifact_opt {
+                    Some(artifact) => match S::assert(artifact.as_ref()) {
+                        Some(value) => value.clone(),
+                        _ => panic!("Unexpected message type"),
+                    },
+                    _ => panic!("Can't find artifact with hash: {:?}", hash.get_ref()),
+                }
+            })
+            .collect()
+    }
+
+    /// Get a consensus message by its hash
+    pub fn get_by_hash(&self, hash: &CryptoHash) -> Option<T> {
+        self.artifacts.get(hash).cloned()
+    }
+
     /// Get a consensus message by its hash
     pub fn remove_by_hash(&mut self, hash: &CryptoHash) -> Option<T> {
         self.artifacts.remove(hash).map(|artifact| {
@@ -62,7 +99,19 @@ impl<T: IntoInner<ConsensusMessage> + Clone + Debug> InMemoryPoolSection<T> {
         })
     }
 
+    fn select_index<S: SelectIndex>(&self) -> &HeightIndex<S> {
+        SelectIndex::select_index(&self.indexes)
+    }
+
     pub fn notarization_shares(&self) -> &dyn HeightIndexedPool<NotarizationShare> {
+        self
+    }
+
+    pub fn notarization(&self) -> &dyn HeightIndexedPool<Notarization> {
+        self
+    }
+
+    pub fn block_proposal(&self) -> &dyn HeightIndexedPool<BlockProposal> {
         self
     }
 }
@@ -74,10 +123,20 @@ impl<
 where
     CryptoHashOf<T>: SelectIndex,
 {
+    fn get_by_height(&self, h: Height) -> Box<dyn Iterator<Item = T>> {
+        let hashes = self.select_index().lookup(h).collect();
+        Box::new(self.get_by_hashes(hashes).into_iter())
+    }
+
     fn height_range(&self) -> Option<HeightRange> {
-        let heights = CryptoHashOf::<T>::select_index(&self.indexes);
-        println!("{:?}", heights);
-        Some(HeightRange::new(0, 0))
+        let heights = CryptoHashOf::<T>::select_index(&self.indexes)
+            .heights()
+            .cloned()
+            .collect::<Vec<_>>();
+        match (heights.first(), heights.last()) {
+            (Some(min), Some(max)) => Some(HeightRange::new(*min, *max)),
+            _ => None,
+        }
     }
 
     fn max_height(&self) -> Option<Height> {

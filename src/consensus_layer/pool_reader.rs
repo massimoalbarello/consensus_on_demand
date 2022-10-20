@@ -1,6 +1,16 @@
-use crate::consensus_layer::pool::ConsensusPoolImpl;
+use crate::{
+    consensus_layer::pool::ConsensusPoolImpl,
+    crypto::CryptoHashOf
+};
 
-use super::{consensus_subcomponents::notary::NotarizationShare, artifacts::ConsensusMessage};
+use super::{
+    consensus_subcomponents::{
+        notary::NotarizationShare, 
+        block_maker::{Block, BlockProposal}
+    },
+    artifacts::ConsensusMessage, height_index::Height
+};
+
 use crate::consensus_layer::artifacts::IntoInner;
 
 // A struct and corresponding impl with helper methods to obtain particular
@@ -37,12 +47,46 @@ impl<'a> PoolReader<'a> {
     }
 
     // Get max height of valid notarized blocks.
-    pub fn get_notarized_height(&self) {
+    pub fn get_notarized_height(&self) -> Height {
         let notarized_height = self.pool
             .validated()
-            .notarization_shares()
-            .max_height()
-            .unwrap();
-        println!("Notarized height: {}", notarized_height);
+            .notarization()
+            .max_height();
+        match notarized_height {
+            Some(height) => {
+                println!("Last block notarized at height: {}", height);
+                height
+            }
+            None => {
+                println!("No block notarized yet");
+                0
+            }
+        }
+    }
+
+    /// Return a valid block with the matching hash and height if it exists.
+    pub fn get_block(&self, hash: &CryptoHashOf<Block>, h: Height) -> Result<Block, ()> {
+        let mut blocks: Vec<BlockProposal> = self
+            .pool
+            .validated()
+            .block_proposal()
+            .get_by_height(h)
+            .filter(|x| x.content.get_hash() == hash.get_ref())
+            .collect();
+        match blocks.len() {
+            1 => Ok(blocks.remove(0).content.value),
+            _ => Err(()),
+        }
+    }
+
+    /// Return all valid notarized blocks of a given height.
+    pub fn get_notarized_blocks(&'a self, h: Height) -> Box<dyn Iterator<Item = Block> + 'a> {
+        Box::new(
+            self.pool
+                .validated()
+                .notarization()
+                .get_by_height(h)
+                .map(move |x| self.get_block(&x.content.block, h).unwrap()),
+        )
     }
 }

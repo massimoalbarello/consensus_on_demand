@@ -7,7 +7,11 @@ pub mod consensus;
 use crate::consensus_layer::consensus::ConsensusImpl;
 
 pub mod artifacts;
-use crate::consensus_layer::artifacts::{ConsensusMessage, UnvalidatedArtifact, ChangeAction};
+use crate::consensus_layer::artifacts::{
+    ConsensusMessage,
+    UnvalidatedArtifact,
+    ChangeAction
+};
 
 pub mod pool_reader;
 

@@ -1,4 +1,8 @@
-use crate::consensus_layer::{pool_reader::PoolReader, artifacts::{ChangeSet, ChangeAction, IntoInner}, consensus::RoundRobin};
+use crate::consensus_layer::{
+    pool_reader::PoolReader,
+    artifacts::{ChangeSet, ChangeAction, IntoInner},
+    consensus::RoundRobin
+};
 
 pub struct Validator {
     schedule: RoundRobin,

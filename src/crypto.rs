@@ -16,7 +16,7 @@ pub struct Signed<T, S> {
 /// as record fields.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Hashed {
-    pub(crate) hash: String,
+    pub(crate) hash: CryptoHash,
     pub(crate) value: Block,
 }
 
@@ -26,6 +26,11 @@ impl Hashed {
             hash: Hashed::calculate_hash(&artifact),
             value: artifact
         }
+    }
+
+    /// Return the hash field as reference.
+    pub fn get_hash(&self) -> &CryptoHash {
+        &self.hash
     }
 
     fn calculate_hash(artifact: &Block) -> CryptoHash {
@@ -41,12 +46,16 @@ pub type CryptoHash = String;
 /// A cryptographic hash for content of type `T`
 pub type CryptoHashOf<T> = Id<T, CryptoHash>;
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(Eq, PartialEq, Clone, Debug, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Id<Entity, Repr>(Repr, PhantomData<Entity>);
 
 impl<Entity, Repr> Id<Entity, Repr> {
     pub const fn new(repr: Repr) -> Id<Entity, Repr> {
         Id(repr, PhantomData)
+    }
+
+    pub const fn get_ref(&self) -> &Repr {
+        &self.0
     }
 }
 
