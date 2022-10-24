@@ -77,9 +77,7 @@ impl Notary {
         pool: &PoolReader<'_>,
         proposal: Signed<Hashed<Block>, u8>,
     ) -> Option<NotarizationShare> {
-        // concatenating the node id in order to distinguish the locally generated notarization share from the ones received from peers in the artifacts pool
-        let block_hash = format!("{}{}", proposal.content.hash, self.node_id.to_string());
-        let content = NotarizationContent::new(proposal.content.value.height, CryptoHashOf::from(block_hash));
+        let content = NotarizationContent::new(proposal.content.value.height, CryptoHashOf::from(proposal.content.hash));
         let signature = self.node_id;
         Some(NotarizationShare { content, signature })
     }

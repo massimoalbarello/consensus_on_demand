@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::crypto::ConsensusMessageHash;
+use crate::crypto::{ConsensusMessageHash, Hashed};
 
 use super::consensus_subcomponents::{
     block_maker::BlockProposal,
@@ -126,7 +126,7 @@ impl ConsensusMessageHashable for BlockProposal {
     }
     
     fn get_cm_hash(&self) -> ConsensusMessageHash {
-        ConsensusMessageHash::BlockProposal(self.content.hash.clone())
+        ConsensusMessageHash::BlockProposal(Hashed::crypto_hash(self))
     }
 
     fn assert(msg: &ConsensusMessage) -> Option<&Self> {
@@ -147,7 +147,7 @@ impl ConsensusMessageHashable for NotarizationShare {
     }
     
     fn get_cm_hash(&self) -> ConsensusMessageHash {
-        ConsensusMessageHash::NotarizationShare(self.content.block.get_ref().clone())
+        ConsensusMessageHash::NotarizationShare(Hashed::crypto_hash(self))
     }
 
     fn assert(msg: &ConsensusMessage) -> Option<&Self> {
@@ -168,7 +168,7 @@ impl ConsensusMessageHashable for Notarization {
     }
     
     fn get_cm_hash(&self) -> ConsensusMessageHash {
-        ConsensusMessageHash::Notarization(self.content.block.get_ref().clone())
+        ConsensusMessageHash::Notarization(Hashed::crypto_hash(self))
     }
 
     fn assert(msg: &ConsensusMessage) -> Option<&Self> {
