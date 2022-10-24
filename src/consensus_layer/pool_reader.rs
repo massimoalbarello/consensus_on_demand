@@ -35,15 +35,9 @@ impl<'a> PoolReader<'a> {
     /// Get all valid notarization shares at the given height.
     pub fn get_notarization_shares(
         &self,
-    ) -> Vec<NotarizationShare> {
-        let mut shares = vec![];
-        for (_, artifact) in &self.pool().validated().artifacts {
-            match artifact.to_owned().into_inner() {
-                ConsensusMessage::NotarizationShare(share) => shares.push(share),
-                _ => (),
-            }
-        }
-        shares
+        h: Height,
+    ) -> Box<dyn Iterator<Item = NotarizationShare>> {
+        self.pool.validated().notarization_share().get_by_height(h)
     }
 
     // Get max height of valid notarized blocks.

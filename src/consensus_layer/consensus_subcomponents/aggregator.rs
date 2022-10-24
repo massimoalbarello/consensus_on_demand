@@ -3,17 +3,18 @@
 //! from random beacon shares, Notarizations from notarization shares and
 //! Finalizations from finalization shares.
 
+use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use crate::consensus_layer::height_index::Height;
 use crate::consensus_layer::{
-    artifacts::N,
     pool_reader::PoolReader,
     artifacts::ConsensusMessage,
 };
 use crate::crypto::{Signed, CryptoHashOf};
 
 use super::block_maker::Block;
+use super::notary::NotarizationShare;
 
 
 // NotarizationContent holds the values that are signed in a notarization
@@ -55,14 +56,18 @@ impl ShareAggregator {
 
     /// Attempt to construct `Notarization`s at `notarized_height + 1`
     fn aggregate_notarization_shares(&self, pool: &PoolReader<'_>) -> Vec<ConsensusMessage> {
-        let notarization_shares = pool.get_notarization_shares();
-        let mut notarizations  = vec![]; 
-        let notarization_hash = String::from("Notarization hash");
-        if notarization_shares.len() >= N-1 && !pool.pool().validated().artifacts.contains_key(&notarization_hash) {
-            let content = NotarizationContent::new(notarization_shares[0].content.height, CryptoHashOf::from(notarization_hash));
-            let signature = self.node_id;
-            notarizations.push(ConsensusMessage::Notarization(Notarization { content, signature }))
+        let height = pool.get_notarized_height();
+        let notarization_shares = pool.get_notarization_shares(height);
+        for share in notarization_shares {
+            println!("Notarization share: {:?}", share);
         }
+        let mut notarizations  = vec![];
+        // let notarization_hash = String::from("Notarization hash");
+        // if notarization_shares.len() >= N-1 && !pool.pool().validated().artifacts.contains_key(&notarization_hash) {
+        //     let content = NotarizationContent::new(notarization_shares[0].content.height, CryptoHashOf::from(notarization_hash));
+        //     let signature = self.node_id;
+        //     notarizations.push(ConsensusMessage::Notarization(Notarization { content, signature }))
+        // }
         notarizations
     }
 }
