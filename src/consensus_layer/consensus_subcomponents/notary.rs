@@ -75,7 +75,7 @@ impl Notary {
     fn notarize_block(
         &self,
         pool: &PoolReader<'_>,
-        proposal: Signed<Hashed, u8>,
+        proposal: Signed<Hashed<Block>, u8>,
     ) -> Option<NotarizationShare> {
         // concatenating the node id in order to distinguish the locally generated notarization share from the ones received from peers in the artifacts pool
         let block_hash = format!("{}{}", proposal.content.hash, self.node_id.to_string());

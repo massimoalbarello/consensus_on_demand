@@ -46,7 +46,7 @@ impl Block {
 }
 
 /// HashedBlock contains a Block together with its hash
-pub type HashedBlock = Hashed;
+pub type HashedBlock = Hashed<Block>;
 
 pub type BlockProposal = Signed<HashedBlock, u8>;
 
