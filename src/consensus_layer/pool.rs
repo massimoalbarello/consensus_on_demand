@@ -103,7 +103,7 @@ impl<T: IntoInner<ConsensusMessage> + Clone + Debug> InMemoryPoolSection<T> {
         SelectIndex::select_index(&self.indexes)
     }
 
-    pub fn notarization_shares(&self) -> &dyn HeightIndexedPool<NotarizationShare> {
+    pub fn notarization_share(&self) -> &dyn HeightIndexedPool<NotarizationShare> {
         self
     }
 
@@ -125,7 +125,10 @@ where
 {
     fn get_by_height(&self, h: Height) -> Box<dyn Iterator<Item = T>> {
         let hashes = self.select_index().lookup(h).collect();
-        Box::new(self.get_by_hashes(hashes).into_iter())
+        println!("Hashes at height {}: {:?}", h, hashes);
+        let artifacts = self.get_by_hashes(hashes);
+        println!("Corresponding artifacts: {:?}", artifacts);
+        Box::new(artifacts.into_iter())
     }
 
     fn height_range(&self) -> Option<HeightRange> {

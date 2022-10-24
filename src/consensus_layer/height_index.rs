@@ -144,18 +144,21 @@ pub trait SelectIndex: Eq + Sized + Debug {
 
 impl SelectIndex for CryptoHashOf<Notarization> {
     fn select_index(indexes: &Indexes) -> &HeightIndex<Self> {
+        println!("Notarization indexes: {:?}", indexes.notarization);
         &indexes.notarization
     }
 }
 
 impl SelectIndex for CryptoHashOf<BlockProposal> {
     fn select_index(indexes: &Indexes) -> &HeightIndex<Self> {
+        println!("Block proposal indexes: {:?}", indexes.block_proposal);
         &indexes.block_proposal
     }
 }
 
 impl SelectIndex for CryptoHashOf<NotarizationShare> {
     fn select_index(indexes: &Indexes) -> &HeightIndex<Self> {
+        println!("Notarization share indexes: {:?}", indexes.notarization_share);
         &indexes.notarization_share
     }
 }
