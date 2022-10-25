@@ -3,9 +3,10 @@
 //! from random beacon shares, Notarizations from notarization shares and
 //! Finalizations from finalization shares.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
+use crate::consensus_layer::artifacts::N;
 use crate::consensus_layer::height_index::Height;
 use crate::consensus_layer::{
     pool_reader::PoolReader,
@@ -14,7 +15,7 @@ use crate::consensus_layer::{
 use crate::crypto::{Signed, CryptoHashOf};
 
 use super::block_maker::Block;
-use super::notary::NotarizationShare;
+use super::notary;
 
 
 // NotarizationContent holds the values that are signed in a notarization
@@ -58,16 +59,38 @@ impl ShareAggregator {
     fn aggregate_notarization_shares(&self, pool: &PoolReader<'_>) -> Vec<ConsensusMessage> {
         let height = pool.get_notarized_height();
         let notarization_shares = pool.get_notarization_shares(height);
-        for share in notarization_shares {
-            println!("Notarization share: {:?}", share);
-        }
-        let mut notarizations  = vec![];
-        // let notarization_hash = String::from("Notarization hash");
-        // if notarization_shares.len() >= N-1 && !pool.pool().validated().artifacts.contains_key(&notarization_hash) {
-        //     let content = NotarizationContent::new(notarization_shares[0].content.height, CryptoHashOf::from(notarization_hash));
-        //     let signature = self.node_id;
-        //     notarizations.push(ConsensusMessage::Notarization(Notarization { content, signature }))
-        // }
-        notarizations
+        let grouped_shares = notarization_shares.fold(BTreeMap::<notary::NotarizationContent, BTreeSet<u8>>::new(), |mut grouped_shares, share| {
+            match grouped_shares.get_mut(&share.content) {
+                Some(existing) => {
+                    existing.insert(share.signature);
+                }
+                None => {
+                    let mut new_set = BTreeSet::<u8>::new();
+                    new_set.insert(share.signature);
+                    grouped_shares.insert(share.content, new_set);
+                }
+            };
+            grouped_shares
+        });
+        grouped_shares.into_iter().filter_map(|(notary_content, shares)| {
+            if shares.len() >= N-1 {
+                println!("\n########## Aggregator ##########");
+                println!("Notarization of share: {:?} by committee: {:?}", notary_content, shares);
+                Some(notary_content)
+            }
+            else {
+                None
+            }.map(|notary_content| {
+                ConsensusMessage::Notarization(
+                    Notarization {
+                        content: NotarizationContent {
+                            height: notary_content.height,
+                            block: notary_content.block,
+                        },
+                        signature: 0,   // committee signature
+                    }
+                )
+            })
+        }).collect()
     }
 }

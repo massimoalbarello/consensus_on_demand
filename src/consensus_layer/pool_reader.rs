@@ -8,10 +8,8 @@ use super::{
         notary::NotarizationShare, 
         block_maker::{Block, BlockProposal}
     },
-    artifacts::ConsensusMessage, height_index::Height
+    height_index::Height
 };
-
-use crate::consensus_layer::artifacts::IntoInner;
 
 // A struct and corresponding impl with helper methods to obtain particular
 // artifacts/messages from the artifact pool.
