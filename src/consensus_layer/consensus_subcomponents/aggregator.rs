@@ -57,7 +57,7 @@ impl ShareAggregator {
 
     /// Attempt to construct `Notarization`s at `notarized_height + 1`
     fn aggregate_notarization_shares(&self, pool: &PoolReader<'_>) -> Vec<ConsensusMessage> {
-        let height = pool.get_notarized_height();
+        let height = pool.get_notarized_height() + 1;
         let notarization_shares = pool.get_notarization_shares(height);
         let grouped_shares = notarization_shares.fold(BTreeMap::<notary::NotarizationContent, BTreeSet<u8>>::new(), |mut grouped_shares, share| {
             match grouped_shares.get_mut(&share.content) {
@@ -73,7 +73,7 @@ impl ShareAggregator {
             grouped_shares
         });
         grouped_shares.into_iter().filter_map(|(notary_content, shares)| {
-            if shares.len() >= N-1 {
+            if shares.len() >= N-1 && !pool.pool().validated().artifacts.contains_key("74031d11fa7914c99d68359d87b29f4e7b8d98d004f098fc5aa64b0f82bb081d"){
                 println!("\n########## Aggregator ##########");
                 println!("Notarization of share: {:?} by committee: {:?}", notary_content, shares);
                 Some(notary_content)

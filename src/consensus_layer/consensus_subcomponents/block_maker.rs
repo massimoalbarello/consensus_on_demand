@@ -2,7 +2,7 @@ use serde::{Serialize, Deserialize};
 
 use crate::{consensus_layer::{
     pool_reader::PoolReader,
-    artifacts::ConsensusMessage
+    artifacts::{ConsensusMessage, N}
 }, crypto::{Signed, Hashed}};
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
@@ -66,7 +66,7 @@ impl BlockMaker {
     pub fn on_state_change(&self, pool: &PoolReader<'_>) -> Option<ConsensusMessage> {
         let my_node_id = self.node_id;
         let (beacon, parent) = get_dependencies(pool).unwrap();
-        let height: u64 = 0;
+        let height: u64 = parent.height + 1;
         match self.get_block_maker_rank(height, &beacon, my_node_id)
         {
             rank => {
@@ -94,7 +94,9 @@ impl BlockMaker {
     }
 
     fn get_block_maker_rank(&self, height: u64, beacon: &RandomBeacon, my_node_id: u8) -> u8 {
-        0
+        let rank = ((height + self.node_id as u64 - 2) % N as u64) as u8;
+        println!("Local rank for height {} is: {}", height, rank);
+        rank
     }
 
     fn is_better_block_proposal_available(
@@ -113,8 +115,8 @@ impl BlockMaker {
         rank: u8,
         parent: Block,
     ) -> Option<BlockProposal> {
-        let parent_hash = String::from("Parent hash");
-        let height: u64 = 0;
+        let parent_hash = Hashed::crypto_hash(&parent);
+        let height: u64 = parent.height + 1;
         self.construct_block_proposal(
             pool,
             parent,
@@ -168,7 +170,7 @@ fn get_dependencies(pool: &PoolReader<'_>) -> Option<(RandomBeacon, Block)> {
                 Block {
                     parent: String::from("Genesis has no parent"),
                     payload: Payload::new(),
-                    height: 1,
+                    height: 0,
                     rank: 0,
                 }
             ))
