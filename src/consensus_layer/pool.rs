@@ -125,9 +125,9 @@ where
 {
     fn get_by_height(&self, h: Height) -> Box<dyn Iterator<Item = T>> {
         let hashes = self.select_index().lookup(h).collect();
-        println!("Hashes at height {}: {:?}", h, hashes);
+        // println!("Hashes at height {}: {:?}", h, hashes);
         let artifacts = self.get_by_hashes(hashes);
-        println!("Corresponding artifacts: {:?}", artifacts);
+        // println!("Corresponding artifacts: {:?}", artifacts);
         Box::new(artifacts.into_iter())
     }
 
@@ -206,10 +206,6 @@ impl ConsensusPoolImpl {
             println!("\n########## Consensus pool ##########");
             println!("Applying change to validated section of the consensus pool");
             self.validated.mutate(ops);
-            println!("Current state of the VALIDATED section:");
-            for (hash, artifact) in &self.validated.artifacts {
-                println!("{:?} -> {:?}", hash, artifact);
-            }
         }
     }
 
@@ -218,10 +214,6 @@ impl ConsensusPoolImpl {
             println!("\n########## Consensus pool ##########");
             println!("Applying change to unvalidated section of the consensus pool");
             self.unvalidated.mutate(ops);
-            println!("Current state of the UNVALIDATED section:");
-            for (hash, artifact) in &self.unvalidated.artifacts {
-                println!("{:?} -> {:?}", hash, artifact);
-            }
         }
     }
 }

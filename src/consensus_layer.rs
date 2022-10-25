@@ -52,7 +52,6 @@ impl ConsensusProcessor {
             ProcessingResult::StateUnchanged
         };
 
-        println!("\n########## Processor ##########");
         if to_broadcast == true {
             for change_action in change_set.iter() {
                 match change_action {
@@ -68,7 +67,11 @@ impl ConsensusProcessor {
             }
         }
 
-        println!("Applying change set: {:?}", change_set);
+        if !change_set.is_empty() {
+            println!("\n########## Processor ##########");
+            println!("Applying change set: {:?}", change_set);
+        }
+
         self.consensus_pool
             .write()
             .unwrap()

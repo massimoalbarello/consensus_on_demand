@@ -13,7 +13,7 @@ pub mod crypto;
 pub mod consensus_layer;
 
 async fn broadcast_message_future() {
-    sleep(Duration::new(1, 0)).await;
+    sleep(Duration::from_millis(100)).await;
 }
 
 #[async_std::main]

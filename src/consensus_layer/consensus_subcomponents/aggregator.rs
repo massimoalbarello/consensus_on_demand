@@ -73,9 +73,9 @@ impl ShareAggregator {
             grouped_shares
         });
         grouped_shares.into_iter().filter_map(|(notary_content, shares)| {
-            if shares.len() >= N-1 && !pool.pool().validated().artifacts.contains_key("74031d11fa7914c99d68359d87b29f4e7b8d98d004f098fc5aa64b0f82bb081d"){
+            if shares.len() >= N-1 {
                 println!("\n########## Aggregator ##########");
-                println!("Notarization of share: {:?} by committee: {:?}", notary_content, shares);
+                println!("Notarization of block with hash: {} at height {} by committee: {:?}", notary_content.block.get_ref(), notary_content.height, shares);
                 Some(notary_content)
             }
             else {

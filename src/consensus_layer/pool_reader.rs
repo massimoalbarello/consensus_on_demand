@@ -46,11 +46,9 @@ impl<'a> PoolReader<'a> {
             .max_height();
         match notarized_height {
             Some(height) => {
-                println!("Last block notarized at height: {}", height);
                 height
             }
             None => {
-                println!("No block notarized yet");
                 0
             }
         }

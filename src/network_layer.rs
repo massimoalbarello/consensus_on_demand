@@ -121,7 +121,6 @@ impl Peer {
                 );
             },
             Err(_) => {
-                println!("No outgoing artifact to be broadcasted");
                 self.swarm.behaviour_mut().floodsub.publish(
                     self.floodsub_topic.clone(),
                     serde_json::to_string::<Message>(&Message::KeepAliveMessage).unwrap()

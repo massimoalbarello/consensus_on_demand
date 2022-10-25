@@ -83,7 +83,7 @@ impl BlockMaker {
                     let block_proposal = self.propose_block(pool, rank, parent).map(|proposal| {
                         ConsensusMessage::BlockProposal(proposal)
                     });
-                    println!("Block proposal: {:?}", block_proposal);
+                    println!("Created block proposal: {:?}", block_proposal);
                     block_proposal
                 }
                 else {
@@ -147,12 +147,13 @@ impl BlockMaker {
 // Return None otherwise.
 fn get_dependencies(pool: &PoolReader<'_>) -> Option<(RandomBeacon, Block)> {
     let notarized_height = pool.get_notarized_height();
+    // println!("Last block notarized at height: {}", notarized_height);
     let parent = pool
         .get_notarized_blocks(notarized_height)
         .min_by(|block1, block2| block1.rank.cmp(&block2.rank));
     match parent {
         Some(parent) => {
-            println!("Parent block: {:?}", parent);
+            // println!("Parent block: {:?}", parent);
             Some((
                 RandomBeacon {},
                 parent
@@ -174,7 +175,7 @@ fn get_dependencies(pool: &PoolReader<'_>) -> Option<(RandomBeacon, Block)> {
 
 fn get_block_maker_rank(height: u64, beacon: &RandomBeacon, my_node_id: u8) -> u8 {
     let rank = ((height + my_node_id as u64 - 2) % N as u64) as u8;
-    println!("Local rank for height {} is: {}", height, rank);
+    // println!("Local rank for height {} is: {}", height, rank);
     rank
 }
 

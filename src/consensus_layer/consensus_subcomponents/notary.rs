@@ -3,7 +3,7 @@ use serde::{Serialize, Deserialize};
 use crate::{
     consensus_layer::{
         pool_reader::PoolReader, 
-        artifacts::{ConsensusMessage, IntoInner}, 
+        artifacts::ConsensusMessage, 
         height_index::Height
     }, crypto::{Signed, Hashed, CryptoHashOf}
 };
@@ -48,9 +48,10 @@ impl Notary {
         let mut notarization_shares = Vec::new();
         let height = notarized_height + 1;
         for proposal in find_lowest_ranked_proposals(pool, height) {
-            println!("\n########## Notary ##########");
             if !self.is_proposal_already_notarized_by_me(pool, &proposal) {
                 if let Some(s) = self.notarize_block(pool, proposal) {
+                    println!("\n########## Notary ##########");
+                    println!("Created notarization share: {:?}", s);
                     notarization_shares.push(ConsensusMessage::NotarizationShare(s));
                 }
             }
