@@ -25,7 +25,7 @@ pub struct Block {
     // the height of the block, which is the height of the parent + 1
     pub height: u64,
     // rank indicates the rank of the block maker that created this block
-    rank: u8,
+    pub rank: u8,
 }
 
 impl Block {

@@ -8,7 +8,7 @@ use crate::{
     }, crypto::{Signed, Hashed, CryptoHashOf}
 };
 
-use super::block_maker::Block;
+use super::block_maker::{Block, BlockProposal};
 
 // NotarizationContent holds the values that are signed in a notarization
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -44,20 +44,15 @@ impl Notary {
     }
 
     pub fn on_state_change(&self, pool: &PoolReader<'_>) -> Vec<ConsensusMessage> {
+        let notarized_height = pool.get_notarized_height();
         let mut notarization_shares = Vec::new();
-        for (hash, artifact) in &pool.pool().validated().artifacts {
+        let height = notarized_height + 1;
+        for proposal in find_lowest_ranked_proposals(pool, height) {
             println!("\n########## Notary ##########");
-            match artifact.to_owned().into_inner() {
-                ConsensusMessage::BlockProposal(proposal) => {
-                    if !self.is_proposal_already_notarized_by_me(pool) {
-                        if let Some(s) = self.notarize_block(pool, proposal) {
-                            let notarization_share = ConsensusMessage::NotarizationShare(s);
-                            println!("Notarization share: {:?}", notarization_share);
-                            notarization_shares.push(notarization_share);
-                        }
-                    }
-                },
-                _ => (),
+            if !self.is_proposal_already_notarized_by_me(pool, &proposal) {
+                if let Some(s) = self.notarize_block(pool, proposal) {
+                    notarization_shares.push(ConsensusMessage::NotarizationShare(s));
+                }
             }
         }
         notarization_shares
@@ -66,9 +61,15 @@ impl Notary {
     
     /// Return true if this node has already published a notarization share
     /// for the given block proposal. Return false otherwise.
-    fn is_proposal_already_notarized_by_me(&self, pool: &PoolReader<'_>) -> bool {
-        // if there is more than one artifact in the validated section of the pool it means that the node has already sent its notarization share
-        pool.pool().validated().artifacts.len() > 1
+    fn is_proposal_already_notarized_by_me<'a>(
+        &self,
+        pool: &PoolReader<'_>,
+        proposal: &'a BlockProposal,
+    ) -> bool {
+        let height = proposal.content.value.height;
+        pool.get_notarization_shares(height)
+            .filter(|s| s.signature == self.node_id)
+            .any(|s| proposal.content.hash.eq(s.content.block.get_ref()))
     }
 
     /// Notarize and return a `NotarizationShare` for the given block
@@ -81,4 +82,27 @@ impl Notary {
         let signature = self.node_id;
         Some(NotarizationShare { content, signature })
     }
+}
+
+/// Return the validated block proposals with the lowest rank at height `h`, if
+/// there are any. Else return `None`.
+pub fn find_lowest_ranked_proposals(pool: &PoolReader<'_>, h: Height) -> Vec<BlockProposal> {
+    let (_, best_proposals) = pool
+        .pool()
+        .validated()
+        .block_proposal()
+        .get_by_height(h)
+        .fold(
+            (None, Vec::new()),
+            |(mut best_rank, mut best_proposals), proposal| {
+                if best_rank.is_none() || best_rank.unwrap() > proposal.content.value.rank {
+                    best_rank = Some(proposal.content.value.rank);
+                    best_proposals = vec![proposal];
+                } else if Some(proposal.content.value.rank) == best_rank {
+                    best_proposals.push(proposal);
+                }
+                (best_rank, best_proposals)
+            },
+        );
+    best_proposals
 }
