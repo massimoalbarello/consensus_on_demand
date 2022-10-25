@@ -180,7 +180,10 @@ fn get_block_maker_rank(height: u64, beacon: &RandomBeacon, my_node_id: u8) -> u
 
 // Return true if this node has already made a proposal at the given height.
 fn already_proposed(pool: &PoolReader<'_>, h: u64, this_node: u8) -> bool {
-    false
+    match pool.pool().validated().block_proposal().max_height() {
+        Some(last_proposed_block_height) => last_proposed_block_height == h,
+        None => false
+    }
 }
 
 // Return true if the time since round start is greater than the required block
@@ -191,8 +194,5 @@ pub fn is_time_to_make_block(
     rank: u8,
     node_id: u8
 ) -> bool {
-    match pool.pool().validated().block_proposal().max_height() {
-        Some(last_proposed_block_height) => rank == 0 &&  last_proposed_block_height == height - 1,
-        None => rank == 0
-    }
+    rank == 0
 }
