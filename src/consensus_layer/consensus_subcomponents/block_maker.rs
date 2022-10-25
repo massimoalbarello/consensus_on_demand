@@ -67,7 +67,7 @@ impl BlockMaker {
         let my_node_id = self.node_id;
         let (beacon, parent) = get_dependencies(pool).unwrap();
         let height: u64 = parent.height + 1;
-        match self.get_block_maker_rank(height, &beacon, my_node_id)
+        match get_block_maker_rank(height, &beacon, my_node_id)
         {
             rank => {
                 if !already_proposed(pool, height, my_node_id)
@@ -91,12 +91,6 @@ impl BlockMaker {
                 }
             }
         }
-    }
-
-    fn get_block_maker_rank(&self, height: u64, beacon: &RandomBeacon, my_node_id: u8) -> u8 {
-        let rank = ((height + self.node_id as u64 - 2) % N as u64) as u8;
-        println!("Local rank for height {} is: {}", height, rank);
-        rank
     }
 
     fn is_better_block_proposal_available(
@@ -178,6 +172,12 @@ fn get_dependencies(pool: &PoolReader<'_>) -> Option<(RandomBeacon, Block)> {
     }
 }
 
+fn get_block_maker_rank(height: u64, beacon: &RandomBeacon, my_node_id: u8) -> u8 {
+    let rank = ((height + my_node_id as u64 - 2) % N as u64) as u8;
+    println!("Local rank for height {} is: {}", height, rank);
+    rank
+}
+
 // Return true if this node has already made a proposal at the given height.
 fn already_proposed(pool: &PoolReader<'_>, h: u64, this_node: u8) -> bool {
     false
@@ -191,7 +191,8 @@ pub fn is_time_to_make_block(
     rank: u8,
     node_id: u8
 ) -> bool {
-    // node 1 proposes block only once (used for tests)
-    // after the first block proposed by node 1, the artifact is inserted in the validated section of node 1's pool and so it will not propose anymore
-    node_id == 1 && pool.pool().validated().artifacts.is_empty()
+    match pool.pool().validated().block_proposal().max_height() {
+        Some(last_proposed_block_height) => rank == 0 &&  last_proposed_block_height == height - 1,
+        None => rank == 0
+    }
 }
