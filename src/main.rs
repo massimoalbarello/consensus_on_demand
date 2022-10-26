@@ -11,6 +11,7 @@ use crate::network_layer::Peer;
 pub mod artifact_manager;
 pub mod crypto;
 pub mod consensus_layer;
+pub mod time_source;
 
 async fn broadcast_message_future() {
     sleep(Duration::from_millis(100)).await;
