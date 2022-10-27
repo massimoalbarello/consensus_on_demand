@@ -45,6 +45,21 @@ impl SysTimeSource {
             current_time: RwLock::new(system_time_now()),
         }
     }
+
+    /// Update time to the new system time value.
+    ///
+    /// It will skip the update and return an error if the new system time is
+    /// less than the previous value.
+    pub fn update_time(&self) -> Result<(), ()> {
+        let mut current_time = self.current_time.write().unwrap();
+        let t = system_time_now();
+        if *current_time > t {
+            Err(())
+        } else {
+            *current_time = t;
+            Ok(())
+        }
+    }
 }
 
 impl TimeSource for SysTimeSource {

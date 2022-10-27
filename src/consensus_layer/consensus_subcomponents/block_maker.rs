@@ -86,7 +86,6 @@ impl BlockMaker {
                         my_node_id
                     )
                 {
-                    println!("\n########## Block maker ##########");
                     let block_proposal = self.propose_block(pool, rank, parent).map(|proposal| {
                         ConsensusMessage::BlockProposal(proposal)
                     });
@@ -210,14 +209,11 @@ fn is_time_to_make_block(
             Some(delay) => delay,
             _ => return false,
         };
-    println!("Block maker delay: {:?}", block_maker_delay);
     match pool.get_round_start_time(height) {
         Some(start_time) => {
             let current_time = time_source.get_relative_time();
-            println!("Current time: {:?}", current_time);
-            println!("Round start time: {:?}", start_time);
             if current_time >= start_time + block_maker_delay {
-                println!("!!!!!!!! Time to propose a block !!!!!!!!");
+                println!("\n########## Block maker ##########");
                 return true
             }
             false

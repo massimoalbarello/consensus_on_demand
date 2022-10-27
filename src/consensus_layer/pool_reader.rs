@@ -95,9 +95,7 @@ impl<'a> PoolReader<'a> {
                 .min()
         };
         let prev_height = height - 1;
-        let notarization_time = get_notarization_time(prev_height)
-            .map(|notarization_time| notarization_time);
-        println!("Last notarization time: {:?}", notarization_time);
-        notarization_time
+        get_notarization_time(prev_height)
+            .map(|notarization_time| notarization_time)
     }
 }

@@ -79,6 +79,8 @@ impl ArtifactProcessorManager {
 
             match ret {
                 Ok(_) | Err(RecvTimeoutError::Timeout) => {
+                    time_source.update_time().ok();
+
                     let artifacts = {
                         let mut artifacts = Vec::new();
                         let mut received_artifacts = pending_artifacts.lock().unwrap();
