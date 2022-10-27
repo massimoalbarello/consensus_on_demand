@@ -43,7 +43,7 @@ impl<T: IntoInner<ConsensusMessage> + HasTimestamp + Clone + Debug> InMemoryPool
         for op in ops.ops {
             match op {
                 PoolSectionOp::Insert(artifact) => {
-                    println!("Inserting artifact");
+                    // println!("Inserting artifact");
                     self.insert(artifact);
                 },
                 PoolSectionOp::Remove(msg_id) => {
@@ -51,7 +51,7 @@ impl<T: IntoInner<ConsensusMessage> + HasTimestamp + Clone + Debug> InMemoryPool
                         println!("Error removing artifact {:?}", &msg_id);
                     }
                     else {
-                        println!("Removing artifact");
+                        // println!("Removing artifact");
                     }
                 }
             }
@@ -213,16 +213,16 @@ impl ConsensusPoolImpl {
 
     fn apply_changes_validated(&mut self, ops: PoolSectionOps<ValidatedConsensusArtifact>) {
         if !ops.ops.is_empty() {
-            println!("\n########## Consensus pool ##########");
-            println!("Applying change to validated section of the consensus pool");
+            // println!("\n########## Consensus pool ##########");
+            // println!("Applying change to validated section of the consensus pool");
             self.validated.mutate(ops);
         }
     }
 
     fn apply_changes_unvalidated(&mut self, ops: PoolSectionOps<UnvalidatedConsensusArtifact>) {
         if !ops.ops.is_empty() {
-            println!("\n########## Consensus pool ##########");
-            println!("Applying change to unvalidated section of the consensus pool");
+            // println!("\n########## Consensus pool ##########");
+            // println!("Applying change to unvalidated section of the consensus pool");
             self.unvalidated.mutate(ops);
         }
     }

@@ -61,11 +61,11 @@ impl ConsensusProcessor {
             for change_action in change_set.iter() {
                 match change_action {
                     ChangeAction::AddToValidated(to_add) => {
-                        println!("Broadcasting consensus message to be added: {:?}", to_add);
+                        // println!("Broadcasting consensus message to be added: {:?}", to_add);
                         adverts.push(to_add.to_owned());
                     }
                     ChangeAction::MoveToValidated(to_move) => {
-                        println!("Broadcasting consensus message to be moved: {:?}", to_move);
+                        // println!("Broadcasting consensus message to be moved: {:?}", to_move);
                         adverts.push(to_move.to_owned());
                     }
                 }
@@ -73,8 +73,8 @@ impl ConsensusProcessor {
         }
 
         if !change_set.is_empty() {
-            println!("\n########## Processor ##########");
-            println!("Applying change set: {:?}", change_set);
+            // println!("\n########## Processor ##########");
+            // println!("Applying change set: {:?}", change_set);
         }
 
         self.consensus_pool

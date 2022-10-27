@@ -12,7 +12,7 @@ use crate::{
 
 use super::block_maker::{Block, BlockProposal};
 
-pub const NOTARIZATION_UNIT_DELAY: Duration = Duration::from_millis(5000);
+pub const NOTARIZATION_UNIT_DELAY: Duration = Duration::from_millis(400);
 
 // NotarizationContent holds the values that are signed in a notarization
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]

@@ -121,7 +121,7 @@ impl Peer {
     pub fn broadcast_message(&mut self) {
         match self.receiver_outgoing_artifact.try_recv() {
             Ok(outgoing_artifact) => {
-                println!("Broadcasted locally generated artifact");
+                // println!("Broadcasted locally generated artifact");
                 self.swarm.behaviour_mut().floodsub.publish(
                     self.floodsub_topic.clone(),
                     serde_json::to_string::<Message>(&Message::ConsensusMessage(outgoing_artifact)).unwrap(),
