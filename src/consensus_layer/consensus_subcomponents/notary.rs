@@ -12,7 +12,7 @@ use crate::{
 
 use super::block_maker::{Block, BlockProposal};
 
-pub const NOTARIZATION_DELAY_UNIT: Duration = Duration::from_millis(5000);
+pub const NOTARIZATION_UNIT_DELAY: Duration = Duration::from_millis(5000);
 
 // NotarizationContent holds the values that are signed in a notarization
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -54,18 +54,43 @@ impl Notary {
         let mut notarization_shares = Vec::new();
         let height = notarized_height + 1;
         for proposal in find_lowest_ranked_proposals(pool, height) {
-            if !self.is_proposal_already_notarized_by_me(pool, &proposal) {
-                if let Some(s) = self.notarize_block(pool, proposal) {
-                    println!("\n########## Notary ##########");
-                    println!("Created notarization share: {:?}", s);
-                    notarization_shares.push(ConsensusMessage::NotarizationShare(s));
+            let rank = proposal.content.value.rank;
+            if self.time_to_notarize(pool, height, rank) {
+                if !self.is_proposal_already_notarized_by_me(pool, &proposal) {
+                    if let Some(s) = self.notarize_block(pool, proposal) {
+                        println!("\n########## Notary ##########");
+                        println!("Created notarization share: {:?} for proposal of rank: {:?}", s, rank);
+                        notarization_shares.push(ConsensusMessage::NotarizationShare(s));
+                    }
                 }
             }
         }
         notarization_shares
     }
 
-    
+    /// Return the time since round start, if it is greater than required
+    /// notarization delay for the given block rank, or None otherwise.
+    fn time_to_notarize(
+        &self,
+        pool: &PoolReader<'_>,
+        height: Height,
+        rank: u8,
+    ) -> bool {
+        let adjusted_notary_delay = get_adjusted_notary_delay(
+            pool,
+            height,
+            rank,
+        );
+        if let Some(start_time) = pool.get_round_start_time(height) {
+            let now = self.time_source.get_relative_time();
+            // println!("Round started at: {:?}", start_time);
+            // println!("Current time: {:?}", now);
+            // println!("Time to notarize: {:?}", start_time + adjusted_notary_delay);
+            return now >= start_time + adjusted_notary_delay;
+        }
+            height == 1
+    }
+
     /// Return true if this node has already published a notarization share
     /// for the given block proposal. Return false otherwise.
     fn is_proposal_already_notarized_by_me<'a>(
@@ -93,7 +118,7 @@ impl Notary {
 
 /// Return the validated block proposals with the lowest rank at height `h`, if
 /// there are any. Else return `None`.
-pub fn find_lowest_ranked_proposals(pool: &PoolReader<'_>, h: Height) -> Vec<BlockProposal> {
+fn find_lowest_ranked_proposals(pool: &PoolReader<'_>, h: Height) -> Vec<BlockProposal> {
     let (_, best_proposals) = pool
         .pool()
         .validated()
@@ -112,4 +137,15 @@ pub fn find_lowest_ranked_proposals(pool: &PoolReader<'_>, h: Height) -> Vec<Blo
             },
         );
     best_proposals
+}
+
+/// Calculate the required delay for notary based on the rank of block to
+/// notarize
+pub fn get_adjusted_notary_delay(
+    pool: &PoolReader<'_>,
+    height: Height,
+    rank: u8,
+) -> Duration {
+    let ranked_delay = NOTARIZATION_UNIT_DELAY.as_millis() as u64 * rank as u64;
+    Duration::from_millis(ranked_delay)
 }

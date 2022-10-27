@@ -7,7 +7,7 @@ use crate::{consensus_layer::{
     artifacts::{ConsensusMessage, N}
 }, crypto::{Signed, Hashed}, time_source::TimeSource};
 
-use super::notary::NOTARIZATION_DELAY_UNIT;
+use super::notary::NOTARIZATION_UNIT_DELAY;
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub struct Payload {}
@@ -232,5 +232,5 @@ fn is_time_to_make_block(
 fn get_block_maker_delay(
     rank: u8,
 ) -> Option<Duration> {
-    Some(NOTARIZATION_DELAY_UNIT * rank as u32)
+    Some(NOTARIZATION_UNIT_DELAY * rank as u32)
 }

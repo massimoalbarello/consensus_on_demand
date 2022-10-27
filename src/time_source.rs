@@ -21,6 +21,16 @@ impl std::ops::Add<Duration> for Time {
     }
 }
 
+impl std::ops::Sub<Time> for Time {
+    type Output = std::time::Duration;
+
+    fn sub(self, other: Time) -> std::time::Duration {
+        let lhs = Duration::from_nanos(self.0);
+        let rhs = Duration::from_nanos(other.0);
+        lhs - rhs
+    }
+}
+
 /// The unix epoch.
 pub const UNIX_EPOCH: Time = Time(0);
 
