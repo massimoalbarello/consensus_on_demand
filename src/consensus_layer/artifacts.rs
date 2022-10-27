@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::crypto::{ConsensusMessageHash, Hashed};
+use crate::{crypto::{ConsensusMessageHash, Hashed}, time_source::Time};
 
 use super::consensus_subcomponents::{
     block_maker::BlockProposal,
@@ -35,18 +35,24 @@ impl<T> AsRef<T> for UnvalidatedArtifact<T> {
     }
 }
 
+pub trait HasTimestamp {
+    fn timestamp(&self) -> Time;
+}
+
 // Unvalidated artifact
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UnvalidatedArtifact<T> {
     pub message: T,
     pub peer_id: u8,
+    pub timestamp: Time,
 }
 
 impl<T> UnvalidatedArtifact<T> {
-    pub fn new(artifact: T) -> Self {
+    pub fn new(artifact: T, timestamp: Time) -> Self {
         Self {
             message: artifact,
             peer_id: 0,
+            timestamp,
         }
     }
 }
@@ -57,10 +63,17 @@ impl<T> IntoInner<T> for UnvalidatedArtifact<T> {
     }
 }
 
+impl<T> HasTimestamp for UnvalidatedArtifact<T> {
+    fn timestamp(&self) -> Time {
+        self.timestamp
+    }
+}
+
 // Validated artifact
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ValidatedArtifact<T> {
     pub msg: T,
+    pub timestamp: Time,
 }
 
 impl<T> IntoInner<T> for ValidatedArtifact<T> {
@@ -72,6 +85,12 @@ impl<T> IntoInner<T> for ValidatedArtifact<T> {
 impl<T> AsRef<T> for ValidatedArtifact<T> {
     fn as_ref(&self) -> &T {
         &self.msg
+    }
+}
+
+impl<T> HasTimestamp for ValidatedArtifact<T> {
+    fn timestamp(&self) -> Time {
+        self.timestamp
     }
 }
 

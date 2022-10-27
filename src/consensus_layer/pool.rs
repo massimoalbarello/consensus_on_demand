@@ -1,12 +1,12 @@
 use std::{collections::BTreeMap, fmt::Debug};
 
-use crate::crypto::{CryptoHash, CryptoHashOf};
+use crate::{crypto::{CryptoHash, CryptoHashOf}, time_source::{Time, TimeSource}};
 
 use super::{
     artifacts::{
         UnvalidatedArtifact, ValidatedArtifact, ConsensusMessage, 
         ChangeSet, ChangeAction, IntoInner, 
-        ConsensusMessageId, ConsensusMessageHashable
+        ConsensusMessageId, ConsensusMessageHashable, HasTimestamp
     }, 
     height_index::{
         Indexes, HeightIndexedPool, SelectIndex,
@@ -27,7 +27,7 @@ pub struct InMemoryPoolSection<T: IntoInner<ConsensusMessage>> {
     pub indexes: Indexes,
 }
 
-impl<T: IntoInner<ConsensusMessage> + Clone + Debug> InMemoryPoolSection<T> {
+impl<T: IntoInner<ConsensusMessage> + HasTimestamp + Clone + Debug> InMemoryPoolSection<T> {
     pub fn new() -> InMemoryPoolSection<T> {
         InMemoryPoolSection {
             artifacts: BTreeMap::new(),
@@ -103,6 +103,11 @@ impl<T: IntoInner<ConsensusMessage> + Clone + Debug> InMemoryPoolSection<T> {
         SelectIndex::select_index(&self.indexes)
     }
 
+    pub fn get_timestamp(&self, msg_id: &ConsensusMessageId) -> Option<Time> {
+        self.get_by_hash(msg_id.hash.digest())
+            .map(|x| x.timestamp())
+    }
+
     pub fn notarization_share(&self) -> &dyn HeightIndexedPool<NotarizationShare> {
         self
     }
@@ -118,7 +123,7 @@ impl<T: IntoInner<ConsensusMessage> + Clone + Debug> InMemoryPoolSection<T> {
 
 impl<
         T: ConsensusMessageHashable + 'static + Debug,
-        S: IntoInner<ConsensusMessage> + Clone + Debug,
+        S: IntoInner<ConsensusMessage> + HasTimestamp + Clone + Debug,
     > HeightIndexedPool<T> for InMemoryPoolSection<S>
 where
     CryptoHashOf<T>: SelectIndex,
@@ -174,7 +179,7 @@ impl ConsensusPoolImpl {
         self.apply_changes_unvalidated(ops);
     }
     
-    pub fn apply_changes(&mut self, change_set: ChangeSet) {
+    pub fn apply_changes(&mut self, time_source: &dyn TimeSource, change_set: ChangeSet) {
         let mut unvalidated_ops = PoolSectionOps::new();
         let mut validated_ops = PoolSectionOps::new();
 
@@ -186,13 +191,18 @@ impl ConsensusPoolImpl {
                 ChangeAction::AddToValidated(to_add) => {
                     validated_ops.insert(ValidatedConsensusArtifact {
                         msg: to_add,
+                        timestamp: time_source.get_relative_time(),
                     });
                 }
                 ChangeAction::MoveToValidated(to_move) => {
                     let msg_id = to_move.get_id();
+                    let timestamp = self.unvalidated.get_timestamp(&msg_id).unwrap_or_else(|| {
+                        panic!("Timestmap is not found for MoveToValidated: {:?}", to_move)
+                    });
                     unvalidated_ops.remove(msg_id);
                     validated_ops.insert(ValidatedConsensusArtifact {
                         msg: to_move,
+                        timestamp,
                     });
                 }
             }

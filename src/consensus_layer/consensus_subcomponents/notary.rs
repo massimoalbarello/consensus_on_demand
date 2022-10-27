@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use serde::{Serialize, Deserialize};
 
@@ -11,6 +11,8 @@ use crate::{
 };
 
 use super::block_maker::{Block, BlockProposal};
+
+pub const NOTARIZATION_DELAY_UNIT: Duration = Duration::from_millis(5000);
 
 // NotarizationContent holds the values that are signed in a notarization
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]

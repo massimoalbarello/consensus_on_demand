@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use async_std::task;
 use crossbeam_channel::Receiver;
 use futures::{prelude::stream::StreamExt, stream::SelectNextSome};
@@ -12,7 +14,7 @@ use serde::{Serialize, Deserialize};
 
 use crate::{
     artifact_manager::ArtifactProcessorManager, 
-    consensus_layer::artifacts::{ConsensusMessage, UnvalidatedArtifact}
+    consensus_layer::artifacts::{ConsensusMessage, UnvalidatedArtifact}, time_source::{SysTimeSource, TimeSource},
 };
 
 // We create a custom network behaviour that combines floodsub and mDNS.
@@ -56,6 +58,7 @@ pub struct Peer {
     floodsub_topic: Topic,
     swarm: Swarm<P2PBehaviour>,
     receiver_outgoing_artifact: Receiver<ConsensusMessage>,
+    time_source: Arc<SysTimeSource>,
     manager: ArtifactProcessorManager,
 }
 
@@ -75,6 +78,9 @@ impl Peer {
         // channel used to transmit locally generated artifacts from the consensus layer to the network layer so that they can be broadcasted to other peers
         let (sender_outgoing_artifact, receiver_outgoing_artifact) = crossbeam_channel::unbounded::<ConsensusMessage>();
 
+        // Initialize the time source.
+        let time_source = Arc::new(SysTimeSource::new());
+
         // Create a Swarm to manage peers and events
         let local_peer = Self {
             node_number,
@@ -92,7 +98,8 @@ impl Peer {
                 Swarm::new(transport, behaviour, local_peer_id)
             },
             receiver_outgoing_artifact,
-            manager: ArtifactProcessorManager::new(node_number, sender_outgoing_artifact),
+            time_source: time_source.clone(),
+            manager: ArtifactProcessorManager::new(node_number, time_source, sender_outgoing_artifact),
         };
         println!(
             "Local node initialized with number: {} and peer id: {:?}",
@@ -172,7 +179,7 @@ impl Peer {
     pub fn handle_incoming_message(&mut self, message_variant: Message) {
         match message_variant {
             Message::KeepAliveMessage => (),
-            Message::ConsensusMessage(consensus_message) => self.manager.on_artifact(UnvalidatedArtifact::new(consensus_message)),
+            Message::ConsensusMessage(consensus_message) => self.manager.on_artifact(UnvalidatedArtifact::new(consensus_message, self.time_source.get_relative_time())),
         }
     }
 }

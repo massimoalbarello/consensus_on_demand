@@ -3,10 +3,10 @@ use std::sync::{Arc, Mutex};
 use crossbeam_channel::{Receiver, RecvTimeoutError, Sender};
 use std::thread::{Builder as ThreadBuilder, JoinHandle};
 
-use crate::consensus_layer::{
+use crate::{consensus_layer::{
     ConsensusProcessor,
     artifacts::{ConsensusMessage, UnvalidatedArtifact}
-};
+}, time_source::{TimeSource, SysTimeSource}};
 
 // Periodic duration of `PollEvent` in milliseconds.
 const ARTIFACT_MANAGER_TIMER_DURATION_MSEC: u64 = 200;
@@ -34,12 +34,12 @@ pub struct ArtifactProcessorManager {
 }
 
 impl ArtifactProcessorManager {
-    pub fn new(node_number: u8, sender_outgoing_artifact: Sender<ConsensusMessage>) -> Self {
+    pub fn new(node_number: u8, time_source: Arc<SysTimeSource>, sender_outgoing_artifact: Sender<ConsensusMessage>) -> Self {
 
         let pending_artifacts = Arc::new(Mutex::new(Vec::new()));
         let (sender_incoming_request, receiver_incoming_request) = crossbeam_channel::unbounded::<ProcessRequest>();
 
-        let client = Box::new(ConsensusProcessor::new(node_number));
+        let client = Box::new(ConsensusProcessor::new(node_number, Arc::clone(&time_source) as Arc<_>));
 
         // Spawn the processor thread
         let sender_incoming_request_cl = sender_incoming_request.clone();
@@ -48,6 +48,7 @@ impl ArtifactProcessorManager {
             .spawn(move || {
                 Self::process_messages(
                     pending_artifacts_cl,
+                    time_source,
                     client,
                     sender_incoming_request_cl,
                     receiver_incoming_request,
@@ -65,6 +66,7 @@ impl ArtifactProcessorManager {
 
     fn process_messages(
         pending_artifacts: Arc<Mutex<Vec<UnvalidatedArtifact<ConsensusMessage>>>>,
+        time_source: Arc<SysTimeSource>,
         client: Box<ConsensusProcessor>,
         sender_incoming_request: Sender<ProcessRequest>,
         receiver_incoming_request: Receiver<ProcessRequest>,
@@ -84,7 +86,7 @@ impl ArtifactProcessorManager {
                         artifacts
                     };
 
-                    let (adverts, result) = client.process_changes(artifacts);
+                    let (adverts, result) = client.process_changes(time_source.as_ref(), artifacts);
 
                     if let ProcessingResult::StateChanged = result {
                         sender_incoming_request

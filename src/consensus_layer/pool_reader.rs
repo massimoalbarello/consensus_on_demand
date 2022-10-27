@@ -1,6 +1,6 @@
 use crate::{
     consensus_layer::pool::ConsensusPoolImpl,
-    crypto::CryptoHashOf
+    crypto::CryptoHashOf, time_source::Time
 };
 
 use super::{
@@ -8,7 +8,7 @@ use super::{
         notary::NotarizationShare, 
         block_maker::{Block, BlockProposal}
     },
-    height_index::Height
+    height_index::Height, artifacts::ConsensusMessageHashable
 };
 
 // A struct and corresponding impl with helper methods to obtain particular
@@ -78,5 +78,26 @@ impl<'a> PoolReader<'a> {
                 .get_by_height(h)
                 .map(move |x| self.get_block(&x.content.block, h).unwrap()),
         )
+    }
+
+    
+    /// Get the round start time of a given height, which is the max timestamp
+    /// of first notarization and random beacon of the previous height.
+    /// Return None if a timestamp is not found.
+    pub fn get_round_start_time(&self, height: Height) -> Option<Time> {
+        let validated = self.pool.validated();
+
+        let get_notarization_time = |h| {
+            validated
+                .notarization()
+                .get_by_height(h)
+                .flat_map(|x| validated.get_timestamp(&x.get_id()))
+                .min()
+        };
+        let prev_height = height - 1;
+        let notarization_time = get_notarization_time(prev_height)
+            .map(|notarization_time| notarization_time);
+        println!("Last notarization time: {:?}", notarization_time);
+        notarization_time
     }
 }

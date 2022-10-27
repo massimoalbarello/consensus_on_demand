@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use serde::{Serialize, Deserialize};
 
@@ -6,6 +6,8 @@ use crate::{consensus_layer::{
     pool_reader::PoolReader,
     artifacts::{ConsensusMessage, N}
 }, crypto::{Signed, Hashed}, time_source::TimeSource};
+
+use super::notary::NOTARIZATION_DELAY_UNIT;
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub struct Payload {}
@@ -80,6 +82,7 @@ impl BlockMaker {
                         pool,
                         height,
                         rank,
+                        self.time_source.as_ref(),
                         my_node_id
                     )
                 {
@@ -194,11 +197,44 @@ fn already_proposed(pool: &PoolReader<'_>, h: u64, this_node: u8) -> bool {
 
 // Return true if the time since round start is greater than the required block
 // maker delay for the given rank.
-pub fn is_time_to_make_block(
+fn is_time_to_make_block(
     pool: &PoolReader<'_>,
     height: u64,
     rank: u8,
+    time_source: &dyn TimeSource,
     node_id: u8
 ) -> bool {
-    rank == 0
+    // rank == 0
+    let block_maker_delay =
+        match get_block_maker_delay(rank) {
+            Some(delay) => delay,
+            _ => return false,
+        };
+    println!("Block maker delay: {:?}", block_maker_delay);
+    match pool.get_round_start_time(height) {
+        Some(start_time) => {
+            let current_time = time_source.get_relative_time();
+            println!("Current time: {:?}", current_time);
+            println!("Round start time: {:?}", start_time);
+            if current_time >= start_time + block_maker_delay {
+                println!("!!!!!!!! Time to propose a block !!!!!!!!");
+                return true
+            }
+            false
+        }
+        None => {
+            if node_id == 1 && rank == 0 {
+                return true
+            }
+            false
+        },
+    }
+}
+
+/// Calculate the required delay for block making based on the block maker's
+/// rank.
+fn get_block_maker_delay(
+    rank: u8,
+) -> Option<Duration> {
+    Some(NOTARIZATION_DELAY_UNIT * rank as u32)
 }

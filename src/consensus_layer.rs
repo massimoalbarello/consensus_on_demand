@@ -12,7 +12,7 @@ use crate::consensus_layer::artifacts::{
     UnvalidatedArtifact,
     ChangeAction
 };
-use crate::time_source::SysTimeSource;
+use crate::time_source::{SysTimeSource, TimeSource};
 
 pub mod pool_reader;
 
@@ -28,17 +28,18 @@ pub struct ConsensusProcessor {
 }
 
 impl ConsensusProcessor {
-    pub fn new(node_number: u8) -> Self {
-        // Initialize the time source.
-        let time_source = Arc::new(SysTimeSource::new());
-
+    pub fn new(node_number: u8, time_source: Arc<dyn TimeSource>) -> Self {
         Self {
             consensus_pool: Arc::new(RwLock::new(ConsensusPoolImpl::new())),
             client: Box::new(ConsensusImpl::new(node_number, Arc::clone(&time_source) as Arc<_>)),
         }
     }
 
-    pub fn process_changes(&self, artifacts: Vec<UnvalidatedArtifact<ConsensusMessage>>) -> (Vec<ConsensusMessage>, ProcessingResult) {
+    pub fn process_changes(
+        &self,
+        time_source: &dyn TimeSource,
+        artifacts: Vec<UnvalidatedArtifact<ConsensusMessage>>
+    ) -> (Vec<ConsensusMessage>, ProcessingResult) {
         {
             let mut consensus_pool = self.consensus_pool.write().unwrap();
             for artifact in artifacts {
@@ -79,7 +80,7 @@ impl ConsensusProcessor {
         self.consensus_pool
             .write()
             .unwrap()
-            .apply_changes(change_set);
+            .apply_changes(time_source, change_set);
 
         (adverts, changed)
     }
