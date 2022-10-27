@@ -12,6 +12,7 @@ use crate::consensus_layer::artifacts::{
     UnvalidatedArtifact,
     ChangeAction
 };
+use crate::time_source::SysTimeSource;
 
 pub mod pool_reader;
 
@@ -28,9 +29,12 @@ pub struct ConsensusProcessor {
 
 impl ConsensusProcessor {
     pub fn new(node_number: u8) -> Self {
+        // Initialize the time source.
+        let time_source = Arc::new(SysTimeSource::new());
+
         Self {
             consensus_pool: Arc::new(RwLock::new(ConsensusPoolImpl::new())),
-            client: Box::new(ConsensusImpl::new(node_number)),
+            client: Box::new(ConsensusImpl::new(node_number, Arc::clone(&time_source) as Arc<_>)),
         }
     }
 

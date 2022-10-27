@@ -1,17 +1,21 @@
-use crate::consensus_layer::{
+use std::sync::Arc;
+
+use crate::{consensus_layer::{
     pool_reader::PoolReader,
     artifacts::{ChangeSet, ChangeAction, IntoInner},
     consensus::RoundRobin
-};
+}, time_source::TimeSource};
 
 pub struct Validator {
     schedule: RoundRobin,
+    time_source: Arc<dyn TimeSource>,
 }
 
 impl Validator {
-    pub fn new() -> Self {
+    pub fn new(time_source: Arc<dyn TimeSource>) -> Self {
         Self {
             schedule: RoundRobin::default(),
+            time_source,
         }
     }
 

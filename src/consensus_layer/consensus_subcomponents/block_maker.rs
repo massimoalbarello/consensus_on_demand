@@ -1,9 +1,11 @@
+use std::sync::Arc;
+
 use serde::{Serialize, Deserialize};
 
 use crate::{consensus_layer::{
     pool_reader::PoolReader,
     artifacts::{ConsensusMessage, N}
-}, crypto::{Signed, Hashed}};
+}, crypto::{Signed, Hashed}, time_source::TimeSource};
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub struct Payload {}
@@ -54,12 +56,14 @@ pub struct RandomBeacon {}
 
 pub struct BlockMaker {
     node_id: u8,
+    time_source: Arc<dyn TimeSource>,
 }
 
 impl BlockMaker {
-    pub fn new(node_id: u8) -> Self {
+    pub fn new(node_id: u8, time_source: Arc<dyn TimeSource>) -> Self {
         Self {
             node_id,
+            time_source,
         }
     }
 

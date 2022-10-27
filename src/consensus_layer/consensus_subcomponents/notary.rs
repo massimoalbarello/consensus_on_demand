@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use serde::{Serialize, Deserialize};
 
 use crate::{
@@ -5,7 +7,7 @@ use crate::{
         pool_reader::PoolReader, 
         artifacts::ConsensusMessage, 
         height_index::Height
-    }, crypto::{Signed, Hashed, CryptoHashOf}
+    }, crypto::{Signed, Hashed, CryptoHashOf}, time_source::TimeSource
 };
 
 use super::block_maker::{Block, BlockProposal};
@@ -34,12 +36,14 @@ pub type NotarizationShare = Signed<NotarizationContent, u8>;
 
 pub struct Notary {
     node_id: u8,
+    time_source: Arc<dyn TimeSource>,
 }
 
 impl Notary {
-    pub fn new(node_id: u8) -> Self {
+    pub fn new(node_id: u8, time_source: Arc<dyn TimeSource>) -> Self {
         Self {
             node_id,
+            time_source,
         }
     }
 

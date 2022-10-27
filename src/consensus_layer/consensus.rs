@@ -1,3 +1,7 @@
+use std::sync::Arc;
+
+use crate::time_source::TimeSource;
+
 use super::{
     pool::ConsensusPoolImpl, 
     artifacts::{ChangeSet, ChangeAction, ConsensusMessage},
@@ -44,16 +48,18 @@ pub struct ConsensusImpl {
     notary: Notary,
     aggregator: ShareAggregator,
     validator: Validator,
+    time_source: Arc<dyn TimeSource>,
     schedule: RoundRobin,
 }
 
 impl ConsensusImpl {
-    pub fn new(node_number: u8) -> Self {
+    pub fn new(node_number: u8, time_source: Arc<dyn TimeSource>) -> Self {
         Self {
-            block_maker: BlockMaker::new(node_number),
-            notary: Notary::new(node_number),
+            block_maker: BlockMaker::new(node_number, Arc::clone(&time_source) as Arc<_>),
+            notary: Notary::new(node_number, Arc::clone(&time_source) as Arc<_>),
             aggregator: ShareAggregator::new(node_number),
-            validator: Validator::new(),
+            validator: Validator::new(Arc::clone(&time_source)),
+            time_source,
             schedule: RoundRobin::default(),
         }
     }
