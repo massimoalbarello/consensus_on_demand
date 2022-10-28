@@ -73,6 +73,7 @@ impl ShareAggregator {
     pub fn on_state_change(&self, pool: &PoolReader<'_>) -> Vec<ConsensusMessage> {
         let mut messages = Vec::new();
         messages.append(&mut self.aggregate_notarization_shares(pool));
+        messages.append(&mut self.aggregate_finalization_shares(pool));
         messages
     }
 
@@ -80,19 +81,7 @@ impl ShareAggregator {
     fn aggregate_notarization_shares(&self, pool: &PoolReader<'_>) -> Vec<ConsensusMessage> {
         let height = pool.get_notarized_height() + 1;
         let notarization_shares = pool.get_notarization_shares(height);
-        let grouped_shares = notarization_shares.fold(BTreeMap::<notary::NotarizationContent, BTreeSet<u8>>::new(), |mut grouped_shares, share| {
-            match grouped_shares.get_mut(&share.content) {
-                Some(existing) => {
-                    existing.insert(share.signature);
-                }
-                None => {
-                    let mut new_set = BTreeSet::<u8>::new();
-                    new_set.insert(share.signature);
-                    grouped_shares.insert(share.content, new_set);
-                }
-            };
-            grouped_shares
-        });
+        let grouped_shares = aggregate(notarization_shares);
         grouped_shares.into_iter().filter_map(|(notary_content, shares)| {
             if shares.len() >= N-1 {
                 println!("\n########## Aggregator ##########");
@@ -114,4 +103,50 @@ impl ShareAggregator {
             })
         }).collect()
     }
+
+    /// Attempt to construct `Finalization`s
+    fn aggregate_finalization_shares(&self, pool: &PoolReader<'_>) -> Vec<ConsensusMessage> {
+        let finalization_shares = pool.get_finalization_shares(
+            pool.get_finalized_height() + 1,
+            pool.get_notarized_height(),
+        );
+        let grouped_shares = aggregate(finalization_shares);
+        grouped_shares.into_iter().filter_map(|(finalization_content, shares)| {
+            if shares.len() >= N-1 {
+                println!("\n########## Aggregator ##########");
+                println!("Finalization of block with hash: {} at height {} by committee: {:?}", finalization_content.block.get_ref(), finalization_content.height, shares);
+                Some(finalization_content)
+            }
+            else {
+                None
+            }.map(|finalization_content| {
+                ConsensusMessage::Finalization(
+                    Finalization {
+                        content: FinalizationContent {
+                            height: finalization_content.height,
+                            block: finalization_content.block,
+                        },
+                        signature: 10,   // committee signature
+                    }
+                )
+            })
+        }).collect()
+    }
+
+}
+
+fn aggregate<T: Ord>(shares: Box<dyn Iterator<Item = Signed<T, u8>>>) -> BTreeMap<T, BTreeSet<u8>>{
+    shares.fold(BTreeMap::<T, BTreeSet<u8>>::new(), |mut grouped_shares, share| {
+        match grouped_shares.get_mut(&share.content) {
+            Some(existing) => {
+                existing.insert(share.signature);
+            }
+            None => {
+                let mut new_set = BTreeSet::<u8>::new();
+                new_set.insert(share.signature);
+                grouped_shares.insert(share.content, new_set);
+            }
+        };
+        grouped_shares
+    })
 }
