@@ -12,7 +12,7 @@ use crate::consensus_layer::artifacts::{
     UnvalidatedArtifact,
     ChangeAction
 };
-use crate::time_source::{SysTimeSource, TimeSource};
+use crate::time_source::TimeSource;
 
 pub mod pool_reader;
 
@@ -72,10 +72,10 @@ impl ConsensusProcessor {
             }
         }
 
-        if !change_set.is_empty() {
+        // if !change_set.is_empty() {
             // println!("\n########## Processor ##########");
             // println!("Applying change set: {:?}", change_set);
-        }
+        // }
 
         self.consensus_pool
             .write()

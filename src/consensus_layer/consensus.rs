@@ -57,7 +57,7 @@ pub struct ConsensusImpl {
 impl ConsensusImpl {
     pub fn new(node_number: u8, time_source: Arc<dyn TimeSource>) -> Self {
         Self {
-            finalizer: Finalizer::new(),
+            finalizer: Finalizer::new(node_number),
             block_maker: BlockMaker::new(node_number, Arc::clone(&time_source) as Arc<_>),
             notary: Notary::new(node_number, Arc::clone(&time_source) as Arc<_>),
             aggregator: ShareAggregator::new(node_number),

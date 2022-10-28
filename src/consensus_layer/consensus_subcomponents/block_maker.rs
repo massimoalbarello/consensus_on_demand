@@ -89,6 +89,7 @@ impl BlockMaker {
                     let block_proposal = self.propose_block(pool, rank, parent).map(|proposal| {
                         ConsensusMessage::BlockProposal(proposal)
                     });
+                    println!("\n########## Block maker ##########");
                     println!("Created block proposal: {:?}", block_proposal);
                     block_proposal
                 }
@@ -203,17 +204,15 @@ fn is_time_to_make_block(
     time_source: &dyn TimeSource,
     node_id: u8
 ) -> bool {
-    // rank == 0
     let block_maker_delay =
-        match get_block_maker_delay(rank) {
-            Some(delay) => delay,
-            _ => return false,
-        };
+    match get_block_maker_delay(rank) {
+        Some(delay) => delay,
+        _ => return false,
+    };
     match pool.get_round_start_time(height) {
         Some(start_time) => {
             let current_time = time_source.get_relative_time();
             if current_time >= start_time + block_maker_delay {
-                println!("\n########## Block maker ##########");
                 return true
             }
             false

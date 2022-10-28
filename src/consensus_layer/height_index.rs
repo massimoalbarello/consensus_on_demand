@@ -69,6 +69,13 @@ impl<T: Eq + Clone + Debug> HeightIndex<T> {
     pub fn heights(&self) -> Box<dyn Iterator<Item = &Height> + '_> {
         Box::new(self.buckets.keys())
     }
+
+    pub fn range<R>(&self, range: R) -> std::collections::btree_map::Range<'_, Height, Vec<T>>
+    where
+        R: std::ops::RangeBounds<Height>,
+    {
+        self.buckets.range(range)
+    }
 }
 
 pub struct Indexes {
@@ -158,6 +165,11 @@ pub trait HeightIndexedPool<T> {
     /// 'h'.
     fn get_by_height(&self, h: Height) -> Box<dyn Iterator<Item = T>>;
 
+    /// Return an iterator over the artifacts of type T
+    /// in range range.min, range.max, inclusive. The items must be sorted
+    /// by height in ascending order.
+    fn get_by_height_range(&self, range: HeightRange) -> Box<dyn Iterator<Item = T>>;
+
     /// Return a single instance of artifact of type T, at height 'h', returning
     /// an error if there isn't one, or if there are more than one.
     fn get_only_by_height(&self, h: Height) -> Result<T, ()>;
@@ -193,6 +205,12 @@ impl SelectIndex for CryptoHashOf<BlockProposal> {
 impl SelectIndex for CryptoHashOf<NotarizationShare> {
     fn select_index(indexes: &Indexes) -> &HeightIndex<Self> {
         &indexes.notarization_share
+    }
+}
+
+impl SelectIndex for CryptoHashOf<FinalizationShare> {
+    fn select_index(indexes: &Indexes) -> &HeightIndex<Self> {
+        &indexes.finalization_share
     }
 }
 

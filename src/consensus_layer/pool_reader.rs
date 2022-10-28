@@ -6,9 +6,9 @@ use crate::{
 use super::{
     consensus_subcomponents::{
         notary::NotarizationShare, 
-        block_maker::{Block, BlockProposal}
+        block_maker::{Block, BlockProposal}, finalizer::FinalizationShare
     },
-    height_index::Height, artifacts::ConsensusMessageHashable
+    height_index::{Height, HeightRange}, artifacts::ConsensusMessageHashable
 };
 
 // A struct and corresponding impl with helper methods to obtain particular
@@ -54,12 +54,23 @@ impl<'a> PoolReader<'a> {
         }
     }
 
+    /// Get all valid finalization shares in the given height range, inclusive.
+    pub fn get_finalization_shares(
+        &self,
+        from: Height,
+        to: Height,
+    ) -> Box<dyn Iterator<Item = FinalizationShare>> {
+        self.pool
+            .validated()
+            .finalization_share()
+            .get_by_height_range(HeightRange::new(from, to))
+    }
+
     /// Get max height of valid finalized blocks.
     pub fn get_finalized_height(&self) -> Height {
         match self.get_finalized_tip() {
             Some(block) => block.height,
             None => {
-                println!("No block finalized yet");
                 0
             }
         }

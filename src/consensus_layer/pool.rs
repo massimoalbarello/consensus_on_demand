@@ -15,7 +15,7 @@ use super::{
     consensus_subcomponents::{
         notary::NotarizationShare,
         aggregator::{Notarization, Finalization},
-        block_maker::{BlockProposal, Block}
+        block_maker::{BlockProposal, Block}, finalizer::FinalizationShare
     }
 };
 
@@ -91,7 +91,7 @@ impl<T: IntoInner<ConsensusMessage> + HasTimestamp + Clone + Debug> InMemoryPool
         self.artifacts.get(hash).cloned()
     }
 
-    /// Get a consensus message by its hash
+    /// Remove a consensus message by its hash
     pub fn remove_by_hash(&mut self, hash: &CryptoHash) -> Option<T> {
         self.artifacts.remove(hash).map(|artifact| {
             self.indexes.remove(artifact.as_ref(), hash.to_string());
@@ -119,7 +119,10 @@ impl<T: IntoInner<ConsensusMessage> + HasTimestamp + Clone + Debug> InMemoryPool
     pub fn block_proposal(&self) -> &dyn HeightIndexedPool<BlockProposal> {
         self
     }
-
+ 
+    pub fn finalization_share(&self) -> &dyn HeightIndexedPool<FinalizationShare> {
+        self
+    }
     fn finalization(&self) -> &dyn HeightIndexedPool<Finalization> {
         self
     }
@@ -138,6 +141,24 @@ where
         let artifacts = self.get_by_hashes(hashes);
         // println!("Corresponding artifacts: {:?}", artifacts);
         Box::new(artifacts.into_iter())
+    }
+
+    fn get_by_height_range(&self, range: HeightRange) -> Box<dyn Iterator<Item = T>> {
+        if range.min > range.max {
+            return Box::new(std::iter::empty());
+        }
+        let heights = CryptoHashOf::<T>::select_index(&self.indexes)
+            .range((
+                std::ops::Bound::Included(range.min),
+                std::ops::Bound::Included(range.max),
+            ))
+            .map(|(h, _)| h);
+
+        // returning the iterator directly isn't trusted due to the use of `self` in the
+        // closure
+        #[allow(clippy::needless_collect)]
+        let vec: Vec<T> = heights.flat_map(|h| self.get_by_height(*h)).collect();
+        Box::new(vec.into_iter())
     }
 
     fn height_range(&self) -> Option<HeightRange> {
@@ -229,7 +250,6 @@ impl ConsensusPoolImpl {
         }
         self.apply_changes_unvalidated(unvalidated_ops);
         self.apply_changes_validated(validated_ops);
-
     }
     
     pub fn finalized_block(&self) -> Option<Block> {
