@@ -36,6 +36,27 @@ impl NotarizationContent {
 
 pub type Notarization = Signed<NotarizationContent, u8>;
 
+/// FinalizationContent holds the values that are signed in a finalization
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct FinalizationContent {
+    pub height: Height,
+    pub block: CryptoHashOf<Block>,
+}
+
+impl FinalizationContent {
+    pub fn new(height: Height, block: CryptoHashOf<Block>) -> Self {
+        FinalizationContent {
+            height,
+            block,
+        }
+    }
+}
+
+/// A finalization is a multi-signature on a FinalizationContent. A finalization
+/// proves that the block identified by the block hash in the finalization
+/// content (and the block chain it implies) is agreed upon.
+pub type Finalization = Signed<FinalizationContent, u8>;
+
 pub struct ShareAggregator {
     node_id: u8,
 }

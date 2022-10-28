@@ -5,7 +5,7 @@ use crate::{crypto::{ConsensusMessageHash, Hashed}, time_source::Time};
 use super::consensus_subcomponents::{
     block_maker::BlockProposal,
     notary::NotarizationShare,
-    aggregator::Notarization
+    aggregator::{Notarization, Finalization}, finalizer::FinalizationShare
 };
 
 pub const N: usize = 4;
@@ -105,6 +105,9 @@ pub enum ConsensusMessage {
     BlockProposal(BlockProposal),
     NotarizationShare(NotarizationShare),
     Notarization(Notarization),
+    FinalizationShare(FinalizationShare),
+    Finalization(Finalization),
+
 }
 
 impl ConsensusMessageHashable for ConsensusMessage {
@@ -117,9 +120,11 @@ impl ConsensusMessageHashable for ConsensusMessage {
 
     fn get_cm_hash(&self) -> ConsensusMessageHash {
         match self {
-            ConsensusMessage::Notarization(value) => value.get_cm_hash(),
             ConsensusMessage::BlockProposal(value) => value.get_cm_hash(),
             ConsensusMessage::NotarizationShare(value) => value.get_cm_hash(),
+            ConsensusMessage::Notarization(value) => value.get_cm_hash(),
+            ConsensusMessage::FinalizationShare(value) => value.get_cm_hash(),
+            ConsensusMessage::Finalization(value) => value.get_cm_hash(),
         }
     }
 
@@ -189,9 +194,51 @@ impl ConsensusMessageHashable for Notarization {
     fn get_cm_hash(&self) -> ConsensusMessageHash {
         ConsensusMessageHash::Notarization(Hashed::crypto_hash(self))
     }
-
+    
     fn assert(msg: &ConsensusMessage) -> Option<&Self> {
         if let ConsensusMessage::Notarization(value) = msg {
+            Some(value)
+        } else {
+            None
+        }
+    }
+}
+
+impl ConsensusMessageHashable for FinalizationShare {
+    fn get_id(&self) -> ConsensusMessageId {
+        ConsensusMessageId {
+            hash: self.get_cm_hash(),
+            height: self.content.height,
+        }
+    }
+    
+    fn get_cm_hash(&self) -> ConsensusMessageHash {
+        ConsensusMessageHash::FinalizationShare(Hashed::crypto_hash(self))
+    }
+
+    fn assert(msg: &ConsensusMessage) -> Option<&Self> {
+        if let ConsensusMessage::FinalizationShare(value) = msg {
+            Some(value)
+        } else {
+            None
+        }
+    }
+}
+
+impl ConsensusMessageHashable for Finalization {
+    fn get_id(&self) -> ConsensusMessageId {
+        ConsensusMessageId {
+            hash: self.get_cm_hash(),
+            height: self.content.height,
+        }
+    }
+    
+    fn get_cm_hash(&self) -> ConsensusMessageHash {
+        ConsensusMessageHash::Finalization(Hashed::crypto_hash(self))
+    }
+
+    fn assert(msg: &ConsensusMessage) -> Option<&Self> {
+        if let ConsensusMessage::Finalization(value) = msg {
             Some(value)
         } else {
             None

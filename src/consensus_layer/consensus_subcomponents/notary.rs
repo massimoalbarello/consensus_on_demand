@@ -83,9 +83,6 @@ impl Notary {
         );
         if let Some(start_time) = pool.get_round_start_time(height) {
             let now = self.time_source.get_relative_time();
-            // println!("Round started at: {:?}", start_time);
-            // println!("Current time: {:?}", now);
-            // println!("Time to notarize: {:?}", start_time + adjusted_notary_delay);
             return now >= start_time + adjusted_notary_delay;
         }
             height == 1

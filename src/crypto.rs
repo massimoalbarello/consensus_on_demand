@@ -71,17 +71,21 @@ impl<Entity, Repr> From<Repr> for Id<Entity, Repr> {
 /// contains only a hash instead of the full message in each variant.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ConsensusMessageHash {
-    NotarizationShare(CryptoHash),
     BlockProposal(CryptoHash),
+    NotarizationShare(CryptoHash),
     Notarization(CryptoHash),
+    FinalizationShare(CryptoHash),
+    Finalization(CryptoHash),
 }
 
 impl ConsensusMessageHash {
     pub fn digest(&self) -> &CryptoHash {
         match self {
-            ConsensusMessageHash::NotarizationShare(hash) => hash,
             ConsensusMessageHash::BlockProposal(hash) => hash,
             ConsensusMessageHash::Notarization(hash) => hash,
+            ConsensusMessageHash::NotarizationShare(hash) => hash,
+            ConsensusMessageHash::Finalization(hash) => hash,
+            ConsensusMessageHash::FinalizationShare(hash) => hash,
         }
     }
 }

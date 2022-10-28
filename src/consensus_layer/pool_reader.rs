@@ -54,6 +54,22 @@ impl<'a> PoolReader<'a> {
         }
     }
 
+    /// Get max height of valid finalized blocks.
+    pub fn get_finalized_height(&self) -> Height {
+        match self.get_finalized_tip() {
+            Some(block) => block.height,
+            None => {
+                println!("No block finalized yet");
+                0
+            }
+        }
+    }
+
+    /// Get the finalized block with greatest height.
+    pub fn get_finalized_tip(&self) -> Option<Block> {
+        self.pool.finalized_block()
+    }
+
     /// Return a valid block with the matching hash and height if it exists.
     pub fn get_block(&self, hash: &CryptoHashOf<Block>, h: Height) -> Result<Block, ()> {
         let mut blocks: Vec<BlockProposal> = self

@@ -14,8 +14,8 @@ use super::{
     },
     consensus_subcomponents::{
         notary::NotarizationShare,
-        aggregator::Notarization,
-        block_maker::BlockProposal
+        aggregator::{Notarization, Finalization},
+        block_maker::{BlockProposal, Block}
     }
 };
 
@@ -119,6 +119,10 @@ impl<T: IntoInner<ConsensusMessage> + HasTimestamp + Clone + Debug> InMemoryPool
     pub fn block_proposal(&self) -> &dyn HeightIndexedPool<BlockProposal> {
         self
     }
+
+    fn finalization(&self) -> &dyn HeightIndexedPool<Finalization> {
+        self
+    }
 }
 
 impl<
@@ -149,6 +153,22 @@ where
 
     fn max_height(&self) -> Option<Height> {
         self.height_range().map(|range| range.max)
+    }
+
+    fn get_highest(&self) -> Result<T, ()> {
+        if let Some(range) = self.height_range() {
+            self.get_only_by_height(range.max)
+        } else {
+            Err(())
+        }
+    }
+
+    fn get_only_by_height(&self, h: Height) -> Result<T, ()> {
+        let mut to_vec: Vec<T> = self.get_by_height(h).collect();
+        match to_vec.len() {
+            1 => Ok(to_vec.remove(0)),
+            _ => Err(()),
+        }
     }
 }
 
@@ -209,6 +229,11 @@ impl ConsensusPoolImpl {
         }
         self.apply_changes_unvalidated(unvalidated_ops);
         self.apply_changes_validated(validated_ops);
+
+    }
+    
+    pub fn finalized_block(&self) -> Option<Block> {
+        get_highest_finalized_block(self)
     }
 
     fn apply_changes_validated(&mut self, ops: PoolSectionOps<ValidatedConsensusArtifact>) {
@@ -250,5 +275,27 @@ impl<T> PoolSectionOps<T> {
 
     pub fn remove(&mut self, msg_id: ConsensusMessageId) {
         self.ops.push(PoolSectionOp::Remove(msg_id));
+    }
+}
+
+
+fn get_highest_finalized_block(
+    pool: &ConsensusPoolImpl,
+) -> Option<Block> {
+    match pool.validated().finalization().get_highest() {
+        Ok(finalization) => {
+            let h = finalization.content.height;
+            let block_hash = &finalization.content.block;
+            for proposal in pool.validated().block_proposal().get_by_height(h) {
+                if proposal.content.get_hash().eq(block_hash.get_ref()) {
+                    return Some(proposal.content.value);
+                }
+            }
+            panic!(
+                "Missing validated block proposal matching finalization {:?}",
+                finalization
+            )
+        }
+        Err(_) => None,
     }
 }

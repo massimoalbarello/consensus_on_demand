@@ -5,9 +5,10 @@ use crate::crypto::{CryptoHash, CryptoHashOf};
 use super::{
     artifacts::ConsensusMessage, 
     consensus_subcomponents::{
-        aggregator::Notarization,
+        aggregator::{Notarization, Finalization},
         block_maker::BlockProposal,
-        notary::NotarizationShare
+        notary::NotarizationShare,
+        finalizer::FinalizationShare,
     }
 };
 
@@ -71,33 +72,45 @@ impl<T: Eq + Clone + Debug> HeightIndex<T> {
 }
 
 pub struct Indexes {
-    pub notarization_share: HeightIndex<CryptoHashOf<NotarizationShare>>,
     pub block_proposal: HeightIndex<CryptoHashOf<BlockProposal>>,
+    pub notarization_share: HeightIndex<CryptoHashOf<NotarizationShare>>,
     pub notarization: HeightIndex<CryptoHashOf<Notarization>>,
+    pub finalization_share: HeightIndex<CryptoHashOf<FinalizationShare>>,
+    pub finalization: HeightIndex<CryptoHashOf<Finalization>>,
 }
 
 #[allow(clippy::new_without_default)]
 impl Indexes {
     pub fn new() -> Indexes {
         Indexes {
-            notarization_share: HeightIndex::new(),
             block_proposal: HeightIndex::new(),
+            notarization_share: HeightIndex::new(),
             notarization: HeightIndex::new(),
+            finalization_share: HeightIndex::new(),
+            finalization: HeightIndex::new(),
         }
     }
 
     pub fn insert(&mut self, msg: &ConsensusMessage, hash: CryptoHash) {
         match msg {
+            ConsensusMessage::BlockProposal(artifact) => {
+                self.block_proposal
+                .insert(artifact.content.value.height, &CryptoHashOf::from(hash))
+            },
             ConsensusMessage::NotarizationShare(artifact) => {
                 self.notarization_share
                     .insert(artifact.content.height, &CryptoHashOf::from(hash))
             },
-            ConsensusMessage::BlockProposal(artifact) => {
-                self.block_proposal
-                    .insert(artifact.content.value.height, &CryptoHashOf::from(hash))
-            },
             ConsensusMessage::Notarization(artifact) => {
                 self.notarization
+                    .insert(artifact.content.height, &CryptoHashOf::from(hash))
+            },
+            ConsensusMessage::FinalizationShare(artifact) => {
+                self.finalization_share
+                    .insert(artifact.content.height, &CryptoHashOf::from(hash))
+            },
+            ConsensusMessage::Finalization(artifact) => {
+                self.finalization
                     .insert(artifact.content.height, &CryptoHashOf::from(hash))
             }
         };
@@ -105,18 +118,27 @@ impl Indexes {
 
     pub fn remove(&mut self, msg: &ConsensusMessage, hash: CryptoHash) {
         match msg {
+            ConsensusMessage::BlockProposal(artifact) => {
+                self.block_proposal
+                .remove(artifact.content.value.height, &CryptoHashOf::from(hash))
+            },
             ConsensusMessage::NotarizationShare(artifact) => {
                 self.notarization_share
                     .remove(artifact.content.height, &CryptoHashOf::from(hash))
             },
-            ConsensusMessage::BlockProposal(artifact) => {
-                self.block_proposal
-                    .remove(artifact.content.value.height, &CryptoHashOf::from(hash))
-            },
             ConsensusMessage::Notarization(artifact) => {
                 self.notarization
                     .remove(artifact.content.height, &CryptoHashOf::from(hash))
+            },
+            ConsensusMessage::FinalizationShare(artifact) => {
+                self.finalization_share
+                    .remove(artifact.content.height, &CryptoHashOf::from(hash))
+            },
+            ConsensusMessage::Finalization(artifact) => {
+                self.finalization
+                    .remove(artifact.content.height, &CryptoHashOf::from(hash))
             }
+
         };
     }
 }
@@ -135,6 +157,15 @@ pub trait HeightIndexedPool<T> {
     /// Return an iterator over the artifacts of type T at height
     /// 'h'.
     fn get_by_height(&self, h: Height) -> Box<dyn Iterator<Item = T>>;
+
+    /// Return a single instance of artifact of type T, at height 'h', returning
+    /// an error if there isn't one, or if there are more than one.
+    fn get_only_by_height(&self, h: Height) -> Result<T, ()>;
+
+    /// Return a single instance of artifact of type T at the highest height
+    /// currently in the pool. Returns an error if there isn't one, or if there
+    /// are more than one.
+    fn get_highest(&self) -> Result<T, ()>;
 }
 
 pub trait SelectIndex: Eq + Sized + Debug {
@@ -144,6 +175,12 @@ pub trait SelectIndex: Eq + Sized + Debug {
 impl SelectIndex for CryptoHashOf<Notarization> {
     fn select_index(indexes: &Indexes) -> &HeightIndex<Self> {
         &indexes.notarization
+    }
+}
+
+impl SelectIndex for CryptoHashOf<Finalization> {
+    fn select_index(indexes: &Indexes) -> &HeightIndex<Self> {
+        &indexes.finalization
     }
 }
 

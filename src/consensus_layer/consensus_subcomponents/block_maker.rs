@@ -219,6 +219,7 @@ fn is_time_to_make_block(
             false
         }
         None => {
+            // if there is no previous notarization, node 1 proposes the first block (has rank 0 in the first round)
             if node_id == 1 && rank == 0 {
                 return true
             }
