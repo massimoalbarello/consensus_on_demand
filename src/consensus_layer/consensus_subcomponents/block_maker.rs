@@ -4,7 +4,7 @@ use serde::{Serialize, Deserialize};
 
 use crate::{consensus_layer::{
     pool_reader::PoolReader,
-    artifacts::{ConsensusMessage, N}
+    artifacts::{ConsensusMessage, N}, height_index::Height
 }, crypto::{Signed, Hashed}, time_source::TimeSource};
 
 use super::notary::NOTARIZATION_UNIT_DELAY;
@@ -100,12 +100,17 @@ impl BlockMaker {
         }
     }
 
+    /// Return true if the validated pool contains a better (lower ranked) block
+    /// proposal than the given rank, for the given height.
     fn is_better_block_proposal_available(
         &self,
         pool: &PoolReader<'_>,
-        height: u64,
+        height: Height,
         rank: u8,
     ) -> bool {
+        if let Some(block) = find_lowest_ranked_proposals(pool, height).first() {
+            return block.content.value.rank < rank;
+        }
         false
     }
 
@@ -233,4 +238,27 @@ fn get_block_maker_delay(
     rank: u8,
 ) -> Option<Duration> {
     Some(NOTARIZATION_UNIT_DELAY * rank as u32)
+}
+
+/// Return the validated block proposals with the lowest rank at height `h`, if
+/// there are any. Else return `None`.
+pub fn find_lowest_ranked_proposals(pool: &PoolReader<'_>, h: Height) -> Vec<BlockProposal> {
+    let (_, best_proposals) = pool
+        .pool()
+        .validated()
+        .block_proposal()
+        .get_by_height(h)
+        .fold(
+            (None, Vec::new()),
+            |(mut best_rank, mut best_proposals), proposal| {
+                if best_rank.is_none() || best_rank.unwrap() > proposal.content.value.rank {
+                    best_rank = Some(proposal.content.value.rank);
+                    best_proposals = vec![proposal];
+                } else if Some(proposal.content.value.rank) == best_rank {
+                    best_proposals.push(proposal);
+                }
+                (best_rank, best_proposals)
+            },
+        );
+    best_proposals
 }
