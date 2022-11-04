@@ -120,9 +120,9 @@ impl ConsensusImpl {
             self.validator.on_state_change(&pool_reader)
         };
 
-        let calls: [&'_ dyn Fn() -> (ChangeSet, bool); 5] = [
-            &finalize,
-            &aggregate,
+        let calls: [&'_ dyn Fn() -> (ChangeSet, bool); 3] = [
+            // &finalize,
+            // &aggregate,
             &notarize,
             &make_block,
             &validate,

@@ -19,17 +19,18 @@ pub const NOTARIZATION_UNIT_DELAY: Duration = Duration::from_millis(400);
 pub struct NotarizationContent {
     pub height: u64,
     pub block: CryptoHashOf<Block>,
+    is_ack: bool,
 }
 
 impl NotarizationContent {
-    pub fn new(block_height: Height, block_hash: CryptoHashOf<Block>) -> Self {
+    pub fn new(block_height: Height, block_hash: CryptoHashOf<Block>, is_ack: bool) -> Self {
         Self {
             height: block_height,
             block: block_hash,
+            is_ack,
         }
     }
 }
-
 
 /// A notarization share is a multi-signature share on a notarization content.
 /// If sufficiently many replicas create notarization shares, the shares can be
@@ -58,8 +59,8 @@ impl Notary {
             if self.time_to_notarize(pool, height, rank) {
                 if !self.is_proposal_already_notarized_by_me(pool, &proposal) {
                     if let Some(s) = self.notarize_block(pool, proposal) {
-                        // println!("\n########## Notary ##########");
-                        // println!("Created notarization share: {:?} for proposal of rank: {:?}", s, rank);
+                        println!("\n########## Notary ##########");
+                        println!("Created notarization share: {:?} for proposal of rank: {:?}", s, rank);
                         notarization_shares.push(ConsensusMessage::NotarizationShare(s));
                     }
                 }
@@ -107,7 +108,9 @@ impl Notary {
         pool: &PoolReader<'_>,
         proposal: Signed<Hashed<Block>, u8>,
     ) -> Option<NotarizationShare> {
-        let content = NotarizationContent::new(proposal.content.value.height, CryptoHashOf::from(proposal.content.hash));
+        let height = proposal.content.value.height;
+        let is_ack = pool.get_notarization_shares(height).count() == 0;
+        let content = NotarizationContent::new(proposal.content.value.height, CryptoHashOf::from(proposal.content.hash), is_ack);
         let signature = self.node_id;
         Some(NotarizationShare { content, signature })
     }
