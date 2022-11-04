@@ -46,6 +46,7 @@ impl Finalizer {
     /// * deliver finalized blocks (as `Batch`s) via `Messaging`
     /// * publish finalization shares for relevant rounds
     pub fn on_state_change(&self, pool: &PoolReader<'_>) -> Vec<ConsensusMessage> {
+        println!("\n########## Finalizer ##########");
         let notarized_height = pool.get_notarized_height();
         let finalized_height = pool.get_finalized_height();
 
@@ -59,7 +60,6 @@ impl Finalizer {
             .filter_map(|h| match self.finalize_height(pool, h) {
                 Some(f) => {
                     let finalization_share = ConsensusMessage::FinalizationShare(f);
-                    println!("\n########## Finalizer ##########");
                     println!("Created finalization share: {:?}", finalization_share);
                     Some(finalization_share)
                 },

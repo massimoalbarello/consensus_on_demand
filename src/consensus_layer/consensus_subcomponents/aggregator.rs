@@ -71,6 +71,7 @@ impl ShareAggregator {
     /// Attempt to construct artifacts from artifact shares in the artifact
     /// pool
     pub fn on_state_change(&self, pool: &PoolReader<'_>) -> Vec<ConsensusMessage> {
+        println!("\n########## Aggregator ##########");
         let mut messages = Vec::new();
         messages.append(&mut self.aggregate_notarization_shares(pool));
         messages.append(&mut self.aggregate_finalization_shares(pool));
@@ -113,7 +114,6 @@ impl ShareAggregator {
         let grouped_shares = aggregate(finalization_shares);
         grouped_shares.into_iter().filter_map(|(finalization_content, shares)| {
             if shares.len() >= N-1 {
-                println!("\n########## Aggregator ##########");
                 println!("Finalization of block with hash: {} at height {} by committee: {:?}", finalization_content.block.get_ref(), finalization_content.height, shares);
                 Some(finalization_content)
             }

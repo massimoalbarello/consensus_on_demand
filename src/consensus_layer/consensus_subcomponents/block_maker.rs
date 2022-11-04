@@ -70,6 +70,7 @@ impl BlockMaker {
     }
 
     pub fn on_state_change(&self, pool: &PoolReader<'_>) -> Option<ConsensusMessage> {
+        println!("\n########## Block maker ##########");
         let my_node_id = self.node_id;
         let (beacon, parent) = get_dependencies(pool).unwrap();
         let height: u64 = parent.height + 1;
@@ -89,7 +90,6 @@ impl BlockMaker {
                     let block_proposal = self.propose_block(pool, rank, parent).map(|proposal| {
                         ConsensusMessage::BlockProposal(proposal)
                     });
-                    println!("\n########## Block maker ##########");
                     println!("Created block proposal: {:?}", block_proposal);
                     block_proposal
                 }
