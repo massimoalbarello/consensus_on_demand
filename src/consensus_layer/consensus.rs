@@ -36,7 +36,7 @@ impl RoundRobin {
             (result, to_broadcast) = calls[next]();
             next = (next + 1) % calls.len();
             if !result.is_empty() || *index == next {
-                break;
+                return (result, to_broadcast);
             };
         }
         *index = next;
@@ -114,7 +114,6 @@ impl ConsensusImpl {
             let to_broadcast = true;
             (change_set, to_broadcast)
         };
-
 
         let validate = || {
             self.validator.on_state_change(&pool_reader)
