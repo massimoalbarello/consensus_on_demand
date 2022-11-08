@@ -82,7 +82,33 @@ impl ShareAggregator {
     fn aggregate_notarization_shares(&self, pool: &PoolReader<'_>) -> Vec<ConsensusMessage> {
         let height = pool.get_notarized_height() + 1;
         let notarization_shares = pool.get_notarization_shares(height);
-        let grouped_shares = aggregate(notarization_shares);
+        let grouped_shares_separated_from_acks = aggregate(notarization_shares);    // shares and acks for the same proposal are in two separate entries
+        // println!("Grouped shares separated from acks {:?}", grouped_shares_separated_from_acks);
+        let mut grouped_shares: BTreeMap<NotarizationContent, BTreeSet<u8>> = BTreeMap::new();  // shares and acks for the same proposal are in the same entry
+        for (notary_content, shares) in &grouped_shares_separated_from_acks {
+            // we need to aggregate the shares and acks of a proposal for which there is at least one notarization share
+            // if there are only acks we do not need to put them in "grouped shares" as once they will reach the threshold,
+            // the acknowledger will take care of them
+            if notary_content.is_ack == false {
+                // look for the entry with the acks for the same proposal
+                let notarization_content_with_ack = notary::NotarizationContent::new(notary_content.height, notary_content.block.clone(), true);
+                match grouped_shares_separated_from_acks.get(&notarization_content_with_ack) {
+                    Some(acks) => {
+                        println!("Merging shares from: {:?} and acks from: {:?} for the same proposal", shares, acks);
+                        // if there are acks for the same proposal, append them to the shares and insert the set as the value of the aggregator::NotarizationContent
+                        let mut shares_and_acks = shares.clone();   // notarization shares for proposal
+                        let mut acks_mut = acks.clone();    // acks fro the same proposal
+                        shares_and_acks.append(&mut acks_mut);
+                        grouped_shares.insert(NotarizationContent::new(notary_content.height, notary_content.block.clone()), shares_and_acks);
+                    }
+                    None => {
+                        // if there are no acks for the same proposal, insert the shares as the value of the aggregator::NotarizationContent
+                        grouped_shares.insert(NotarizationContent::new(notary_content.height, notary_content.block.clone()), shares.clone());
+                    }
+                };
+            }
+        }
+        // println!("Grouped shares: {:?}", grouped_shares);
         grouped_shares.into_iter().filter_map(|(notary_content, shares)| {
             if shares.len() >= N-1 {
                 println!("Notarization of block with hash: {} at height {} by committee: {:?}", notary_content.block.get_ref(), notary_content.height, shares);
