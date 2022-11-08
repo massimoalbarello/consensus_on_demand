@@ -85,7 +85,6 @@ impl ShareAggregator {
         let grouped_shares = aggregate(notarization_shares);
         grouped_shares.into_iter().filter_map(|(notary_content, shares)| {
             if shares.len() >= N-1 {
-                println!("\n########## Aggregator ##########");
                 println!("Notarization of block with hash: {} at height {} by committee: {:?}", notary_content.block.get_ref(), notary_content.height, shares);
                 Some(notary_content)
             }
@@ -135,7 +134,7 @@ impl ShareAggregator {
 
 }
 
-fn aggregate<T: Ord>(shares: Box<dyn Iterator<Item = Signed<T, u8>>>) -> BTreeMap<T, BTreeSet<u8>>{
+pub fn aggregate<T: Ord>(shares: Box<dyn Iterator<Item = Signed<T, u8>>>) -> BTreeMap<T, BTreeSet<u8>>{
     shares.fold(BTreeMap::<T, BTreeSet<u8>>::new(), |mut grouped_shares, share| {
         match grouped_shares.get_mut(&share.content) {
             Some(existing) => {

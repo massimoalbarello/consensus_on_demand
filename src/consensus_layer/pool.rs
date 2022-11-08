@@ -215,6 +215,8 @@ impl ConsensusPoolImpl {
     }
 
     pub fn insert(&mut self, unvalidated_artifact: UnvalidatedConsensusArtifact) {
+        // println!("\n########## Consensus pool ##########");
+        // println!("Inserting received artifact in unvalidated section of the consensus pool: {:?}", unvalidated_artifact);
         let mut ops = PoolSectionOps::new();
         ops.insert(unvalidated_artifact);
         self.apply_changes_unvalidated(ops);

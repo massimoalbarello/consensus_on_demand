@@ -19,7 +19,7 @@ pub const NOTARIZATION_UNIT_DELAY: Duration = Duration::from_millis(400);
 pub struct NotarizationContent {
     pub height: u64,
     pub block: CryptoHashOf<Block>,
-    is_ack: bool,
+    pub is_ack: bool,
 }
 
 impl NotarizationContent {

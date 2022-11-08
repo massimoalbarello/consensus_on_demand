@@ -11,7 +11,7 @@ use super::{
         finalizer::Finalizer,
         block_maker::BlockMaker,
         validator::Validator,
-        aggregator::ShareAggregator,
+        aggregator::ShareAggregator, acknowledger::Acknowledger,
     },
 };
 
@@ -45,6 +45,7 @@ impl RoundRobin {
 }
 
 pub struct ConsensusImpl {
+    acknowledger: Acknowledger,
     finalizer: Finalizer,
     block_maker: BlockMaker,
     notary: Notary,
@@ -57,6 +58,7 @@ pub struct ConsensusImpl {
 impl ConsensusImpl {
     pub fn new(node_number: u8, time_source: Arc<dyn TimeSource>) -> Self {
         Self {
+            acknowledger: Acknowledger::new(node_number),
             finalizer: Finalizer::new(node_number),
             block_maker: BlockMaker::new(node_number, Arc::clone(&time_source) as Arc<_>),
             notary: Notary::new(node_number, Arc::clone(&time_source) as Arc<_>),
@@ -90,6 +92,12 @@ impl ConsensusImpl {
 
         let pool_reader = PoolReader::new(pool);
 
+        let acknowledge = || {
+            let change_set = add_all_to_validated(self.acknowledger.on_state_change(&pool_reader));
+            let to_broadcast = false;
+            (change_set, to_broadcast)
+        };
+
         let finalize = || {
             let change_set = add_all_to_validated(self.finalizer.on_state_change(&pool_reader));
             let to_broadcast = true;
@@ -119,7 +127,8 @@ impl ConsensusImpl {
             self.validator.on_state_change(&pool_reader)
         };
 
-        let calls: [&'_ dyn Fn() -> (ChangeSet, bool); 5] = [
+        let calls: [&'_ dyn Fn() -> (ChangeSet, bool); 6] = [
+            &acknowledge,
             &finalize,
             &aggregate,
             &notarize,

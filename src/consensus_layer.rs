@@ -73,8 +73,8 @@ impl ConsensusProcessor {
         }
 
         // if !change_set.is_empty() {
-            // println!("\n########## Processor ##########");
-            // println!("Applying change set: {:?}", change_set);
+        //     println!("\n########## Processor ##########");
+        //     println!("Applying change set: {:?}", change_set);
         // }
 
         self.consensus_pool
