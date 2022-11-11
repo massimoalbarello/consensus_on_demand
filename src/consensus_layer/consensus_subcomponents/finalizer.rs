@@ -7,16 +7,16 @@ use crate::{consensus_layer::{height_index::Height, pool_reader::PoolReader, art
 use super::block_maker::Block;
 
 
-/// FinalizationContent holds the values that are signed in a finalization
+/// FinalizationShareContent holds the values that are signed in a finalization share
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct FinalizationContent {
+pub struct FinalizationShareContent {
     pub height: Height,
     pub block: CryptoHashOf<Block>,
 }
 
-impl FinalizationContent {
+impl FinalizationShareContent {
     pub fn new(height: Height, block: CryptoHashOf<Block>) -> Self {
-        FinalizationContent {
+        FinalizationShareContent {
             height,
             block,
         }
@@ -26,7 +26,7 @@ impl FinalizationContent {
 /// A finalization share is a multi-signature share on a finalization content.
 /// If sufficiently many replicas create finalization shares, the shares can be
 /// aggregated into a full finalization.
-pub type FinalizationShare = Signed<FinalizationContent, u8>;
+pub type FinalizationShare = Signed<FinalizationShareContent, u8>;
 
 pub struct Finalizer {
     node_id: u8,
@@ -72,7 +72,7 @@ impl Finalizer {
     /// Try to create a finalization share for a notarized block at the given
     /// height
     fn finalize_height(&self, pool: &PoolReader<'_>, height: Height) -> Option<FinalizationShare> {
-        let content = FinalizationContent::new(
+        let content = FinalizationShareContent::new(
             height,
             CryptoHashOf::new(Hashed::crypto_hash(&self.pick_block_to_finality_sign(pool, height)?)),
         );

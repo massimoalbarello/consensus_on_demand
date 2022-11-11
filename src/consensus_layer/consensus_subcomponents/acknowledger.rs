@@ -1,18 +1,19 @@
-use serde::{Serialize, Deserialize};
-
 use crate::{
     consensus_layer::{
-        height_index::Height, pool_reader::PoolReader, artifacts::{ConsensusMessage, N}, consensus_subcomponents::aggregator::{aggregate, Notarization, Finalization, self}
+        pool_reader::PoolReader, artifacts::{ConsensusMessage, N}, consensus_subcomponents::aggregator::{
+            aggregate, 
+            Notarization, NotarizationContent, 
+            Finalization, FinalizationContent, 
+        }
     },
-    crypto::{CryptoHashOf, Signed, Hashed}
+    crypto::{Signed}
 };
-
-use super::{block_maker::Block, finalizer::FinalizationContent};
+use super::finalizer::FinalizationShareContent;
 
 /// A finalization share is a multi-signature share on a finalization content.
 /// If sufficiently many replicas create finalization shares, the shares can be
 /// aggregated into a full finalization.
-pub type FinalizationShare = Signed<FinalizationContent, u8>;
+pub type FinalizationShare = Signed<FinalizationShareContent, u8>;
 
 pub struct Acknowledger {
     node_id: u8,
@@ -42,7 +43,7 @@ impl Acknowledger {
                 (
                     ConsensusMessage::Notarization(
                         Notarization {
-                            content: aggregator::NotarizationContent {
+                            content: NotarizationContent {
                                 height: notarization_content.height,
                                 block: notarization_content.block.clone(),
                             },
@@ -51,7 +52,7 @@ impl Acknowledger {
                     ),
                     ConsensusMessage::Finalization(
                         Finalization {
-                            content: aggregator::FinalizationContent {
+                            content: FinalizationContent {
                                 height: notarization_content.height,
                                 block: notarization_content.block,
                             },

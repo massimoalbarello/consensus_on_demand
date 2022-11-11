@@ -15,7 +15,7 @@ use crate::consensus_layer::{
 use crate::crypto::{Signed, CryptoHashOf};
 
 use super::block_maker::Block;
-use super::notary;
+use super::notary::NotarizationShareContent;
 
 
 // NotarizationContent holds the values that are signed in a notarization
@@ -91,7 +91,7 @@ impl ShareAggregator {
             // the acknowledger will take care of them
             if notary_content.is_ack == false {
                 // look for the entry with the acks for the same proposal
-                let notarization_content_with_ack = notary::NotarizationContent::new(notary_content.height, notary_content.block.clone(), true);
+                let notarization_content_with_ack = NotarizationShareContent::new(notary_content.height, notary_content.block.clone(), true);
                 match grouped_shares_separated_from_acks.get(&notarization_content_with_ack) {
                     Some(acks) => {
                         println!("Merging shares from: {:?} and acks from: {:?} for the same proposal", shares, acks);

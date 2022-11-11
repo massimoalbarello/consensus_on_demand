@@ -14,15 +14,15 @@ use super::block_maker::{Block, BlockProposal};
 
 pub const NOTARIZATION_UNIT_DELAY: Duration = Duration::from_millis(400);
 
-// NotarizationContent holds the values that are signed in a notarization
+// NotarizationShareContent holds the values that are signed in a notarization share
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct NotarizationContent {
+pub struct NotarizationShareContent {
     pub height: u64,
     pub block: CryptoHashOf<Block>,
     pub is_ack: bool,
 }
 
-impl NotarizationContent {
+impl NotarizationShareContent {
     pub fn new(block_height: Height, block_hash: CryptoHashOf<Block>, is_ack: bool) -> Self {
         Self {
             height: block_height,
@@ -35,7 +35,7 @@ impl NotarizationContent {
 /// A notarization share is a multi-signature share on a notarization content.
 /// If sufficiently many replicas create notarization shares, the shares can be
 /// aggregated into a full notarization.
-pub type NotarizationShare = Signed<NotarizationContent, u8>;
+pub type NotarizationShare = Signed<NotarizationShareContent, u8>;
 
 pub struct Notary {
     node_id: u8,
@@ -114,7 +114,7 @@ impl Notary {
             .get_notarization_shares(height)
             .filter(|s| s.signature == self.node_id)
             .count() == 0;
-        let content = NotarizationContent::new(proposal.content.value.height, CryptoHashOf::from(proposal.content.hash), is_ack);
+        let content = NotarizationShareContent::new(proposal.content.value.height, CryptoHashOf::from(proposal.content.hash), is_ack);
         let signature = self.node_id;
         Some(NotarizationShare { content, signature })
     }
