@@ -54,8 +54,9 @@ impl Finalizer {
             *self.prev_finalized_height.borrow_mut() = finalized_height;
         }
 
-        // Try to finalize rounds from finalized_height + 1 up to (and including)
-        // notarized_height
+        // Try to finalize rounds from finalized_height + 1 up to (and including) notarized_height
+        // if received a finalization for a block at height h+1 before a notarization for the same height
+        // (due to CoD fast path), the range will be empty and thus no finalization shares will be created
         (finalized_height+1..=notarized_height)
             .filter_map(|h| match self.finalize_height(pool, h) {
                 Some(f) => {

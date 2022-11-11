@@ -94,7 +94,7 @@ impl ConsensusImpl {
 
         let acknowledge = || {
             let change_set = add_all_to_validated(self.acknowledger.on_state_change(&pool_reader));
-            let to_broadcast = false;
+            let to_broadcast = true;
             (change_set, to_broadcast)
         };
 
@@ -107,7 +107,7 @@ impl ConsensusImpl {
         let aggregate = || {
             let change_set = add_all_to_validated(self.aggregator.on_state_change(&pool_reader));
             // aggregation of shares does not have to be broadcasted as each node can compute it locally based on its consensus pool
-            let to_broadcast = false;
+            let to_broadcast = true;
             (change_set, to_broadcast)
         };
 

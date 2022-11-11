@@ -109,6 +109,7 @@ impl Notary {
         proposal: Signed<Hashed<Block>, u8>,
     ) -> Option<NotarizationShare> {
         let height = proposal.content.value.height;
+        // set notarization share as an acknowledgement, if it is the first sent by the local replica for the current height
         let is_ack = pool
             .get_notarization_shares(height)
             .filter(|s| s.signature == self.node_id)
