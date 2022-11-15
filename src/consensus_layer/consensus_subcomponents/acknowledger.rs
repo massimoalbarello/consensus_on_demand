@@ -32,7 +32,7 @@ impl Acknowledger {
         let height = pool.get_notarized_height() + 1;
         let notarization_shares = pool.get_notarization_shares(height);
         let grouped_shares = aggregate(notarization_shares);
-        let messages: Vec<(ConsensusMessage, ConsensusMessage)> = grouped_shares.into_iter().filter_map(|(notarization_content, committee)| {
+        grouped_shares.into_iter().filter_map(|(notarization_content, committee)| {
             if notarization_content.is_ack == true && committee.len() >= N-1 {
                 println!("Acknowledgement of block with hash: {} at height {} by committee: {:?}", notarization_content.block.get_ref(), notarization_content.height, committee);
                 Some(notarization_content)
@@ -40,7 +40,7 @@ impl Acknowledger {
             else {
                 None
             }.map(|notarization_content| {
-                (
+                vec![
                     ConsensusMessage::Notarization(
                         Notarization {
                             content: NotarizationContent {
@@ -59,14 +59,8 @@ impl Acknowledger {
                             signature: 10,   // committee signature
                         }
                     )
-                )
+                ]
             })
-        }).collect();
-        let mut consensus_messages: Vec<ConsensusMessage> = vec![];
-        for (notarization, finalization) in messages {
-            consensus_messages.push(notarization);
-            consensus_messages.push(finalization);
-        }
-        consensus_messages
+        }).flatten().collect()
     }
 }
