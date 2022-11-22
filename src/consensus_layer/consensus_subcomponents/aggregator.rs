@@ -194,21 +194,12 @@ mod tests {
     use crate::crypto::Id;
     use super::*;
 
+    // test whether shares for the same proposal without any acks are included in the same entry of "grouped_shares"
     #[test]
-    fn groups_shares_and_acks_for_same_proposal() {
+    fn groups_shares_without_acks() {
         let mut grouped_shares_separated_from_acks = BTreeMap::new();
 
-        let mut acks_set = BTreeSet::new();
-        acks_set.insert(2 as u8);
-        grouped_shares_separated_from_acks.insert(
-            NotarizationShareContent {
-                height: 9,
-                block: Id::new(String::from("28d7bd1c45d7e5652aa5e9ed84cfbc666f3e376990cd95fff60e83c0194f3a6c")),
-                is_ack: true 
-            },
-            acks_set
-        );
-
+        // proposal "28d7bd1c45d7e5652aa5e9ed84cfbc666f3e376990cd95fff60e83c0194f3a6c" received shares from replicas 1 and 3
         let mut shares_set = BTreeSet::new();
         shares_set.insert(1 as u8);
         shares_set.insert(3 as u8);
@@ -221,6 +212,7 @@ mod tests {
             shares_set
         );
 
+        // proposal "6b6dcab6e7b86ee50066b978080a826894aed3162e1fe7046ffed115837bc906" received shares from replica 2
         let mut shares_set = BTreeSet::new();
         shares_set.insert(2 as u8);
         grouped_shares_separated_from_acks.insert(
@@ -237,6 +229,129 @@ mod tests {
 
         let mut correct_grouped_shares = BTreeMap::new();
 
+        // shares from replicas 1 and 3 for proposal "28d7bd1c45d7e5652aa5e9ed84cfbc666f3e376990cd95fff60e83c0194f3a6c" must have been included in the same entry
+        let mut correct_set = BTreeSet::new();
+        correct_set.insert(1 as u8);
+        correct_set.insert(3 as u8);
+        correct_grouped_shares.insert(
+            NotarizationContent {
+                height: 9,
+                block: Id::new(String::from("28d7bd1c45d7e5652aa5e9ed84cfbc666f3e376990cd95fff60e83c0194f3a6c")),
+            },
+            correct_set
+        );
+
+        // share from replica 2 for proposal "6b6dcab6e7b86ee50066b978080a826894aed3162e1fe7046ffed115837bc906" must have been included in a separate entry
+        let mut correct_set = BTreeSet::new();
+        correct_set.insert(2 as u8);
+        correct_grouped_shares.insert(
+            NotarizationContent {
+                height: 9,
+                block: Id::new(String::from("6b6dcab6e7b86ee50066b978080a826894aed3162e1fe7046ffed115837bc906")),
+            },
+            correct_set
+        );
+
+        assert_eq!(grouped_shares, correct_grouped_shares);
+    }
+
+    // test whether acks for a proposal which hasn't received any shares are NOT included in "grouped_shares"
+    #[test]
+    fn ignores_acks_without_shares() {
+        let mut grouped_shares_separated_from_acks = BTreeMap::new();
+
+        // proposal "28d7bd1c45d7e5652aa5e9ed84cfbc666f3e376990cd95fff60e83c0194f3a6c" received an ack from replica 2
+        let mut acks_set = BTreeSet::new();
+        acks_set.insert(2 as u8);
+        grouped_shares_separated_from_acks.insert(
+            NotarizationShareContent {
+                height: 9,
+                block: Id::new(String::from("28d7bd1c45d7e5652aa5e9ed84cfbc666f3e376990cd95fff60e83c0194f3a6c")),
+                is_ack: true 
+            },
+            acks_set
+        );
+
+        // proposal "6b6dcab6e7b86ee50066b978080a826894aed3162e1fe7046ffed115837bc906" received an ack from replica 2
+        let mut acks_set = BTreeSet::new();
+        acks_set.insert(2 as u8);
+        grouped_shares_separated_from_acks.insert(
+            NotarizationShareContent {
+                height: 9,
+                block: Id::new(String::from("6b6dcab6e7b86ee50066b978080a826894aed3162e1fe7046ffed115837bc906")),
+                is_ack: true 
+            },
+            acks_set
+        );
+
+        let grouped_shares = group_shares_and_acks(grouped_shares_separated_from_acks);
+
+        // share from replica 2 for proposal "28d7bd1c45d7e5652aa5e9ed84cfbc666f3e376990cd95fff60e83c0194f3a6c" must NOT have been included
+        // share from replica 2 for proposal "6b6dcab6e7b86ee50066b978080a826894aed3162e1fe7046ffed115837bc906" must NOT have been included
+        let correct_grouped_shares = BTreeMap::new();
+
+        assert_eq!(grouped_shares, correct_grouped_shares);
+    }
+
+    // test whether acks for proposals which also received shares are included in the same entry of the respective shares
+    #[test]
+    fn groups_shares_and_acks_for_same_proposal() {
+        let mut grouped_shares_separated_from_acks = BTreeMap::new();
+
+        // proposal "28d7bd1c45d7e5652aa5e9ed84cfbc666f3e376990cd95fff60e83c0194f3a6c" received an ack from replica 2
+        let mut acks_set = BTreeSet::new();
+        acks_set.insert(2 as u8);
+        grouped_shares_separated_from_acks.insert(
+            NotarizationShareContent {
+                height: 9,
+                block: Id::new(String::from("28d7bd1c45d7e5652aa5e9ed84cfbc666f3e376990cd95fff60e83c0194f3a6c")),
+                is_ack: true 
+            },
+            acks_set
+        );
+
+        // proposal "28d7bd1c45d7e5652aa5e9ed84cfbc666f3e376990cd95fff60e83c0194f3a6c" received shares from replicas 1 and 3
+        let mut shares_set = BTreeSet::new();
+        shares_set.insert(1 as u8);
+        shares_set.insert(3 as u8);
+        grouped_shares_separated_from_acks.insert(
+            NotarizationShareContent {
+                height: 9,
+                block: Id::new(String::from("28d7bd1c45d7e5652aa5e9ed84cfbc666f3e376990cd95fff60e83c0194f3a6c")),
+                is_ack: false 
+            },
+            shares_set
+        );
+
+        // proposal "6b6dcab6e7b86ee50066b978080a826894aed3162e1fe7046ffed115837bc906" received a share from replica 2
+        let mut shares_set = BTreeSet::new();
+        shares_set.insert(2 as u8);
+        grouped_shares_separated_from_acks.insert(
+            NotarizationShareContent {
+                height: 9,
+                block: Id::new(String::from("6b6dcab6e7b86ee50066b978080a826894aed3162e1fe7046ffed115837bc906")),
+                is_ack: false
+            },
+            shares_set
+        );
+
+        // proposal "fb4f2dafc775ca19792729f7adb3a9bbe9d24725cdc95fa5cff873da32352720" received an ack from replica 4
+        let mut acks_set = BTreeSet::new();
+        acks_set.insert(4 as u8);
+        grouped_shares_separated_from_acks.insert(
+            NotarizationShareContent {
+                height: 9,
+                block: Id::new(String::from("fb4f2dafc775ca19792729f7adb3a9bbe9d24725cdc95fa5cff873da32352720")),
+                is_ack: true
+            },
+            acks_set
+        );
+
+        let grouped_shares = group_shares_and_acks(grouped_shares_separated_from_acks);
+
+        let mut correct_grouped_shares = BTreeMap::new();
+
+        // ack from replica 2 for proposal "28d7bd1c45d7e5652aa5e9ed84cfbc666f3e376990cd95fff60e83c0194f3a6c" must have been included in the same entry as the shares for the same proposal from replicas 1 and 3
         let mut correct_set = BTreeSet::new();
         correct_set.insert(1 as u8);
         correct_set.insert(2 as u8);
@@ -249,6 +364,7 @@ mod tests {
             correct_set
         );
 
+        // share from replica 2 for proposal "6b6dcab6e7b86ee50066b978080a826894aed3162e1fe7046ffed115837bc906" must have been included in a separate entry
         let mut correct_set = BTreeSet::new();
         correct_set.insert(2 as u8);
         correct_grouped_shares.insert(
@@ -258,6 +374,8 @@ mod tests {
             },
             correct_set
         );
+
+        // ack from replica 4 for proposal "fb4f2dafc775ca19792729f7adb3a9bbe9d24725cdc95fa5cff873da32352720" must NOT have been included
 
         assert_eq!(grouped_shares, correct_grouped_shares);
 
