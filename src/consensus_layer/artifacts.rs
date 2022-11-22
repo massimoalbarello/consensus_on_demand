@@ -8,8 +8,6 @@ use super::consensus_subcomponents::{
     aggregator::{Notarization, Finalization}, finalizer::FinalizationShare
 };
 
-pub const N: usize = 4;
-
 pub type ChangeSet = Vec<ChangeAction>;
 
 #[derive(Debug, Clone)]

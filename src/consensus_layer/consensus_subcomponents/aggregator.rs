@@ -6,7 +6,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
-use crate::consensus_layer::artifacts::N;
+use crate::SubnetParams;
 use crate::consensus_layer::height_index::Height;
 use crate::consensus_layer::{
     pool_reader::PoolReader,
@@ -59,12 +59,14 @@ pub type Finalization = Signed<FinalizationContent, u8>;
 
 pub struct ShareAggregator {
     node_id: u8,
+    subnet_params: SubnetParams,
 }
 
 impl ShareAggregator {
-    pub fn new(node_id: u8) -> Self {
+    pub fn new(node_id: u8, subnet_params: SubnetParams) -> Self {
         Self {
             node_id,
+            subnet_params,
         }
     }
 
@@ -83,13 +85,13 @@ impl ShareAggregator {
         let height = pool.get_notarized_height() + 1;
         let notarization_shares = pool.get_notarization_shares(height);
         let grouped_shares_separated_from_acks = aggregate(notarization_shares);    // shares and acks for the same proposal are in two separate entries
-        println!("Grouped shares separated from acks {:?}", grouped_shares_separated_from_acks);
+        // println!("Grouped shares separated from acks {:?}", grouped_shares_separated_from_acks);
 
         let grouped_shares = group_shares_and_acks(grouped_shares_separated_from_acks);
-        println!("Grouped shares: {:?}", grouped_shares);
+        // println!("Grouped shares: {:?}", grouped_shares);
 
         grouped_shares.into_iter().filter_map(|(notary_content, shares)| {
-            if shares.len() >= N-1 {
+            if shares.len() >= (self.subnet_params.total_nodes_number - self.subnet_params.byzantine_nodes_number) as usize {
                 println!("Notarization of block with hash: {} at height {} by committee: {:?}", notary_content.block.get_ref(), notary_content.height, shares);
                 Some(notary_content)
             }
@@ -117,7 +119,7 @@ impl ShareAggregator {
         );
         let grouped_shares = aggregate(finalization_shares);
         grouped_shares.into_iter().filter_map(|(finalization_content, shares)| {
-            if shares.len() >= N-1 {
+            if shares.len() >= (self.subnet_params.total_nodes_number - self.subnet_params.byzantine_nodes_number) as usize {
                 println!("Finalization of block with hash: {} at height {} by committee: {:?}", finalization_content.block.get_ref(), finalization_content.height, shares);
                 Some(finalization_content)
             }
@@ -156,7 +158,6 @@ pub fn aggregate<T: Ord>(shares: Box<dyn Iterator<Item = Signed<T, u8>>>) -> BTr
 }
 
 fn group_shares_and_acks(grouped_shares_separated_from_acks: BTreeMap<NotarizationShareContent, BTreeSet<u8>>) -> BTreeMap<NotarizationContent, BTreeSet<u8>> {
-    // shares and acks for the same proposal are in the same entry
     grouped_shares_separated_from_acks.iter()
         .filter_map(|(notary_content, shares)| match notary_content.is_ack {
             // we need to aggregate the shares and acks of a proposal for which there is at least one notarization share
@@ -184,7 +185,7 @@ fn group_shares_and_acks(grouped_shares_separated_from_acks: BTreeMap<Notarizati
                 None
             },
         })
-        .collect()
+        .collect()  // shares and acks for the same proposal are in the same entry
 }
 
 

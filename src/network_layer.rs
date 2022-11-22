@@ -14,7 +14,7 @@ use serde::{Serialize, Deserialize};
 
 use crate::{
     artifact_manager::ArtifactProcessorManager, 
-    consensus_layer::artifacts::{ConsensusMessage, UnvalidatedArtifact}, time_source::{SysTimeSource, TimeSource},
+    consensus_layer::artifacts::{ConsensusMessage, UnvalidatedArtifact}, time_source::{SysTimeSource, TimeSource}, SubnetParams,
 };
 
 // We create a custom network behaviour that combines floodsub and mDNS.
@@ -52,7 +52,7 @@ pub enum Message {
 }
 
 pub struct Peer {
-    node_number: u8,
+    replica_number: u8,
     round: usize,
     rank: u64,
     floodsub_topic: Topic,
@@ -63,7 +63,7 @@ pub struct Peer {
 }
 
 impl Peer {
-    pub async fn new(node_number: u8, topic: &str) -> Self {
+    pub async fn new(replica_number: u8, subnet_params: SubnetParams, topic: &str) -> Self {
         let starting_round = 1;
         // Create a random PeerId
         let local_key = Keypair::generate_ed25519();
@@ -83,7 +83,7 @@ impl Peer {
 
         // Create a Swarm to manage peers and events
         let local_peer = Self {
-            node_number,
+            replica_number,
             round: starting_round,
             rank: 0, // updated after Peer object is instantiated
             floodsub_topic: floodsub_topic.clone(),
@@ -99,11 +99,11 @@ impl Peer {
             },
             receiver_outgoing_artifact,
             time_source: time_source.clone(),
-            manager: ArtifactProcessorManager::new(node_number, time_source, sender_outgoing_artifact),
+            manager: ArtifactProcessorManager::new(replica_number, subnet_params, time_source, sender_outgoing_artifact),
         };
         println!(
             "Local node initialized with number: {} and peer id: {:?}",
-            local_peer.node_number, local_peer_id
+            local_peer.replica_number, local_peer_id
         );
         local_peer
     }

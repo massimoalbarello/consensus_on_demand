@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::time_source::TimeSource;
+use crate::{time_source::TimeSource, SubnetParams};
 
 use super::{
     pool::ConsensusPoolImpl, 
@@ -56,13 +56,13 @@ pub struct ConsensusImpl {
 }
 
 impl ConsensusImpl {
-    pub fn new(node_number: u8, time_source: Arc<dyn TimeSource>) -> Self {
+    pub fn new(replica_number: u8, subnet_params: SubnetParams, time_source: Arc<dyn TimeSource>) -> Self {
         Self {
-            acknowledger: Acknowledger::new(node_number),
-            finalizer: Finalizer::new(node_number),
-            block_maker: BlockMaker::new(node_number, Arc::clone(&time_source) as Arc<_>),
-            notary: Notary::new(node_number, Arc::clone(&time_source) as Arc<_>),
-            aggregator: ShareAggregator::new(node_number),
+            acknowledger: Acknowledger::new(replica_number, subnet_params.clone()),
+            finalizer: Finalizer::new(replica_number),
+            block_maker: BlockMaker::new(replica_number,subnet_params.clone(), Arc::clone(&time_source) as Arc<_>),
+            notary: Notary::new(replica_number, Arc::clone(&time_source) as Arc<_>),
+            aggregator: ShareAggregator::new(replica_number, subnet_params),
             validator: Validator::new(Arc::clone(&time_source)),
             time_source,
             schedule: RoundRobin::default(),

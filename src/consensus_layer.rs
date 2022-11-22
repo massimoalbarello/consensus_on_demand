@@ -1,3 +1,4 @@
+use crate::SubnetParams;
 use crate::artifact_manager::ProcessingResult;
 
 pub mod pool;
@@ -28,10 +29,10 @@ pub struct ConsensusProcessor {
 }
 
 impl ConsensusProcessor {
-    pub fn new(node_number: u8, time_source: Arc<dyn TimeSource>) -> Self {
+    pub fn new(replica_number: u8, subnet_params: SubnetParams, time_source: Arc<dyn TimeSource>) -> Self {
         Self {
             consensus_pool: Arc::new(RwLock::new(ConsensusPoolImpl::new())),
-            client: Box::new(ConsensusImpl::new(node_number, Arc::clone(&time_source) as Arc<_>)),
+            client: Box::new(ConsensusImpl::new(replica_number, subnet_params, Arc::clone(&time_source) as Arc<_>)),
         }
     }
 

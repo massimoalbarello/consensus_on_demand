@@ -4,8 +4,8 @@ use serde::{Serialize, Deserialize};
 
 use crate::{consensus_layer::{
     pool_reader::PoolReader,
-    artifacts::{ConsensusMessage, N}, height_index::Height
-}, crypto::{Signed, Hashed}, time_source::TimeSource};
+    artifacts::ConsensusMessage, height_index::Height
+}, crypto::{Signed, Hashed}, time_source::TimeSource, SubnetParams};
 
 use super::notary::NOTARIZATION_UNIT_DELAY;
 
@@ -58,13 +58,15 @@ pub struct RandomBeacon {}
 
 pub struct BlockMaker {
     node_id: u8,
+    subnet_params: SubnetParams,
     time_source: Arc<dyn TimeSource>,
 }
 
 impl BlockMaker {
-    pub fn new(node_id: u8, time_source: Arc<dyn TimeSource>) -> Self {
+    pub fn new(node_id: u8, subnet_params: SubnetParams, time_source: Arc<dyn TimeSource>) -> Self {
         Self {
             node_id,
+            subnet_params,
             time_source,
         }
     }
@@ -74,7 +76,7 @@ impl BlockMaker {
         let my_node_id = self.node_id;
         let (beacon, parent) = get_dependencies(pool).unwrap();
         let height: u64 = parent.height + 1;
-        match get_block_maker_rank(height, &beacon, my_node_id)
+        match self.get_block_maker_rank(height, &beacon, my_node_id)
         {
             rank => {
                 if !already_proposed(pool, height, my_node_id)
@@ -98,6 +100,12 @@ impl BlockMaker {
                 }
             }
         }
+    }
+
+    fn get_block_maker_rank(&self, height: u64, beacon: &RandomBeacon, my_node_id: u8) -> u8 {
+        let rank = ((height + my_node_id as u64 - 2) % self.subnet_params.total_nodes_number as u64) as u8;
+        // println!("Local rank for height {} is: {}", height, rank);
+        rank
     }
 
     /// Return true if the validated pool contains a better (lower ranked) block
@@ -183,12 +191,6 @@ fn get_dependencies(pool: &PoolReader<'_>) -> Option<(RandomBeacon, Block)> {
             ))
         }
     }
-}
-
-fn get_block_maker_rank(height: u64, beacon: &RandomBeacon, my_node_id: u8) -> u8 {
-    let rank = ((height + my_node_id as u64 - 2) % N as u64) as u8;
-    // println!("Local rank for height {} is: {}", height, rank);
-    rank
 }
 
 // Return true if this node has already made a proposal at the given height.
