@@ -8,7 +8,7 @@ use libp2p::{
     identity::Keypair,
     mdns::{Mdns, MdnsConfig, MdnsEvent},
     swarm::SwarmEvent,
-    NetworkBehaviour, PeerId, Swarm,
+    NetworkBehaviour, PeerId, Swarm, multiaddr::Protocol, multihash::Multihash,
 };
 use serde::{Serialize, Deserialize};
 
@@ -53,6 +53,7 @@ pub enum Message {
 
 pub struct Peer {
     replica_number: u8,
+    id: PeerId,
     round: usize,
     rank: u64,
     floodsub_topic: Topic,
@@ -84,6 +85,7 @@ impl Peer {
         // Create a Swarm to manage peers and events
         let local_peer = Self {
             replica_number,
+            id: local_peer_id,
             round: starting_round,
             rank: 0, // updated after Peer object is instantiated
             floodsub_topic: floodsub_topic.clone(),
@@ -142,7 +144,8 @@ impl Peer {
 
     pub fn match_event<T>(&mut self, event: SwarmEvent<OutEvent, T>) {
         match event {
-            SwarmEvent::NewListenAddr { address, .. } => {
+            SwarmEvent::NewListenAddr { mut address, .. } => {
+                address.push(Protocol::P2p(Multihash::from_bytes(&self.id.to_bytes()[..]).unwrap()));
                 println!("Listening on {:?}", address);
             }
             SwarmEvent::Behaviour(OutEvent::Floodsub(FloodsubEvent::Message(floodsub_message))) => {
