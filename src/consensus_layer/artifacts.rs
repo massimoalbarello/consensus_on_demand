@@ -4,7 +4,7 @@ use crate::{crypto::{ConsensusMessageHash, Hashed}, time_source::Time};
 
 use super::consensus_subcomponents::{
     block_maker::BlockProposal,
-    notary::NotarizationShare,
+    notary::{NotarizationShare, NotarizationShareContent},
     aggregator::{Notarization, Finalization}, finalizer::FinalizationShare
 };
 
@@ -162,9 +162,19 @@ impl ConsensusMessageHashable for BlockProposal {
 
 impl ConsensusMessageHashable for NotarizationShare {
     fn get_id(&self) -> ConsensusMessageId {
-        ConsensusMessageId {
-            hash: self.get_cm_hash(),
-            height: self.content.height,
+        match self.content.to_owned() {
+            NotarizationShareContent::COD(share_content) => {
+                ConsensusMessageId {
+                    hash: self.get_cm_hash(),
+                    height: share_content.height,
+                }
+            },
+            NotarizationShareContent::ICC(share_content) => {
+                ConsensusMessageId {
+                    hash: self.get_cm_hash(),
+                    height: share_content.height,
+                }
+            }
         }
     }
     

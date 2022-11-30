@@ -7,27 +7,49 @@ use crate::{
         pool_reader::PoolReader, 
         artifacts::ConsensusMessage, 
         height_index::Height
-    }, crypto::{Signed, Hashed, CryptoHashOf}, time_source::TimeSource
+    }, crypto::{Signed, Hashed, CryptoHashOf}, time_source::TimeSource, SubnetParams
 };
 
 use super::block_maker::{Block, BlockProposal};
 
 pub const NOTARIZATION_UNIT_DELAY: Duration = Duration::from_millis(400);
 
-// NotarizationShareContent holds the values that are signed in a notarization share
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct NotarizationShareContent {
+pub enum NotarizationShareContent {
+    COD(NotarizationShareContentCOD),   // content of notarization share when Consensus on Demand is used
+    ICC(NotarizationShareContentICC)    // content of notarization share when only Internet Computer Consensus is used
+}
+
+// NotarizationShareContentICC holds the values that are signed in a notarization share when only IC Consensus is used
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct NotarizationShareContentICC {
+    pub height: u64,
+    pub block: CryptoHashOf<Block>,
+}
+
+impl NotarizationShareContentICC {
+    pub fn new(block_height: Height, block_hash: CryptoHashOf<Block>, is_ack: Option<bool>) -> Self {
+        Self {
+            height: block_height,
+            block: block_hash,
+        }
+    }
+}
+
+// NotarizationShareContentCOD holds the values that are signed in a notarization share when Consensus on Demand is used
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct NotarizationShareContentCOD {
     pub height: u64,
     pub block: CryptoHashOf<Block>,
     pub is_ack: bool,
 }
 
-impl NotarizationShareContent {
-    pub fn new(block_height: Height, block_hash: CryptoHashOf<Block>, is_ack: bool) -> Self {
+impl NotarizationShareContentCOD {
+    pub fn new(block_height: Height, block_hash: CryptoHashOf<Block>, is_ack: Option<bool>) -> Self {
         Self {
             height: block_height,
             block: block_hash,
-            is_ack,
+            is_ack: is_ack.unwrap(),
         }
     }
 }
@@ -39,13 +61,15 @@ pub type NotarizationShare = Signed<NotarizationShareContent, u8>;
 
 pub struct Notary {
     node_id: u8,
+    subnet_params: SubnetParams,
     time_source: Arc<dyn TimeSource>,
 }
 
 impl Notary {
-    pub fn new(node_id: u8, time_source: Arc<dyn TimeSource>) -> Self {
+    pub fn new(node_id: u8, subnet_params: SubnetParams, time_source: Arc<dyn TimeSource>) -> Self {
         Self {
             node_id,
+            subnet_params,
             time_source,
         }
     }
@@ -99,7 +123,12 @@ impl Notary {
         let height = proposal.content.value.height;
         pool.get_notarization_shares(height)
             .filter(|s| s.signature == self.node_id)
-            .any(|s| proposal.content.hash.eq(s.content.block.get_ref()))
+            .any(|s| {
+                match s.content {
+                    NotarizationShareContent::COD(share_content) => proposal.content.hash.eq(share_content.block.get_ref()),
+                    NotarizationShareContent::ICC(share_content) => proposal.content.hash.eq(share_content.block.get_ref()),
+                }
+            })
     }
 
     /// Notarize and return a `NotarizationShare` for the given block
@@ -109,12 +138,18 @@ impl Notary {
         proposal: Signed<Hashed<Block>, u8>,
     ) -> Option<NotarizationShare> {
         let height = proposal.content.value.height;
-        // set notarization share as an acknowledgement, if it is the first sent by the local replica for the current height
-        let is_ack = pool
-            .get_notarization_shares(height)
-            .filter(|s| s.signature == self.node_id)
-            .count() == 0;
-        let content = NotarizationShareContent::new(proposal.content.value.height, CryptoHashOf::from(proposal.content.hash), is_ack);
+        let mut content: NotarizationShareContent;
+        if self.subnet_params.consensus_on_demand == true {
+            // set notarization share as an acknowledgement, if it is the first sent by the local replica for the current height
+            let is_ack = pool
+                .get_notarization_shares(height)
+                .filter(|s| s.signature == self.node_id)
+                .count() == 0;
+            content = NotarizationShareContent::COD(NotarizationShareContentCOD::new(proposal.content.value.height, CryptoHashOf::from(proposal.content.hash), Some(is_ack)));
+        }
+        else {
+            content = NotarizationShareContent::ICC(NotarizationShareContentICC::new(proposal.content.value.height, CryptoHashOf::from(proposal.content.hash), None));
+        }
         let signature = self.node_id;
         Some(NotarizationShare { content, signature })
     }

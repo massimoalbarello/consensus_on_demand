@@ -4,7 +4,7 @@ use serde::{Serialize, Deserialize};
 
 use crate::{consensus_layer::{height_index::Height, pool_reader::PoolReader, artifacts::ConsensusMessage}, crypto::{CryptoHashOf, Signed, Hashed}};
 
-use super::block_maker::Block;
+use super::{block_maker::Block, notary::NotarizationShareContent};
 
 
 /// FinalizationShareContent holds the values that are signed in a finalization share
@@ -124,8 +124,14 @@ impl Finalizer {
         // If notarization shares exists created by this replica at height `h`
         // that sign a block different than `notarized_block`, do not finalize.
         let other_notarized_shares_exists = pool.get_notarization_shares(h).any(|x| {
-            x.signature == self.node_id
-                && x.content.block != CryptoHashOf::new(Hashed::crypto_hash(&notarized_block))
+            match x.content {
+                NotarizationShareContent::COD(share_content) => {
+                    x.signature == self.node_id && share_content.block != CryptoHashOf::new(Hashed::crypto_hash(&notarized_block))
+                },
+                NotarizationShareContent::ICC(share_content) => {
+                    x.signature == self.node_id && share_content.block != CryptoHashOf::new(Hashed::crypto_hash(&notarized_block))
+                },
+            }
         });
         if other_notarized_shares_exists {
             return None;

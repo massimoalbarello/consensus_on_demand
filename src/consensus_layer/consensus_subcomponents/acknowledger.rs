@@ -1,10 +1,10 @@
 use crate::{
     consensus_layer::{
-        pool_reader::PoolReader, artifacts::ConsensusMessage, consensus_subcomponents::aggregator::{
+        pool_reader::PoolReader, artifacts::ConsensusMessage, consensus_subcomponents::{aggregator::{
             aggregate, 
             Notarization, NotarizationContent, 
             Finalization, FinalizationContent, 
-        }
+        }, notary::NotarizationShareContent}
     },
     crypto::{Signed}, SubnetParams
 };
@@ -35,34 +35,39 @@ impl Acknowledger {
         let notarization_shares = pool.get_notarization_shares(height);
         let grouped_shares = aggregate(notarization_shares);
         grouped_shares.into_iter().filter_map(|(notarization_content, committee)| {
-            if notarization_content.is_ack == true && committee.len() >= (self.subnet_params.total_nodes_number - self.subnet_params.faulty_nodes_number) as usize {
-                println!("Acknowledgement of block with hash: {} at height {} by committee: {:?}", notarization_content.block.get_ref(), notarization_content.height, committee);
-                Some(notarization_content)
+            match notarization_content {
+                NotarizationShareContent::COD(notarization_content) => {
+                    if notarization_content.is_ack == true && committee.len() >= (self.subnet_params.total_nodes_number - self.subnet_params.faulty_nodes_number) as usize {
+                        println!("Acknowledgement of block with hash: {} at height {} by committee: {:?}", notarization_content.block.get_ref(), notarization_content.height, committee);
+                        Some(notarization_content)
+                    }
+                    else {
+                        None
+                    }.map(|notarization_content| {
+                        vec![
+                            ConsensusMessage::Notarization(
+                                Notarization {
+                                    content: NotarizationContent {
+                                        height: notarization_content.height,
+                                        block: notarization_content.block.clone(),
+                                    },
+                                    signature: 0,   // committee signature
+                                }
+                            ),
+                            ConsensusMessage::Finalization(
+                                Finalization {
+                                    content: FinalizationContent {
+                                        height: notarization_content.height,
+                                        block: notarization_content.block,
+                                    },
+                                    signature: 10,   // committee signature
+                                }
+                            )
+                        ]
+                    })
+                },
+                NotarizationShareContent::ICC(notarization_content) => None,
             }
-            else {
-                None
-            }.map(|notarization_content| {
-                vec![
-                    ConsensusMessage::Notarization(
-                        Notarization {
-                            content: NotarizationContent {
-                                height: notarization_content.height,
-                                block: notarization_content.block.clone(),
-                            },
-                            signature: 0,   // committee signature
-                        }
-                    ),
-                    ConsensusMessage::Finalization(
-                        Finalization {
-                            content: FinalizationContent {
-                                height: notarization_content.height,
-                                block: notarization_content.block,
-                            },
-                            signature: 10,   // committee signature
-                        }
-                    )
-                ]
-            })
         }).flatten().collect()
     }
 }

@@ -15,8 +15,7 @@ use crate::consensus_layer::{
 use crate::crypto::{Signed, CryptoHashOf};
 
 use super::block_maker::Block;
-use super::notary::NotarizationShareContent;
-
+use super::notary::{NotarizationShareContent, NotarizationShareContentICC, NotarizationShareContentCOD};
 
 // NotarizationContent holds the values that are signed in a notarization
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -84,31 +83,36 @@ impl ShareAggregator {
     fn aggregate_notarization_shares(&self, pool: &PoolReader<'_>) -> Vec<ConsensusMessage> {
         let height = pool.get_notarized_height() + 1;
         let notarization_shares = pool.get_notarization_shares(height);
-        let grouped_shares_separated_from_acks = aggregate(notarization_shares);    // shares and acks for the same proposal are in two separate entries
+        let grouped_shares_separated_from_acks = aggregate(notarization_shares);    // in case CoD is used, shares and acks for the same proposal are in two separate entries
         // println!("Grouped shares separated from acks {:?}", grouped_shares_separated_from_acks);
 
-        let grouped_shares = group_shares_and_acks(grouped_shares_separated_from_acks);
-        // println!("Grouped shares: {:?}", grouped_shares);
+        if self.subnet_params.consensus_on_demand == true {
+            let grouped_shares = group_shares_and_acks(grouped_shares_separated_from_acks);
+            // println!("Grouped shares: {:?}", grouped_shares);
 
-        grouped_shares.into_iter().filter_map(|(notary_content, shares)| {
-            if shares.len() >= (self.subnet_params.total_nodes_number - self.subnet_params.byzantine_nodes_number) as usize {
-                println!("Notarization of block with hash: {} at height {} by committee: {:?}", notary_content.block.get_ref(), notary_content.height, shares);
-                Some(notary_content)
-            }
-            else {
-                None
-            }.map(|notary_content| {
-                ConsensusMessage::Notarization(
-                    Notarization {
-                        content: NotarizationContent {
-                            height: notary_content.height,
-                            block: notary_content.block,
-                        },
-                        signature: 0,   // committee signature
-                    }
-                )
-            })
-        }).collect()
+            grouped_shares.into_iter().filter_map(|(notary_content, shares)| {
+                if shares.len() >= (self.subnet_params.total_nodes_number - self.subnet_params.byzantine_nodes_number) as usize {
+                    println!("Notarization of block with hash: {} at height {} by committee: {:?}", notary_content.block.get_ref(), notary_content.height, shares);
+                    Some(notary_content)
+                }
+                else {
+                    None
+                }.map(|notary_content| {
+                    ConsensusMessage::Notarization(
+                        Notarization {
+                            content: NotarizationContent {
+                                height: notary_content.height,
+                                block: notary_content.block,
+                            },
+                            signature: 0,   // committee signature
+                        }
+                    )
+                })
+            }).collect()
+        }
+        else {
+            vec![]
+        }
     }
 
     /// Attempt to construct `Finalization`s
@@ -159,31 +163,34 @@ pub fn aggregate<T: Ord>(shares: Box<dyn Iterator<Item = Signed<T, u8>>>) -> BTr
 
 fn group_shares_and_acks(grouped_shares_separated_from_acks: BTreeMap<NotarizationShareContent, BTreeSet<u8>>) -> BTreeMap<NotarizationContent, BTreeSet<u8>> {
     grouped_shares_separated_from_acks.iter()
-        .filter_map(|(notary_content, shares)| match notary_content.is_ack {
-            // we need to aggregate the shares and acks of a proposal for which there is at least one notarization share
-            // if there are only acks we do not need to put them in "grouped shares" as once they will reach the threshold,
-            // the acknowledger will take care of them
-            false => {
-                // look for the entry with the acks for the same proposal
-                let notarization_content_with_ack = NotarizationShareContent::new(notary_content.height, notary_content.block.clone(), true);
-                match grouped_shares_separated_from_acks.get(&notarization_content_with_ack) {
-                    Some(acks) => {
-                        println!("Merging shares from: {:?} and acks from: {:?} for the same proposal", shares, acks);
-                        // if there are acks for the same proposal, append them to the shares and insert the set as the value of the aggregator::NotarizationContent
-                        let mut shares_and_acks = shares.clone();   // notarization shares for proposal
-                        let mut acks_mut = acks.clone();    // acks fro the same proposal
-                        shares_and_acks.append(&mut acks_mut);
-                        Some((NotarizationContent::new(notary_content.height, notary_content.block.clone()), shares_and_acks))
+        .filter_map(|(notarization_share_content, shares)| match notarization_share_content {
+            NotarizationShareContent::COD(notary_content) => {
+                match notary_content.is_ack {
+                    // we need to aggregate the shares and acks of a proposal for which there is at least one notarization share
+                    // if there are only acks we do not need to put them in "grouped shares" as once they will reach the threshold,
+                    // the acknowledger will take care of them
+                    false => {
+                        // look for the entry with the acks for the same proposal
+                        let notarization_content_with_ack = NotarizationShareContent::COD(NotarizationShareContentCOD::new(notary_content.height, notary_content.block.clone(), Some(true)));
+                        match grouped_shares_separated_from_acks.get(&notarization_content_with_ack) {
+                            Some(acks) => {
+                                println!("Merging shares from: {:?} and acks from: {:?} for the same proposal", shares, acks);
+                                // if there are acks for the same proposal, append them to the shares and insert the set as the value of the aggregator::NotarizationContent
+                                let mut shares_and_acks = shares.clone();   // notarization shares for proposal
+                                let mut acks_mut = acks.clone();    // acks fro the same proposal
+                                shares_and_acks.append(&mut acks_mut);
+                                Some((NotarizationContent::new(notary_content.height, notary_content.block.clone()), shares_and_acks))
+                            },
+                            None => {
+                                // if there are no acks for the same proposal, insert the shares as the value of the aggregator::NotarizationContent
+                                Some((NotarizationContent::new(notary_content.height, notary_content.block.clone()), shares.clone()))
+                            }
+                        }
                     },
-                    None => {
-                        // if there are no acks for the same proposal, insert the shares as the value of the aggregator::NotarizationContent
-                        Some((NotarizationContent::new(notary_content.height, notary_content.block.clone()), shares.clone()))
-                    }
+                    true => None,
                 }
             },
-            true => {
-                None
-            },
+            NotarizationShareContent::ICC(notary_content) => None
         })
         .collect()  // shares and acks for the same proposal are in the same entry
 }
@@ -205,11 +212,11 @@ mod tests {
         shares_set.insert(1 as u8);
         shares_set.insert(3 as u8);
         grouped_shares_separated_from_acks.insert(
-            NotarizationShareContent {
+            NotarizationShareContent::COD(NotarizationShareContentCOD {
                 height: 9,
                 block: Id::new(String::from("28d7bd1c45d7e5652aa5e9ed84cfbc666f3e376990cd95fff60e83c0194f3a6c")),
                 is_ack: false 
-            },
+            }),
             shares_set
         );
 
@@ -217,11 +224,11 @@ mod tests {
         let mut shares_set = BTreeSet::new();
         shares_set.insert(2 as u8);
         grouped_shares_separated_from_acks.insert(
-            NotarizationShareContent {
+            NotarizationShareContent::COD(NotarizationShareContentCOD {
                 height: 9,
                 block: Id::new(String::from("6b6dcab6e7b86ee50066b978080a826894aed3162e1fe7046ffed115837bc906")),
                 is_ack: false
-            },
+            }),
             shares_set
         );
 
@@ -265,11 +272,11 @@ mod tests {
         let mut acks_set = BTreeSet::new();
         acks_set.insert(2 as u8);
         grouped_shares_separated_from_acks.insert(
-            NotarizationShareContent {
+            NotarizationShareContent::COD(NotarizationShareContentCOD {
                 height: 9,
                 block: Id::new(String::from("28d7bd1c45d7e5652aa5e9ed84cfbc666f3e376990cd95fff60e83c0194f3a6c")),
                 is_ack: true 
-            },
+            }),
             acks_set
         );
 
@@ -277,11 +284,11 @@ mod tests {
         let mut acks_set = BTreeSet::new();
         acks_set.insert(2 as u8);
         grouped_shares_separated_from_acks.insert(
-            NotarizationShareContent {
+            NotarizationShareContent::COD(NotarizationShareContentCOD {
                 height: 9,
                 block: Id::new(String::from("6b6dcab6e7b86ee50066b978080a826894aed3162e1fe7046ffed115837bc906")),
                 is_ack: true 
-            },
+            }),
             acks_set
         );
 
@@ -303,11 +310,11 @@ mod tests {
         let mut acks_set = BTreeSet::new();
         acks_set.insert(2 as u8);
         grouped_shares_separated_from_acks.insert(
-            NotarizationShareContent {
+            NotarizationShareContent::COD(NotarizationShareContentCOD {
                 height: 9,
                 block: Id::new(String::from("28d7bd1c45d7e5652aa5e9ed84cfbc666f3e376990cd95fff60e83c0194f3a6c")),
                 is_ack: true 
-            },
+            }),
             acks_set
         );
 
@@ -316,11 +323,11 @@ mod tests {
         shares_set.insert(1 as u8);
         shares_set.insert(3 as u8);
         grouped_shares_separated_from_acks.insert(
-            NotarizationShareContent {
+            NotarizationShareContent::COD(NotarizationShareContentCOD {
                 height: 9,
                 block: Id::new(String::from("28d7bd1c45d7e5652aa5e9ed84cfbc666f3e376990cd95fff60e83c0194f3a6c")),
                 is_ack: false 
-            },
+            }),
             shares_set
         );
 
@@ -328,11 +335,11 @@ mod tests {
         let mut shares_set = BTreeSet::new();
         shares_set.insert(2 as u8);
         grouped_shares_separated_from_acks.insert(
-            NotarizationShareContent {
+            NotarizationShareContent::COD(NotarizationShareContentCOD {
                 height: 9,
                 block: Id::new(String::from("6b6dcab6e7b86ee50066b978080a826894aed3162e1fe7046ffed115837bc906")),
                 is_ack: false
-            },
+            }),
             shares_set
         );
 
@@ -340,11 +347,11 @@ mod tests {
         let mut acks_set = BTreeSet::new();
         acks_set.insert(4 as u8);
         grouped_shares_separated_from_acks.insert(
-            NotarizationShareContent {
+            NotarizationShareContent::COD(NotarizationShareContentCOD {
                 height: 9,
                 block: Id::new(String::from("fb4f2dafc775ca19792729f7adb3a9bbe9d24725cdc95fa5cff873da32352720")),
                 is_ack: true
-            },
+            }),
             acks_set
         );
 

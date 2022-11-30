@@ -7,7 +7,7 @@ use super::{
     consensus_subcomponents::{
         aggregator::{Notarization, Finalization},
         block_maker::BlockProposal,
-        notary::NotarizationShare,
+        notary::{NotarizationShare, NotarizationShareContent},
         finalizer::FinalizationShare,
     }
 };
@@ -105,8 +105,16 @@ impl Indexes {
                 .insert(artifact.content.value.height, &CryptoHashOf::from(hash))
             },
             ConsensusMessage::NotarizationShare(artifact) => {
-                self.notarization_share
-                    .insert(artifact.content.height, &CryptoHashOf::from(hash))
+                match artifact.content.to_owned() {
+                    NotarizationShareContent::COD(share_content) => {
+                        self.notarization_share
+                            .insert(share_content.height, &CryptoHashOf::from(hash))
+                    },
+                    NotarizationShareContent::ICC(share_content) => {
+                        self.notarization_share
+                            .insert(share_content.height, &CryptoHashOf::from(hash))
+                    }
+                }
             },
             ConsensusMessage::Notarization(artifact) => {
                 self.notarization
@@ -130,8 +138,16 @@ impl Indexes {
                 .remove(artifact.content.value.height, &CryptoHashOf::from(hash))
             },
             ConsensusMessage::NotarizationShare(artifact) => {
-                self.notarization_share
-                    .remove(artifact.content.height, &CryptoHashOf::from(hash))
+                match artifact.content.to_owned() {
+                    NotarizationShareContent::COD(share_content) => {
+                        self.notarization_share
+                            .remove(share_content.height, &CryptoHashOf::from(hash))
+                    },
+                    NotarizationShareContent::ICC(share_content) => {
+                        self.notarization_share
+                            .remove(share_content.height, &CryptoHashOf::from(hash))
+                    }
+                }
             },
             ConsensusMessage::Notarization(artifact) => {
                 self.notarization

@@ -53,6 +53,7 @@ pub struct ConsensusImpl {
     validator: Validator,
     time_source: Arc<dyn TimeSource>,
     schedule: RoundRobin,
+    subnet_params: SubnetParams,
 }
 
 impl ConsensusImpl {
@@ -61,11 +62,12 @@ impl ConsensusImpl {
             acknowledger: Acknowledger::new(replica_number, subnet_params.clone()),
             finalizer: Finalizer::new(replica_number),
             block_maker: BlockMaker::new(replica_number,subnet_params.clone(), Arc::clone(&time_source) as Arc<_>),
-            notary: Notary::new(replica_number, Arc::clone(&time_source) as Arc<_>),
-            aggregator: ShareAggregator::new(replica_number, subnet_params),
+            notary: Notary::new(replica_number, subnet_params.clone(), Arc::clone(&time_source) as Arc<_>),
+            aggregator: ShareAggregator::new(replica_number, subnet_params.clone()),
             validator: Validator::new(Arc::clone(&time_source)),
             time_source,
             schedule: RoundRobin::default(),
+            subnet_params,
         }
     }
 
@@ -93,9 +95,14 @@ impl ConsensusImpl {
         let pool_reader = PoolReader::new(pool);
 
         let acknowledge = || {
-            let change_set = add_all_to_validated(self.acknowledger.on_state_change(&pool_reader));
-            let to_broadcast = true;
-            (change_set, to_broadcast)
+            if self.subnet_params.consensus_on_demand == true {
+                let change_set = add_all_to_validated(self.acknowledger.on_state_change(&pool_reader));
+                let to_broadcast = true;
+                return (change_set, to_broadcast);
+            }
+            else {
+                return (vec![], false);
+            }
         };
 
         let finalize = || {
