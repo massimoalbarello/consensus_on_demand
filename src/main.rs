@@ -18,14 +18,16 @@ pub struct SubnetParams {
     total_nodes_number: u8,
     byzantine_nodes_number: u8,
     faulty_nodes_number: u8,
+    consensus_on_demand: bool,
 }
 
 impl SubnetParams {
-    fn new(n: u8, f: u8, p: u8) -> Self {
+    fn new(n: u8, f: u8, p: u8, cod: bool) -> Self {
         Self {
             total_nodes_number: n,
             byzantine_nodes_number: f,
-            faulty_nodes_number: p
+            faulty_nodes_number: p,
+            consensus_on_demand: cod,
         }
     }
 }
@@ -62,25 +64,35 @@ async fn main() {
                                     let p: u8 = p
                                         .parse()
                                         .expect("cannot parse input from command line into number of faulty nodes");
-                                    let mut my_peer = Peer::new(replica_number, SubnetParams::new(n, f, p), "gossip_blocks").await;
+                                    // enable/disable Consensus on Demand
+                                    match cmd_line_args.next() {
+                                        Some(cod) => {
+                                            let cod: bool = cod
+                                                .parse()
+                                                .expect("cannot parse input from command line into enable/disable CoD");
 
-                                    // Listen on all interfaces and whatever port the OS assigns
-                                    my_peer.listen_for_dialing();
-                        
-                                    // Read full lines from stdin
-                                    let mut stdin = io::BufReader::new(io::stdin()).lines().fuse();
-                        
-                                    // Process events
-                                    loop {
-                                        select! {
-                                            _ = stdin.select_next_some() => (),
-                                            _ = broadcast_message_future().fuse() => {
-                                                // prevent Mdns expiration event by periodically broadcasting keep alive messages to peers
-                                                // if any locally generated artifact, broadcast it
-                                                my_peer.broadcast_message();
-                                            },
-                                            event = my_peer.get_next_event() => my_peer.match_event(event),
-                                        }
+                                            let mut my_peer = Peer::new(replica_number, SubnetParams::new(n, f, p, cod), "gossip_blocks").await;
+
+                                            // Listen on all interfaces and whatever port the OS assigns
+                                            my_peer.listen_for_dialing();
+                                
+                                            // Read full lines from stdin
+                                            let mut stdin = io::BufReader::new(io::stdin()).lines().fuse();
+                                
+                                            // Process events
+                                            loop {
+                                                select! {
+                                                    _ = stdin.select_next_some() => (),
+                                                    _ = broadcast_message_future().fuse() => {
+                                                        // prevent Mdns expiration event by periodically broadcasting keep alive messages to peers
+                                                        // if any locally generated artifact, broadcast it
+                                                        my_peer.broadcast_message();
+                                                    },
+                                                    event = my_peer.get_next_event() => my_peer.match_event(event),
+                                                }
+                                            }
+                                        },
+                                        None => panic!("must receive boolean to enable/disable CoD from the command line"),
                                     }
                                 },
                                 None => panic!("must receive number of faulty nodes from the command line"),
