@@ -85,34 +85,27 @@ impl ShareAggregator {
         let notarization_shares = pool.get_notarization_shares(height);
         let grouped_shares_separated_from_acks = aggregate(notarization_shares);    // in case CoD is used, shares and acks for the same proposal are in two separate entries
         // println!("Grouped shares separated from acks {:?}", grouped_shares_separated_from_acks);
-
-        if self.subnet_params.consensus_on_demand == true {
-            let grouped_shares = group_shares_and_acks(grouped_shares_separated_from_acks);
-            // println!("Grouped shares: {:?}", grouped_shares);
-
-            grouped_shares.into_iter().filter_map(|(notary_content, shares)| {
-                if shares.len() >= (self.subnet_params.total_nodes_number - self.subnet_params.byzantine_nodes_number) as usize {
-                    println!("Notarization of block with hash: {} at height {} by committee: {:?}", notary_content.block.get_ref(), notary_content.height, shares);
-                    Some(notary_content)
-                }
-                else {
-                    None
-                }.map(|notary_content| {
-                    ConsensusMessage::Notarization(
-                        Notarization {
-                            content: NotarizationContent {
-                                height: notary_content.height,
-                                block: notary_content.block,
-                            },
-                            signature: 0,   // committee signature
-                        }
-                    )
-                })
-            }).collect()
-        }
-        else {
-            vec![]
-        }
+        let grouped_shares = group_shares_and_acks(grouped_shares_separated_from_acks);
+        // println!("Grouped shares: {:?}", grouped_shares);
+        grouped_shares.into_iter().filter_map(|(notary_content, shares)| {
+            if shares.len() >= (self.subnet_params.total_nodes_number - self.subnet_params.byzantine_nodes_number) as usize {
+                println!("Notarization of block with hash: {} at height {} by committee: {:?}", notary_content.block.get_ref(), notary_content.height, shares);
+                Some(notary_content)
+            }
+            else {
+                None
+            }.map(|notary_content| {
+                ConsensusMessage::Notarization(
+                    Notarization {
+                        content: NotarizationContent {
+                            height: notary_content.height,
+                            block: notary_content.block,
+                        },
+                        signature: 0,   // committee signature
+                    }
+                )
+            })
+        }).collect()
     }
 
     /// Attempt to construct `Finalization`s
@@ -190,7 +183,11 @@ fn group_shares_and_acks(grouped_shares_separated_from_acks: BTreeMap<Notarizati
                     true => None,
                 }
             },
-            NotarizationShareContent::ICC(notary_content) => None
+            NotarizationShareContent::ICC(notary_content) => {
+                // if only ICC is used, as there are no acks, there is no need to group them with the shares
+                // shares for the same proposal are already aggregated by the "aggregate" function
+                Some((NotarizationContent::new(notary_content.height, notary_content.block.clone()), shares.clone()))
+            }
         })
         .collect()  // shares and acks for the same proposal are in the same entry
 }
