@@ -17,7 +17,7 @@ pub mod time_source;
 pub struct SubnetParams {
     total_nodes_number: u8,
     byzantine_nodes_number: u8,
-    faulty_nodes_number: u8,
+    disagreeing_nodes_number: u8,
     consensus_on_demand: bool,
 }
 
@@ -26,7 +26,7 @@ impl SubnetParams {
         Self {
             total_nodes_number: n,
             byzantine_nodes_number: f,
-            faulty_nodes_number: p,
+            disagreeing_nodes_number: p,
             consensus_on_demand: cod,
         }
     }

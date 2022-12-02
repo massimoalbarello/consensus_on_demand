@@ -5,7 +5,7 @@ use crate::{
 
 use super::{
     consensus_subcomponents::{
-        notary::NotarizationShare, 
+        notary::{NotarizationShare, NotarizationShareContent}, 
         block_maker::{Block, BlockProposal}, finalizer::FinalizationShare
     },
     height_index::{Height, HeightRange}, artifacts::ConsensusMessageHashable
@@ -36,6 +36,15 @@ impl<'a> PoolReader<'a> {
         h: Height,
     ) -> Box<dyn Iterator<Item = NotarizationShare>> {
         self.pool.validated().notarization_share().get_by_height(h)
+    }
+
+    pub fn count_acknowledgements(
+        &self,
+        h: Height,
+    ) -> usize {
+        self.get_notarization_shares(h)
+            .filter(|share| if let NotarizationShareContent::COD(_) = share.content { true } else { false })
+            .count()
     }
 
     // Get max height of valid notarized blocks.

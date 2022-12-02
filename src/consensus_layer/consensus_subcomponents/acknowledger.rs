@@ -37,7 +37,7 @@ impl Acknowledger {
         grouped_shares.into_iter().filter_map(|(notarization_content, committee)| {
             match notarization_content {
                 NotarizationShareContent::COD(notarization_content) => {
-                    if notarization_content.is_ack == true && committee.len() >= (self.subnet_params.total_nodes_number - self.subnet_params.faulty_nodes_number) as usize {
+                    if notarization_content.is_ack == true && committee.len() >= (self.subnet_params.total_nodes_number - self.subnet_params.disagreeing_nodes_number) as usize {
                         println!("Acknowledgement of block with hash: {} at height {} by committee: {:?}", notarization_content.block.get_ref(), notarization_content.height, committee);
                         Some(notarization_content)
                     }
