@@ -38,7 +38,7 @@ impl<'a> PoolReader<'a> {
         self.pool.validated().notarization_share().get_by_height(h)
     }
 
-    pub fn count_acknowledgements(
+    pub fn count_acknowledgements_at_height(
         &self,
         h: Height,
     ) -> usize {

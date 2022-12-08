@@ -82,15 +82,6 @@ impl ShareAggregator {
     /// Attempt to construct `Notarization`s at `notarized_height + 1`
     fn aggregate_notarization_shares(&self, pool: &PoolReader<'_>) -> Vec<ConsensusMessage> {
         let height = pool.get_notarized_height() + 1;
-        
-        // CoD rule 1
-        // do not create any notarization for a block at height h until n-f acks for blocks at height h are received
-        if self.subnet_params.consensus_on_demand == true && pool.count_acknowledgements(height) < (self.subnet_params.total_nodes_number - self.subnet_params.byzantine_nodes_number) as usize {
-            println!("RULE 1: not enough acks at height {} to notarize block", height);
-            return vec![];
-        }
-        // end of CoD rule 1
-        
         let notarization_shares = pool.get_notarization_shares(height);
         let grouped_shares_separated_from_acks = aggregate(notarization_shares);    // in case CoD is used, shares and acks for the same proposal are in two separate entries
         // println!("Grouped shares separated from acks {:?}", grouped_shares_separated_from_acks);
