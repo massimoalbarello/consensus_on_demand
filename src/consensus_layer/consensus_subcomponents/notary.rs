@@ -142,11 +142,19 @@ impl Notary {
         let height = proposal.content.value.height;
         let mut content: NotarizationShareContent;
         if self.subnet_params.consensus_on_demand == true {
-            // set notarization share as an acknowledgement, if it is the first sent by the local replica for the current height
+            // CoD rule 1: first child of each block is acknowledged
             let is_ack = pool
                 .get_notarization_shares(height)
-                .filter(|s| s.signature == self.node_id)
-                .count() == 0;
+                .filter(|s| s.signature == self.node_id)    // filter out shares not sent by local replica
+                .filter(|s| {
+                    if let NotarizationShareContent::COD(notarization_share_content_cod) = &s.content {
+                        notarization_share_content_cod.block_parent_hash == proposal.content.value.parent   // filter out shares for blocks that do not have the same parent of the block being proposed
+                    }
+                    else {
+                        panic!("no notarization shares of ICC variant when consensus_on_demand parameter is true");
+                    }
+                })
+                .count() == 0;  // set 'is_ack' to true if 'proposal' is the first child of its parent for which the local replica creates a notarization share, the latter is also an acknowledgement
             content = NotarizationShareContent::COD(NotarizationShareContentCOD::new(proposal.content.value.height, CryptoHashOf::from(proposal.content.hash), proposal.content.value.parent, Some(is_ack)));
         }
         else {
