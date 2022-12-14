@@ -164,7 +164,7 @@ fn group_shares_and_acks(grouped_shares_separated_from_acks: BTreeMap<Notarizati
                     // the acknowledger will take care of them
                     false => {
                         // look for the entry with the acks for the same proposal
-                        let notarization_content_with_ack = NotarizationShareContent::COD(NotarizationShareContentCOD::new(notary_content.height, notary_content.block.clone(), Some(true)));
+                        let notarization_content_with_ack = NotarizationShareContent::COD(NotarizationShareContentCOD::new(notary_content.height, notary_content.block.clone(), notary_content.block_parent_hash.clone(), Some(true)));
                         match grouped_shares_separated_from_acks.get(&notarization_content_with_ack) {
                             Some(acks) => {
                                 println!("Merging shares from: {:?} and acks from: {:?} for the same proposal", shares, acks);
@@ -212,6 +212,7 @@ mod tests {
             NotarizationShareContent::COD(NotarizationShareContentCOD {
                 height: 9,
                 block: Id::new(String::from("28d7bd1c45d7e5652aa5e9ed84cfbc666f3e376990cd95fff60e83c0194f3a6c")),
+                block_parent_hash: String::from(""),
                 is_ack: false 
             }),
             shares_set
@@ -224,6 +225,7 @@ mod tests {
             NotarizationShareContent::COD(NotarizationShareContentCOD {
                 height: 9,
                 block: Id::new(String::from("6b6dcab6e7b86ee50066b978080a826894aed3162e1fe7046ffed115837bc906")),
+                block_parent_hash: String::from(""),
                 is_ack: false
             }),
             shares_set
@@ -272,6 +274,7 @@ mod tests {
             NotarizationShareContent::COD(NotarizationShareContentCOD {
                 height: 9,
                 block: Id::new(String::from("28d7bd1c45d7e5652aa5e9ed84cfbc666f3e376990cd95fff60e83c0194f3a6c")),
+                block_parent_hash: String::from(""),
                 is_ack: true 
             }),
             acks_set
@@ -284,6 +287,7 @@ mod tests {
             NotarizationShareContent::COD(NotarizationShareContentCOD {
                 height: 9,
                 block: Id::new(String::from("6b6dcab6e7b86ee50066b978080a826894aed3162e1fe7046ffed115837bc906")),
+                block_parent_hash: String::from(""),
                 is_ack: true 
             }),
             acks_set
@@ -310,6 +314,7 @@ mod tests {
             NotarizationShareContent::COD(NotarizationShareContentCOD {
                 height: 9,
                 block: Id::new(String::from("28d7bd1c45d7e5652aa5e9ed84cfbc666f3e376990cd95fff60e83c0194f3a6c")),
+                block_parent_hash: String::from(""),
                 is_ack: true 
             }),
             acks_set
@@ -323,6 +328,7 @@ mod tests {
             NotarizationShareContent::COD(NotarizationShareContentCOD {
                 height: 9,
                 block: Id::new(String::from("28d7bd1c45d7e5652aa5e9ed84cfbc666f3e376990cd95fff60e83c0194f3a6c")),
+                block_parent_hash: String::from(""),
                 is_ack: false 
             }),
             shares_set
@@ -335,6 +341,7 @@ mod tests {
             NotarizationShareContent::COD(NotarizationShareContentCOD {
                 height: 9,
                 block: Id::new(String::from("6b6dcab6e7b86ee50066b978080a826894aed3162e1fe7046ffed115837bc906")),
+                block_parent_hash: String::from(""),
                 is_ack: false
             }),
             shares_set
@@ -347,6 +354,7 @@ mod tests {
             NotarizationShareContent::COD(NotarizationShareContentCOD {
                 height: 9,
                 block: Id::new(String::from("fb4f2dafc775ca19792729f7adb3a9bbe9d24725cdc95fa5cff873da32352720")),
+                block_parent_hash: String::from(""),
                 is_ack: true
             }),
             acks_set
