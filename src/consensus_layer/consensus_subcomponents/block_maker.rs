@@ -23,7 +23,7 @@ impl Payload {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct Block {
     // the parent block that this block extends, forming a block chain
-    parent: String,
+    pub parent: String,
     // the payload of the block
     payload: Payload,
     // the height of the block, which is the height of the parent + 1

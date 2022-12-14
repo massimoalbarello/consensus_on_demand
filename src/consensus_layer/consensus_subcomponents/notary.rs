@@ -41,14 +41,16 @@ impl NotarizationShareContentICC {
 pub struct NotarizationShareContentCOD {
     pub height: u64,
     pub block: CryptoHashOf<Block>,
+    pub block_parent_hash: String,
     pub is_ack: bool,
 }
 
 impl NotarizationShareContentCOD {
-    pub fn new(block_height: Height, block_hash: CryptoHashOf<Block>, is_ack: Option<bool>) -> Self {
+    pub fn new(block_height: Height, block_hash: CryptoHashOf<Block>, block_parent_hash: String, is_ack: Option<bool>) -> Self {
         Self {
             height: block_height,
             block: block_hash,
+            block_parent_hash,
             is_ack: is_ack.unwrap(),
         }
     }
@@ -145,7 +147,7 @@ impl Notary {
                 .get_notarization_shares(height)
                 .filter(|s| s.signature == self.node_id)
                 .count() == 0;
-            content = NotarizationShareContent::COD(NotarizationShareContentCOD::new(proposal.content.value.height, CryptoHashOf::from(proposal.content.hash), Some(is_ack)));
+            content = NotarizationShareContent::COD(NotarizationShareContentCOD::new(proposal.content.value.height, CryptoHashOf::from(proposal.content.hash), proposal.content.value.parent, Some(is_ack)));
         }
         else {
             content = NotarizationShareContent::ICC(NotarizationShareContentICC::new(proposal.content.value.height, CryptoHashOf::from(proposal.content.hash), None));
