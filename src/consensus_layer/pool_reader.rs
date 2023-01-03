@@ -90,6 +90,10 @@ impl<'a> PoolReader<'a> {
         self.pool.finalized_block()
     }
 
+    pub fn get_finalized_block_hash_at_height(&self, height: Height) -> Option<String> {
+        self.pool.finalized_block_hash_at_height(height)
+    }
+
     /// Return a valid block with the matching hash and height if it exists.
     pub fn get_block(&self, hash: &CryptoHashOf<Block>, h: Height) -> Result<Block, ()> {
         let mut blocks: Vec<BlockProposal> = self

@@ -77,7 +77,7 @@ impl Notary {
     }
 
     pub fn on_state_change(&self, pool: &PoolReader<'_>) -> Vec<ConsensusMessage> {
-        println!("\n########## Notary ##########");
+        // println!("\n########## Notary ##########");
         let notarized_height = pool.get_notarized_height();
         let mut notarization_shares = Vec::new();
         let height = notarized_height + 1;
@@ -86,7 +86,7 @@ impl Notary {
             if self.time_to_notarize(pool, height, rank) {
                 if !self.is_proposal_already_notarized_by_me(pool, &proposal) {
                     if let Some(s) = self.notarize_block(pool, proposal) {
-                        println!("Created notarization share: {:?} for proposal of rank: {:?}", s, rank);
+                        println!("\nCreated notarization share: {:?} for proposal of rank: {:?}", s, rank);
                         notarization_shares.push(ConsensusMessage::NotarizationShare(s));
                     }
                 }

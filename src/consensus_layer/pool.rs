@@ -258,6 +258,16 @@ impl ConsensusPoolImpl {
         get_highest_finalized_block(self)
     }
 
+    pub fn finalized_block_hash_at_height(&self, height: Height) -> Option<String> {
+        match self.validated().finalization().get_by_height(height).count() {
+            0 => None,
+            1 => {
+                Some(self.validated().finalization().get_by_height(height).last().unwrap().content.block.get_ref().to_owned())
+            },
+            _ => panic!("more than one finalized blocks at the same height"),
+        }
+    }
+
     fn apply_changes_validated(&mut self, ops: PoolSectionOps<ValidatedConsensusArtifact>) {
         if !ops.ops.is_empty() {
             // println!("\n########## Consensus pool ##########");
