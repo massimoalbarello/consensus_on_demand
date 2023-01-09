@@ -11,7 +11,7 @@ use super::{
         finalizer::Finalizer,
         block_maker::BlockMaker,
         validator::Validator,
-        aggregator::ShareAggregator, acknowledger::Acknowledger,
+        aggregator::ShareAggregator, acknowledger::Acknowledger, goodifier::Goodifier,
     },
 };
 
@@ -45,6 +45,7 @@ impl RoundRobin {
 }
 
 pub struct ConsensusImpl {
+    goodifier: Goodifier,
     acknowledger: Acknowledger,
     finalizer: Finalizer,
     block_maker: BlockMaker,
@@ -59,6 +60,7 @@ pub struct ConsensusImpl {
 impl ConsensusImpl {
     pub fn new(replica_number: u8, subnet_params: SubnetParams, time_source: Arc<dyn TimeSource>) -> Self {
         Self {
+            goodifier: Goodifier::new(replica_number),
             acknowledger: Acknowledger::new(replica_number, subnet_params.clone()),
             finalizer: Finalizer::new(replica_number),
             block_maker: BlockMaker::new(replica_number,subnet_params.clone(), Arc::clone(&time_source) as Arc<_>),
@@ -93,6 +95,17 @@ impl ConsensusImpl {
         // a priority, but it should not affect liveness or correctness.
 
         let pool_reader = PoolReader::new(pool);
+
+        let goodify = || {
+            if self.subnet_params.consensus_on_demand == true {
+                let change_set = add_all_to_validated(self.goodifier.on_state_change(&pool_reader));
+                let to_broadcast = false;
+                return (change_set, to_broadcast);
+            }
+            else {
+                return (vec![], false);
+            }
+        };
 
         let acknowledge = || {
             if self.subnet_params.consensus_on_demand == true {
@@ -134,7 +147,8 @@ impl ConsensusImpl {
             self.validator.on_state_change(&pool_reader)
         };
 
-        let calls: [&'_ dyn Fn() -> (ChangeSet, bool); 6] = [
+        let calls: [&'_ dyn Fn() -> (ChangeSet, bool); 7] = [
+            &goodify,
             &acknowledge,
             &finalize,
             &aggregate,
