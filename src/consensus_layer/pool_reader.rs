@@ -120,17 +120,19 @@ impl<'a> PoolReader<'a> {
         )
     }
 
-    pub fn exists_goodness_artifact_for_parent(&self, parent_hash: &String, height: Height) -> bool {
-        let goodness_artifact_for_parent: Vec<GoodnessArtifact> = self.pool
+    pub fn get_latest_goodness_artifact_for_parent(&self, parent_hash: &String, height: Height) -> Option<GoodnessArtifact> {
+        self.pool
             .validated()
             .goodness_artifact()
             .get_by_height(height)
-            .filter(|goodness_artifact| goodness_artifact.parent.eq(parent_hash))
-            .collect();
-        match goodness_artifact_for_parent.len() {
-            0 => false,
-            1 => true,
-            _ => panic!("only one goodness artifact for each parent")
+            .filter(|goodness_artifact| goodness_artifact.parent_hash.eq(parent_hash))
+            .min_by(|first, second| first.timestamp.cmp(&second.timestamp))
+    }
+
+    pub fn exists_goodness_artifact_for_parent(&self, parent_hash: &String, height: Height) -> bool {
+        match self.get_latest_goodness_artifact_for_parent(parent_hash, height) {
+            Some(_) => true,
+            None => false,
         }
     }
 
