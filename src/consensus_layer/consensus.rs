@@ -60,7 +60,7 @@ pub struct ConsensusImpl {
 impl ConsensusImpl {
     pub fn new(replica_number: u8, subnet_params: SubnetParams, time_source: Arc<dyn TimeSource>) -> Self {
         Self {
-            goodifier: Goodifier::new(replica_number),
+            goodifier: Goodifier::new(replica_number, subnet_params.clone()),
             acknowledger: Acknowledger::new(replica_number, subnet_params.clone()),
             finalizer: Finalizer::new(replica_number),
             block_maker: BlockMaker::new(replica_number,subnet_params.clone(), Arc::clone(&time_source) as Arc<_>),

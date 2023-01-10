@@ -5,7 +5,7 @@ use crate::{crypto::{ConsensusMessageHash, Hashed}, time_source::Time};
 use super::consensus_subcomponents::{
     block_maker::BlockProposal,
     notary::{NotarizationShare, NotarizationShareContent},
-    aggregator::{Notarization, Finalization}, finalizer::FinalizationShare
+    aggregator::{Notarization, Finalization}, finalizer::FinalizationShare, goodifier::GoodnessArtifact
 };
 
 pub type ChangeSet = Vec<ChangeAction>;
@@ -105,7 +105,7 @@ pub enum ConsensusMessage {
     Notarization(Notarization),
     FinalizationShare(FinalizationShare),
     Finalization(Finalization),
-
+    GoodnessArtifact(GoodnessArtifact)  // does not require to be signed as it is never broadcasted
 }
 
 impl ConsensusMessageHashable for ConsensusMessage {
@@ -123,6 +123,7 @@ impl ConsensusMessageHashable for ConsensusMessage {
             ConsensusMessage::Notarization(value) => value.get_cm_hash(),
             ConsensusMessage::FinalizationShare(value) => value.get_cm_hash(),
             ConsensusMessage::Finalization(value) => value.get_cm_hash(),
+            ConsensusMessage::GoodnessArtifact(value) => value.get_cm_hash(),
         }
     }
 
@@ -247,6 +248,27 @@ impl ConsensusMessageHashable for Finalization {
 
     fn assert(msg: &ConsensusMessage) -> Option<&Self> {
         if let ConsensusMessage::Finalization(value) = msg {
+            Some(value)
+        } else {
+            None
+        }
+    }
+}
+
+impl ConsensusMessageHashable for GoodnessArtifact {
+    fn get_id(&self) -> ConsensusMessageId {
+        ConsensusMessageId {
+            hash: self.get_cm_hash(),
+            height: self.height,
+        }
+    }
+    
+    fn get_cm_hash(&self) -> ConsensusMessageHash {
+        ConsensusMessageHash::GoodnessArtifact(Hashed::crypto_hash(self))
+    }
+
+    fn assert(msg: &ConsensusMessage) -> Option<&Self> {
+        if let ConsensusMessage::GoodnessArtifact(value) = msg {
             Some(value)
         } else {
             None

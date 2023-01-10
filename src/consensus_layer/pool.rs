@@ -15,7 +15,7 @@ use super::{
     consensus_subcomponents::{
         notary::NotarizationShare,
         aggregator::{Notarization, Finalization},
-        block_maker::{BlockProposal, Block}, finalizer::FinalizationShare
+        block_maker::{BlockProposal, Block}, finalizer::FinalizationShare, goodifier::GoodnessArtifact
     }
 };
 
@@ -43,7 +43,7 @@ impl<T: IntoInner<ConsensusMessage> + HasTimestamp + Clone + Debug> InMemoryPool
         for op in ops.ops {
             match op {
                 PoolSectionOp::Insert(artifact) => {
-                    // println!("Inserting artifact");
+                    // println!("Inserting artifact: {:?}", artifact);
                     self.insert(artifact);
                 },
                 PoolSectionOp::Remove(msg_id) => {
@@ -124,6 +124,9 @@ impl<T: IntoInner<ConsensusMessage> + HasTimestamp + Clone + Debug> InMemoryPool
         self
     }
     fn finalization(&self) -> &dyn HeightIndexedPool<Finalization> {
+        self
+    }
+    pub fn goodness_artifact(&self) -> &dyn HeightIndexedPool<GoodnessArtifact> {
         self
     }
 }

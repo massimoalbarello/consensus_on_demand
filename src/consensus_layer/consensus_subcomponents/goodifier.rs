@@ -2,14 +2,15 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Serialize, Deserialize};
 
-use crate::{consensus_layer::{artifacts::ConsensusMessage, pool_reader::PoolReader, consensus_subcomponents::block_maker::Block}, crypto::CryptoHashOf};
+use crate::{consensus_layer::{artifacts::ConsensusMessage, pool_reader::PoolReader, height_index::Height}, SubnetParams};
 
 use super::notary::NotarizationShareContent;
 
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct GoodnessArtifact {
-    parent: String,
+    pub height: Height,
+    pub parent: String,
     most_acks_child: String,
     most_acks_child_count: usize,
     total_acks_for_children: usize,
@@ -17,12 +18,14 @@ pub struct GoodnessArtifact {
 
 pub struct Goodifier {
     node_id: u8,
+    subnet_params: SubnetParams,
 }
 
 impl Goodifier {
-    pub fn new(node_id: u8) -> Self {
+    pub fn new(node_id: u8, subnet_params: SubnetParams) -> Self {
         Self {
             node_id,
+            subnet_params,
         }
     }
 
@@ -66,10 +69,10 @@ impl Goodifier {
             }
             grouped_acks_by_parent
         });
-        println!("\n{:?}", grouped_acks);
 
-        let children_goodness_artifacts: Vec<GoodnessArtifact> = grouped_acks.into_iter().map(|(parent, grouped_acks_by_parent)| {
+        grouped_acks.into_iter().filter_map(|(parent, grouped_acks_by_parent)| {
             let mut children_goodness_artifact = GoodnessArtifact {
+                height,
                 parent,
                 most_acks_child: String::from(""),
                 most_acks_child_count: 0,
@@ -83,11 +86,22 @@ impl Goodifier {
                     children_goodness_artifact.total_acks_for_children += acks_for_current_block_count;
                 }
             }
-            children_goodness_artifact
-        }).collect();
-        for goodness_artifact in children_goodness_artifacts {
-            println!("For parent {}, the child with most acks is {} and received {} acks out of {}", goodness_artifact.parent, goodness_artifact.most_acks_child, goodness_artifact.most_acks_child_count, goodness_artifact.total_acks_for_children);
-        }
-        vec![]
+            if !pool.exists_goodness_artifact_for_parent(&children_goodness_artifact.parent, height) {
+                if children_goodness_artifact.total_acks_for_children - children_goodness_artifact.most_acks_child_count > (self.subnet_params.byzantine_nodes_number + self.subnet_params.disagreeing_nodes_number) as usize {
+                    println!("\n!!!!!!!!!!!!!!! All children of {} are GOOD !!!!!!!!!!!!!!!", children_goodness_artifact.parent);
+                    return Some(ConsensusMessage::GoodnessArtifact(children_goodness_artifact));
+                }
+                else if children_goodness_artifact.total_acks_for_children > (self.subnet_params.total_nodes_number - self.subnet_params.byzantine_nodes_number) as usize {
+                    println!("\nFor parent {}, the good child with most acks is {} and received {} acks out of {}", children_goodness_artifact.parent, children_goodness_artifact.most_acks_child, children_goodness_artifact.most_acks_child_count, children_goodness_artifact.total_acks_for_children);
+                    return Some(ConsensusMessage::GoodnessArtifact(children_goodness_artifact));
+                }
+                else {
+                    return None;
+                }
+            }
+            else {
+                return None;
+            }
+        }).collect()
     }
 }

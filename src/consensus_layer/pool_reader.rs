@@ -6,7 +6,7 @@ use crate::{
 use super::{
     consensus_subcomponents::{
         notary::{NotarizationShare, NotarizationShareContent}, 
-        block_maker::{Block, BlockProposal}, finalizer::FinalizationShare
+        block_maker::{Block, BlockProposal}, finalizer::FinalizationShare, goodifier::GoodnessArtifact
     },
     height_index::{Height, HeightRange}, artifacts::ConsensusMessageHashable
 };
@@ -120,7 +120,20 @@ impl<'a> PoolReader<'a> {
         )
     }
 
-    
+    pub fn exists_goodness_artifact_for_parent(&self, parent_hash: &String, height: Height) -> bool {
+        let goodness_artifact_for_parent: Vec<GoodnessArtifact> = self.pool
+            .validated()
+            .goodness_artifact()
+            .get_by_height(height)
+            .filter(|goodness_artifact| goodness_artifact.parent.eq(parent_hash))
+            .collect();
+        match goodness_artifact_for_parent.len() {
+            0 => false,
+            1 => true,
+            _ => panic!("only one goodness artifact for each parent")
+        }
+    }
+
     /// Get the round start time of a given height, which is the max timestamp
     /// of first notarization and random beacon of the previous height.
     /// Return None if a timestamp is not found.
