@@ -126,7 +126,7 @@ impl<'a> PoolReader<'a> {
             .goodness_artifact()
             .get_by_height(height)
             .filter(|goodness_artifact| goodness_artifact.parent_hash.eq(parent_hash))
-            .min_by(|first, second| first.timestamp.cmp(&second.timestamp))
+            .max_by(|first, second| first.timestamp.cmp(&second.timestamp))
     }
 
     pub fn exists_goodness_artifact_for_parent(&self, parent_hash: &String, height: Height) -> bool {

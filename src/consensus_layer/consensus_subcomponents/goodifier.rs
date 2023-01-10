@@ -127,9 +127,12 @@ impl Goodifier {
                         return Some(ConsensusMessage::GoodnessArtifact(children_goodness_artifact));
                     }
                     if children_goodness_artifact.total_acks_for_children >= (self.subnet_params.total_nodes_number - self.subnet_params.byzantine_nodes_number) as usize {
-                        // if the child with most acks is different from the one stored in the previous "goodness" artifact (and therefore has more acks)
-                        // we create an updtaed "goodness" child
-                        if previous_goodness_artifact.most_acks_child != children_goodness_artifact.most_acks_child {
+                        // if the child with most acks is different from the one stored in the previous "goodness" artifact and has more acks
+                        // we create an updated "goodness" child
+                        if
+                            previous_goodness_artifact.most_acks_child != children_goodness_artifact.most_acks_child &&
+                            previous_goodness_artifact.most_acks_child_count < children_goodness_artifact.most_acks_child_count
+                        {
                             println!("\n!!!!!!!!!!!!!!! Updating good child with most acks {} for parent {} !!!!!!!!!!!!!!!", children_goodness_artifact.most_acks_child, children_goodness_artifact.parent_hash);
                             return Some(ConsensusMessage::GoodnessArtifact(children_goodness_artifact)); 
                         }
