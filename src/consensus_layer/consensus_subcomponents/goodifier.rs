@@ -2,14 +2,14 @@ use std::{collections::{BTreeMap, BTreeSet}, sync::Arc};
 
 use serde::{Serialize, Deserialize};
 
-use crate::{consensus_layer::{artifacts::ConsensusMessage, pool_reader::PoolReader, height_index::Height}, SubnetParams, time_source::{Time, TimeSource}};
+use crate::{consensus_layer::{artifacts::ConsensusMessage, pool_reader::PoolReader, height_index::Height}, SubnetParams, time_source::{Time, TimeSource}, crypto::Hashed};
 
-use super::notary::NotarizationShareContent;
+use super::{notary::NotarizationShareContent, block_maker::Block};
 
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct GoodnessArtifact {
-    pub height: Height,
+    pub children_height: Height,
     pub parent_hash: String,
     pub most_acks_child: String,
     pub most_acks_child_count: usize,
@@ -34,11 +34,11 @@ impl Goodifier {
     }
 
     pub fn on_state_change(&self, pool: &PoolReader<'_>) -> Vec<ConsensusMessage> {
-        let height = pool.get_notarized_height() + 1;
+        let notarized_height = pool.get_notarized_height();
         // group acks according to the parent of the block they are acknowledging
         // then for each parent group, group acks according to the block they are acknowledging
         let grouped_acks = pool
-            .get_notarization_shares(height)
+            .get_notarization_shares(notarized_height)
             .fold(BTreeMap::<String, BTreeMap<String, BTreeSet<u8>>>::new(), |mut grouped_acks_by_parent, signed_share| {
                 if let NotarizationShareContent::COD(notarization_share) = signed_share.content {
                     if notarization_share.is_ack {
@@ -75,14 +75,14 @@ impl Goodifier {
                 }
                 grouped_acks_by_parent
             });
-        println!("{:?}", grouped_acks);
+        // println!("Grouped acks {:?}", grouped_acks);
 
         // for each parent, check conditions to determine which children are "good"
         // add "goodness" artifact to the pool
         grouped_acks.into_iter().filter_map(|(parent_hash, grouped_acks_by_block)| {
             // initialize "goodness" artifact for a particular parent
             let mut children_goodness_artifact = GoodnessArtifact {
-                height,
+                children_height: notarized_height,
                 parent_hash,
                 most_acks_child: String::from(""),
                 most_acks_child_count: 0,
@@ -99,7 +99,7 @@ impl Goodifier {
                 }
                 children_goodness_artifact.total_acks_for_children += acks_for_current_block_count;
             }
-            match pool.get_latest_goodness_artifact_for_parent(&children_goodness_artifact.parent_hash, height) {
+            match pool.get_latest_goodness_artifact_for_parent(&children_goodness_artifact.parent_hash, notarized_height) {
                 // if "goodness" artifact does not exist, we check whether it can be created according to currently received acks 
                 None => {
                     if children_goodness_artifact.total_acks_for_children - children_goodness_artifact.most_acks_child_count > (self.subnet_params.byzantine_nodes_number + self.subnet_params.disagreeing_nodes_number) as usize {
@@ -108,7 +108,7 @@ impl Goodifier {
                         return Some(ConsensusMessage::GoodnessArtifact(children_goodness_artifact));
                     }
                     if children_goodness_artifact.total_acks_for_children >= (self.subnet_params.total_nodes_number - self.subnet_params.byzantine_nodes_number) as usize {
-                        println!("\nFor parent {}, the good child with most acks is {} and received {} acks out of {}", children_goodness_artifact.parent_hash, children_goodness_artifact.most_acks_child, children_goodness_artifact.most_acks_child_count, children_goodness_artifact.total_acks_for_children);
+                        println!("\nFor parent {} at height {}, the good child with most acks is {} and received {} acks out of {}", children_goodness_artifact.parent_hash, children_goodness_artifact.children_height-1, children_goodness_artifact.most_acks_child, children_goodness_artifact.most_acks_child_count, children_goodness_artifact.total_acks_for_children);
                         return Some(ConsensusMessage::GoodnessArtifact(children_goodness_artifact));
                     }
                     None
@@ -133,7 +133,7 @@ impl Goodifier {
                             previous_goodness_artifact.most_acks_child != children_goodness_artifact.most_acks_child &&
                             previous_goodness_artifact.most_acks_child_count < children_goodness_artifact.most_acks_child_count
                         {
-                            println!("\n!!!!!!!!!!!!!!! Updating good child with most acks {} for parent {} !!!!!!!!!!!!!!!", children_goodness_artifact.most_acks_child, children_goodness_artifact.parent_hash);
+                            println!("\n!!!!!!!!!!!!!!! Updating good child with most acks {} for parent {} at height {} !!!!!!!!!!!!!!!", children_goodness_artifact.most_acks_child, children_goodness_artifact.parent_hash, children_goodness_artifact.children_height-1);
                             return Some(ConsensusMessage::GoodnessArtifact(children_goodness_artifact)); 
                         }
                     }
@@ -143,3 +143,27 @@ impl Goodifier {
         }).collect()
     }
 }
+
+pub fn block_is_good(pool: &PoolReader<'_>, block: &Block) -> bool {
+    // block is one of the children for the latest "goodness" artifact
+    // println!("\nBlock at height {} has parent hash: {}", block.height, block.parent);
+    // pool.print_goodness_artifacts_at_height(block.height);
+    match pool.get_latest_goodness_artifact_for_parent(&block.parent, block.height) {
+        Some(goodness_artifact) => {
+            println!("Latest goodness artifact {:?}", goodness_artifact);
+            if goodness_artifact.all_children_good {
+                return true;
+            }
+            let block_hash = Hashed::crypto_hash(&block);
+            // println!("Block to be checked: {}", block_hash);
+            goodness_artifact.most_acks_child == block_hash
+        },
+        None => {
+            if block.height == 0 {
+                return true    // genesis is good
+            }
+            false
+        }
+    }
+}
+
