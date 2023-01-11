@@ -4,7 +4,7 @@ use serde::{Serialize, Deserialize};
 
 use crate::{consensus_layer::{height_index::Height, pool_reader::PoolReader, artifacts::ConsensusMessage}, crypto::{CryptoHashOf, Signed, Hashed}};
 
-use super::{block_maker::Block, notary::NotarizationShareContent};
+use super::{block_maker::Block, notary::NotarizationShareContent, goodifier::block_is_good};
 
 
 /// FinalizationShareContent holds the values that are signed in a finalization share
@@ -120,6 +120,11 @@ impl Finalizer {
                 return None;
             }
         };
+
+        // CoD rule 3b: send finalization share only for "good" block
+        if !block_is_good(pool, &notarized_block) {
+            return None;
+        }
 
         // If notarization shares exists created by this replica at height `h`
         // that sign a block different than `notarized_block`, do not finalize.
