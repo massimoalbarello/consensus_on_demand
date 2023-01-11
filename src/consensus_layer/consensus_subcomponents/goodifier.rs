@@ -146,11 +146,10 @@ impl Goodifier {
 
 pub fn block_is_good(pool: &PoolReader<'_>, block: &Block) -> bool {
     // block is one of the children for the latest "goodness" artifact
-    // println!("\nBlock at height {} has parent hash: {}", block.height, block.parent);
     // pool.print_goodness_artifacts_at_height(block.height);
     match pool.get_latest_goodness_artifact_for_parent(&block.parent, block.height) {
         Some(goodness_artifact) => {
-            println!("Latest goodness artifact {:?}", goodness_artifact);
+            // println!("\nLatest goodness artifact {:?}", goodness_artifact);
             if goodness_artifact.all_children_good {
                 return true;
             }

@@ -88,8 +88,6 @@ impl BlockMaker {
                         self.time_source.as_ref(),
                         my_node_id
                     )
-                    // CoD rule 3a: extend only "good" blocks 
-                    && block_is_good(pool, &parent)
                 {
                     let block_proposal = self.propose_block(pool, rank, parent).map(|proposal| {
                         ConsensusMessage::BlockProposal(proposal)
@@ -170,8 +168,17 @@ impl BlockMaker {
 fn get_dependencies(pool: &PoolReader<'_>) -> Option<(RandomBeacon, Block)> {
     let notarized_height = pool.get_notarized_height();
     // println!("Last block notarized at height: {}", notarized_height);
+    // the only "good" block might not be the rank 0 block
+    // therefore, we must first filter out the notarized blocks that are not "good"
+    // and then choose the one with the smallest rank among the "good" ones
     let parent = pool
         .get_notarized_blocks(notarized_height)
+        .filter(|block| {
+            // CoD rule 3a: extend only "good" blocks
+            let is_good = block_is_good(pool, &block);
+            // println!("Notarized block {:?} is good: {}", block, is_good);
+            is_good
+        })
         .min_by(|block1, block2| block1.rank.cmp(&block2.rank));
     match parent {
         Some(parent) => {
