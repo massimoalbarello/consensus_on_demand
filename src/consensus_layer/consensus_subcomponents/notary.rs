@@ -12,7 +12,7 @@ use crate::{
 
 use super::block_maker::{Block, BlockProposal};
 
-pub const NOTARIZATION_UNIT_DELAY: Duration = Duration::from_millis(400);
+pub const NOTARIZATION_UNIT_DELAY: Duration = Duration::from_millis(600);
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum NotarizationShareContent {
@@ -81,7 +81,8 @@ impl Notary {
         let notarized_height = pool.get_notarized_height();
         let mut notarization_shares = Vec::new();
         let height = notarized_height + 1;
-        for proposal in find_lowest_ranked_proposals(pool, height) {
+        // for proposal in find_lowest_ranked_proposals(pool, height) {
+        for proposal in get_proposals(pool, height) {
             let rank = proposal.content.value.rank;
             if self.time_to_notarize(pool, height, rank) {
                 if !self.is_proposal_already_notarized_by_me(pool, &proposal) {
@@ -163,6 +164,15 @@ impl Notary {
         let signature = self.node_id;
         Some(NotarizationShare { content, signature })
     }
+}
+
+fn get_proposals(pool: &PoolReader<'_>, h: Height) -> Vec<BlockProposal> {
+    pool
+        .pool()
+        .validated()
+        .block_proposal()
+        .get_by_height(h)
+        .collect()
 }
 
 /// Return the validated block proposals with the lowest rank at height `h`, if
