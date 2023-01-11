@@ -132,7 +132,7 @@ impl Indexes {
             },
             ConsensusMessage::GoodnessArtifact(artifact) => {
                 self.goodness_artifact
-                    .insert(artifact.height, &CryptoHashOf::from(hash))
+                    .insert(artifact.children_height, &CryptoHashOf::from(hash))
             }
         };
     }
@@ -169,7 +169,7 @@ impl Indexes {
             },
             ConsensusMessage::GoodnessArtifact(artifact) => {
                 self.goodness_artifact
-                    .remove(artifact.height, &CryptoHashOf::from(hash))
+                    .remove(artifact.children_height, &CryptoHashOf::from(hash))
             }
         };
     }

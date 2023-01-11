@@ -7,7 +7,7 @@ use crate::{consensus_layer::{
     artifacts::ConsensusMessage, height_index::Height
 }, crypto::{Signed, Hashed}, time_source::TimeSource, SubnetParams};
 
-use super::notary::NOTARIZATION_UNIT_DELAY;
+use super::{notary::NOTARIZATION_UNIT_DELAY, goodifier::block_is_good};
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub struct Payload {}
@@ -88,6 +88,8 @@ impl BlockMaker {
                         self.time_source.as_ref(),
                         my_node_id
                     )
+                    // CoD rule 3a: extend only "good" blocks 
+                    && block_is_good(pool, &parent)
                 {
                     let block_proposal = self.propose_block(pool, rank, parent).map(|proposal| {
                         ConsensusMessage::BlockProposal(proposal)

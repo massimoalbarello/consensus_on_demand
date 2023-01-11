@@ -259,7 +259,7 @@ impl ConsensusMessageHashable for GoodnessArtifact {
     fn get_id(&self) -> ConsensusMessageId {
         ConsensusMessageId {
             hash: self.get_cm_hash(),
-            height: self.height,
+            height: self.children_height,
         }
     }
     

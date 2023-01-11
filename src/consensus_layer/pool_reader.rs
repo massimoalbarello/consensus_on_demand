@@ -120,11 +120,21 @@ impl<'a> PoolReader<'a> {
         )
     }
 
-    pub fn get_latest_goodness_artifact_for_parent(&self, parent_hash: &String, height: Height) -> Option<GoodnessArtifact> {
-        self.pool
+    pub fn print_goodness_artifacts_at_height(&self, height: Height) {
+        for good in self.pool
             .validated()
             .goodness_artifact()
             .get_by_height(height)
+        {
+            println!("{:?}", good);
+        }
+    }
+
+    pub fn get_latest_goodness_artifact_for_parent(&self, parent_hash: &String, children_height: Height) -> Option<GoodnessArtifact> {
+        self.pool
+            .validated()
+            .goodness_artifact()
+            .get_by_height(children_height)
             .filter(|goodness_artifact| goodness_artifact.parent_hash.eq(parent_hash))
             .max_by(|first, second| first.timestamp.cmp(&second.timestamp))
     }
