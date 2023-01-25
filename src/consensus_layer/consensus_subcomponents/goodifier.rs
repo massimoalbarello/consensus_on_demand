@@ -100,47 +100,17 @@ impl Goodifier {
                 }
                 children_goodness_artifact.total_acks_for_children += acks_for_current_block_count;
             }
-            match pool.get_latest_goodness_artifact_for_parent(&children_goodness_artifact.parent_hash, height_to_be_checked) {
-                // if "goodness" artifact does not exist, we check whether it can be created according to currently received acks 
-                None => {
-                    if children_goodness_artifact.total_acks_for_children - children_goodness_artifact.most_acks_child_count > (self.subnet_params.byzantine_nodes_number + self.subnet_params.disagreeing_nodes_number) as usize {
-                        println!("\nAll children of {} are good", children_goodness_artifact.parent_hash);
-                        children_goodness_artifact.all_children_good = true;
-                        return Some(ConsensusMessage::GoodnessArtifact(children_goodness_artifact));
-                    }
-                    if children_goodness_artifact.total_acks_for_children >= (self.subnet_params.total_nodes_number - self.subnet_params.byzantine_nodes_number) as usize {
-                        println!("\nFor parent {} at height {}, the good child with most acks is {} and received {} acks out of {}", children_goodness_artifact.parent_hash, children_goodness_artifact.children_height-1, children_goodness_artifact.most_acks_child, children_goodness_artifact.most_acks_child_count, children_goodness_artifact.total_acks_for_children);
-                        return Some(ConsensusMessage::GoodnessArtifact(children_goodness_artifact));
-                    }
-                    None
-                },
-                // if the "goodness" artifact already exists, we must check whether it should be updated
-                Some(previous_goodness_artifact) =>  {
-                    // if all children are "good", the "goodness" artifact for this parent does not have to be updated as all children will remain "good" 
-                    // and in this case we do not care about which one is the one with the most acks
-                    if previous_goodness_artifact.all_children_good {
-                        return None;
-                    }
-                    // if all children become "good" we create an updated "goodness" artifact
-                    if children_goodness_artifact.total_acks_for_children - children_goodness_artifact.most_acks_child_count > (self.subnet_params.byzantine_nodes_number + self.subnet_params.disagreeing_nodes_number) as usize {
-                        println!("\nAll children of {} are good", children_goodness_artifact.parent_hash);
-                        children_goodness_artifact.all_children_good = true;
-                        return Some(ConsensusMessage::GoodnessArtifact(children_goodness_artifact));
-                    }
-                    if children_goodness_artifact.total_acks_for_children >= (self.subnet_params.total_nodes_number - self.subnet_params.byzantine_nodes_number) as usize {
-                        // if the child with most acks is different from the one stored in the previous "goodness" artifact and has more acks
-                        // we create an updated "goodness" child
-                        if
-                            previous_goodness_artifact.most_acks_child != children_goodness_artifact.most_acks_child &&
-                            previous_goodness_artifact.most_acks_child_count < children_goodness_artifact.most_acks_child_count
-                        {
-                            println!("\n!!!!!!!!!!!!!!! Updating good child with most acks {} for parent {} at height {} !!!!!!!!!!!!!!!", children_goodness_artifact.most_acks_child, children_goodness_artifact.parent_hash, children_goodness_artifact.children_height-1);
-                            return Some(ConsensusMessage::GoodnessArtifact(children_goodness_artifact)); 
-                        }
-                    }
-                    None
-                }
+            // check whether a goodness artifact can be created according to currently received acks
+            if children_goodness_artifact.total_acks_for_children - children_goodness_artifact.most_acks_child_count > (self.subnet_params.byzantine_nodes_number + self.subnet_params.disagreeing_nodes_number) as usize {
+                println!("\nAll children of {} are good", children_goodness_artifact.parent_hash);
+                children_goodness_artifact.all_children_good = true;
+                return Some(ConsensusMessage::GoodnessArtifact(children_goodness_artifact));
             }
+            if children_goodness_artifact.total_acks_for_children >= (self.subnet_params.total_nodes_number - self.subnet_params.byzantine_nodes_number) as usize {
+                println!("\nFor parent {} at height {}, the good child with most acks is {} and received {} acks out of {}", children_goodness_artifact.parent_hash, children_goodness_artifact.children_height-1, children_goodness_artifact.most_acks_child, children_goodness_artifact.most_acks_child_count, children_goodness_artifact.total_acks_for_children);
+                return Some(ConsensusMessage::GoodnessArtifact(children_goodness_artifact));
+            }
+            None
         }).collect()
     }
 }
