@@ -7,6 +7,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
 use crate::SubnetParams;
+use crate::consensus_layer::consensus_subcomponents::goodifier::{get_block_by_hash_and_height, block_is_good};
 use crate::consensus_layer::height_index::Height;
 use crate::consensus_layer::{
     pool_reader::PoolReader,
@@ -87,7 +88,7 @@ impl ShareAggregator {
         // println!("Grouped shares separated from acks {:?}", grouped_shares_separated_from_acks);
         let grouped_shares = group_shares_and_acks(grouped_shares_separated_from_acks);
         // println!("Grouped shares: {:?}", grouped_shares);
-        grouped_shares.into_iter().filter_map(|(notary_content, shares)| {
+        let notarizations = grouped_shares.into_iter().filter_map(|(notary_content, shares)| {
             let notary_content = match notary_content {
                 NotarizationShareContent::COD(notary_content) => {
                     NotarizationContent {
@@ -103,8 +104,17 @@ impl ShareAggregator {
                 }
             };
             if shares.len() >= (self.subnet_params.total_nodes_number - self.subnet_params.byzantine_nodes_number) as usize {
-                println!("\nNotarization of block with hash: {} at height {} by committee: {:?}", notary_content.block.get_ref(), notary_content.height, shares);
-                Some(notary_content)
+                // println!("\nBlock with hash: {} received at least n-f notarization shares", notary_content.block.get_ref());
+                let block = get_block_by_hash_and_height(pool, &notary_content.block, notary_content.height);
+                // println!("Block: {:?}", block);
+                if block_is_good(pool, &block.expect("block must be in pool")) {
+                    println!("Notarization of block with hash: {} at height {} by committee: {:?}", notary_content.block.get_ref(), notary_content.height, shares);
+                    Some(notary_content)
+                }
+                else {
+                    // println!("Ignoring notarization of block with hash : {} as it is not 'good'", notary_content.block.get_ref());
+                    None
+                }
             }
             else {
                 None
@@ -119,7 +129,9 @@ impl ShareAggregator {
                     }
                 )
             })
-        }).collect()
+        }).collect();
+        // println!("Notarizations: {:?}", notarizations);
+        notarizations
     }
 
     /// Attempt to construct `Finalization`s

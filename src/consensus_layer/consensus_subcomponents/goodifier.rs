@@ -2,9 +2,9 @@ use std::{collections::{BTreeMap, BTreeSet}, sync::Arc};
 
 use serde::{Serialize, Deserialize};
 
-use crate::{consensus_layer::{artifacts::ConsensusMessage, pool_reader::PoolReader, height_index::Height}, SubnetParams, time_source::{Time, TimeSource}, crypto::Hashed};
+use crate::{consensus_layer::{artifacts::ConsensusMessage, pool_reader::PoolReader, height_index::Height}, SubnetParams, time_source::{Time, TimeSource}, crypto::{Hashed, CryptoHashOf}};
 
-use super::{notary::NotarizationShareContent, block_maker::Block};
+use super::{notary::NotarizationShareContent, block_maker::{Block, BlockProposal}};
 
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -34,11 +34,12 @@ impl Goodifier {
     }
 
     pub fn on_state_change(&self, pool: &PoolReader<'_>) -> Vec<ConsensusMessage> {
-        let notarized_height = pool.get_notarized_height();
+        // println!("\n########## Goodifier ##########");
+        let height_to_be_checked = pool.get_goodness_height() + 1;
         // group acks according to the parent of the block they are acknowledging
         // then for each parent group, group acks according to the block they are acknowledging
         let grouped_acks = pool
-            .get_notarization_shares(notarized_height)
+            .get_notarization_shares(height_to_be_checked)
             .fold(BTreeMap::<String, BTreeMap<String, BTreeSet<u8>>>::new(), |mut grouped_acks_by_parent, signed_share| {
                 if let NotarizationShareContent::COD(notarization_share) = signed_share.content {
                     if notarization_share.is_ack {
@@ -82,7 +83,7 @@ impl Goodifier {
         grouped_acks.into_iter().filter_map(|(parent_hash, grouped_acks_by_block)| {
             // initialize "goodness" artifact for a particular parent
             let mut children_goodness_artifact = GoodnessArtifact {
-                children_height: notarized_height,
+                children_height: height_to_be_checked,
                 parent_hash,
                 most_acks_child: String::from(""),
                 most_acks_child_count: 0,
@@ -99,7 +100,7 @@ impl Goodifier {
                 }
                 children_goodness_artifact.total_acks_for_children += acks_for_current_block_count;
             }
-            match pool.get_latest_goodness_artifact_for_parent(&children_goodness_artifact.parent_hash, notarized_height) {
+            match pool.get_latest_goodness_artifact_for_parent(&children_goodness_artifact.parent_hash, height_to_be_checked) {
                 // if "goodness" artifact does not exist, we check whether it can be created according to currently received acks 
                 None => {
                     if children_goodness_artifact.total_acks_for_children - children_goodness_artifact.most_acks_child_count > (self.subnet_params.byzantine_nodes_number + self.subnet_params.disagreeing_nodes_number) as usize {
@@ -141,6 +142,21 @@ impl Goodifier {
                 }
             }
         }).collect()
+    }
+}
+
+pub fn get_block_by_hash_and_height(pool: &PoolReader<'_>, hash: &CryptoHashOf<Block>, h: Height) -> Option<Block> {
+    // return a valid block with the matching hash and height if it exists.
+    let mut blocks: Vec<BlockProposal> = pool
+        .pool()
+        .validated()
+        .block_proposal()
+        .get_by_height(h)
+        .filter(|x| x.content.get_hash() == hash.get_ref())
+        .collect();
+    match blocks.len() {
+        1 => Some(blocks.remove(0).content.value),
+        _ => None,
     }
 }
 

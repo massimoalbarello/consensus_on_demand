@@ -130,6 +130,17 @@ impl<'a> PoolReader<'a> {
         }
     }
 
+    pub fn get_goodness_height(&self) -> Height {
+        match self.pool
+            .validated()
+            .goodness_artifact()
+            .max_height()
+        {
+            None => 0,
+            Some(height) => height 
+        }
+    }
+
     pub fn get_latest_goodness_artifact_for_parent(&self, parent_hash: &String, children_height: Height) -> Option<GoodnessArtifact> {
         self.pool
             .validated()
