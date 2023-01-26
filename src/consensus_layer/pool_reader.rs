@@ -5,8 +5,8 @@ use crate::{
 
 use super::{
     consensus_subcomponents::{
-        notary::NotarizationShare, 
-        block_maker::{Block, BlockProposal}, finalizer::FinalizationShare
+        notary::{NotarizationShare, NotarizationShareContent}, 
+        block_maker::{Block, BlockProposal}, finalizer::FinalizationShare, goodifier::GoodnessArtifact
     },
     height_index::{Height, HeightRange}, artifacts::ConsensusMessageHashable
 };
@@ -36,6 +36,15 @@ impl<'a> PoolReader<'a> {
         h: Height,
     ) -> Box<dyn Iterator<Item = NotarizationShare>> {
         self.pool.validated().notarization_share().get_by_height(h)
+    }
+
+    pub fn count_acknowledgements_at_height(
+        &self,
+        h: Height,
+    ) -> usize {
+        self.get_notarization_shares(h)
+            .filter(|share| if let NotarizationShareContent::COD(_) = share.content { true } else { false })
+            .count()
     }
 
     // Get max height of valid notarized blocks.
@@ -81,6 +90,10 @@ impl<'a> PoolReader<'a> {
         self.pool.finalized_block()
     }
 
+    pub fn get_finalized_block_hash_at_height(&self, height: Height) -> Option<String> {
+        self.pool.finalized_block_hash_at_height(height)
+    }
+
     /// Return a valid block with the matching hash and height if it exists.
     pub fn get_block(&self, hash: &CryptoHashOf<Block>, h: Height) -> Result<Block, ()> {
         let mut blocks: Vec<BlockProposal> = self
@@ -107,7 +120,43 @@ impl<'a> PoolReader<'a> {
         )
     }
 
-    
+    pub fn print_goodness_artifacts_at_height(&self, height: Height) {
+        for good in self.pool
+            .validated()
+            .goodness_artifact()
+            .get_by_height(height)
+        {
+            println!("{:?}", good);
+        }
+    }
+
+    pub fn get_goodness_height(&self) -> Height {
+        match self.pool
+            .validated()
+            .goodness_artifact()
+            .max_height()
+        {
+            None => 0,
+            Some(height) => height 
+        }
+    }
+
+    pub fn get_latest_goodness_artifact_for_parent(&self, parent_hash: &String, children_height: Height) -> Option<GoodnessArtifact> {
+        self.pool
+            .validated()
+            .goodness_artifact()
+            .get_by_height(children_height)
+            .filter(|goodness_artifact| goodness_artifact.parent_hash.eq(parent_hash))
+            .max_by(|first, second| first.timestamp.cmp(&second.timestamp))
+    }
+
+    pub fn exists_goodness_artifact_for_parent(&self, parent_hash: &String, height: Height) -> bool {
+        match self.get_latest_goodness_artifact_for_parent(parent_hash, height) {
+            Some(_) => true,
+            None => false,
+        }
+    }
+
     /// Get the round start time of a given height, which is the max timestamp
     /// of first notarization and random beacon of the previous height.
     /// Return None if a timestamp is not found.

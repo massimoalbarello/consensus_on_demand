@@ -7,8 +7,8 @@ use super::{
     consensus_subcomponents::{
         aggregator::{Notarization, Finalization},
         block_maker::BlockProposal,
-        notary::NotarizationShare,
-        finalizer::FinalizationShare,
+        notary::{NotarizationShare, NotarizationShareContent},
+        finalizer::FinalizationShare, goodifier::GoodnessArtifact,
     }
 };
 
@@ -84,6 +84,7 @@ pub struct Indexes {
     pub notarization: HeightIndex<CryptoHashOf<Notarization>>,
     pub finalization_share: HeightIndex<CryptoHashOf<FinalizationShare>>,
     pub finalization: HeightIndex<CryptoHashOf<Finalization>>,
+    pub goodness_artifact: HeightIndex<CryptoHashOf<GoodnessArtifact>>
 }
 
 #[allow(clippy::new_without_default)]
@@ -95,6 +96,7 @@ impl Indexes {
             notarization: HeightIndex::new(),
             finalization_share: HeightIndex::new(),
             finalization: HeightIndex::new(),
+            goodness_artifact: HeightIndex::new(),
         }
     }
 
@@ -105,8 +107,16 @@ impl Indexes {
                 .insert(artifact.content.value.height, &CryptoHashOf::from(hash))
             },
             ConsensusMessage::NotarizationShare(artifact) => {
-                self.notarization_share
-                    .insert(artifact.content.height, &CryptoHashOf::from(hash))
+                match artifact.content.to_owned() {
+                    NotarizationShareContent::COD(share_content) => {
+                        self.notarization_share
+                            .insert(share_content.height, &CryptoHashOf::from(hash))
+                    },
+                    NotarizationShareContent::ICC(share_content) => {
+                        self.notarization_share
+                            .insert(share_content.height, &CryptoHashOf::from(hash))
+                    }
+                }
             },
             ConsensusMessage::Notarization(artifact) => {
                 self.notarization
@@ -119,6 +129,10 @@ impl Indexes {
             ConsensusMessage::Finalization(artifact) => {
                 self.finalization
                     .insert(artifact.content.height, &CryptoHashOf::from(hash))
+            },
+            ConsensusMessage::GoodnessArtifact(artifact) => {
+                self.goodness_artifact
+                    .insert(artifact.children_height, &CryptoHashOf::from(hash))
             }
         };
     }
@@ -130,8 +144,16 @@ impl Indexes {
                 .remove(artifact.content.value.height, &CryptoHashOf::from(hash))
             },
             ConsensusMessage::NotarizationShare(artifact) => {
-                self.notarization_share
-                    .remove(artifact.content.height, &CryptoHashOf::from(hash))
+                match artifact.content.to_owned() {
+                    NotarizationShareContent::COD(share_content) => {
+                        self.notarization_share
+                            .remove(share_content.height, &CryptoHashOf::from(hash))
+                    },
+                    NotarizationShareContent::ICC(share_content) => {
+                        self.notarization_share
+                            .remove(share_content.height, &CryptoHashOf::from(hash))
+                    }
+                }
             },
             ConsensusMessage::Notarization(artifact) => {
                 self.notarization
@@ -144,8 +166,11 @@ impl Indexes {
             ConsensusMessage::Finalization(artifact) => {
                 self.finalization
                     .remove(artifact.content.height, &CryptoHashOf::from(hash))
+            },
+            ConsensusMessage::GoodnessArtifact(artifact) => {
+                self.goodness_artifact
+                    .remove(artifact.children_height, &CryptoHashOf::from(hash))
             }
-
         };
     }
 }
@@ -211,6 +236,12 @@ impl SelectIndex for CryptoHashOf<NotarizationShare> {
 impl SelectIndex for CryptoHashOf<FinalizationShare> {
     fn select_index(indexes: &Indexes) -> &HeightIndex<Self> {
         &indexes.finalization_share
+    }
+}
+
+impl SelectIndex for CryptoHashOf<GoodnessArtifact> {
+    fn select_index(indexes: &Indexes) -> &HeightIndex<Self> {
+        &indexes.goodness_artifact
     }
 }
 

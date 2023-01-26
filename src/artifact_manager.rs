@@ -6,7 +6,7 @@ use std::thread::{Builder as ThreadBuilder, JoinHandle};
 use crate::{consensus_layer::{
     ConsensusProcessor,
     artifacts::{ConsensusMessage, UnvalidatedArtifact}
-}, time_source::{TimeSource, SysTimeSource}};
+}, time_source::{TimeSource, SysTimeSource}, SubnetParams};
 
 // Periodic duration of `PollEvent` in milliseconds.
 const ARTIFACT_MANAGER_TIMER_DURATION_MSEC: u64 = 200;
@@ -34,12 +34,12 @@ pub struct ArtifactProcessorManager {
 }
 
 impl ArtifactProcessorManager {
-    pub fn new(node_number: u8, time_source: Arc<SysTimeSource>, sender_outgoing_artifact: Sender<ConsensusMessage>) -> Self {
+    pub fn new(replica_number: u8, subnet_params: SubnetParams, time_source: Arc<SysTimeSource>, sender_outgoing_artifact: Sender<ConsensusMessage>) -> Self {
 
         let pending_artifacts = Arc::new(Mutex::new(Vec::new()));
         let (sender_incoming_request, receiver_incoming_request) = crossbeam_channel::unbounded::<ProcessRequest>();
 
-        let client = Box::new(ConsensusProcessor::new(node_number, Arc::clone(&time_source) as Arc<_>));
+        let client = Box::new(ConsensusProcessor::new(replica_number, subnet_params, Arc::clone(&time_source) as Arc<_>));
 
         // Spawn the processor thread
         let sender_incoming_request_cl = sender_incoming_request.clone();

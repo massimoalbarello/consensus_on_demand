@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::time_source::TimeSource;
+use crate::{time_source::TimeSource, SubnetParams};
 
 use super::{
     pool::ConsensusPoolImpl, 
@@ -11,7 +11,7 @@ use super::{
         finalizer::Finalizer,
         block_maker::BlockMaker,
         validator::Validator,
-        aggregator::ShareAggregator,
+        aggregator::ShareAggregator, acknowledger::Acknowledger, goodifier::Goodifier,
     },
 };
 
@@ -36,7 +36,7 @@ impl RoundRobin {
             (result, to_broadcast) = calls[next]();
             next = (next + 1) % calls.len();
             if !result.is_empty() || *index == next {
-                break;
+                return (result, to_broadcast);
             };
         }
         *index = next;
@@ -45,6 +45,8 @@ impl RoundRobin {
 }
 
 pub struct ConsensusImpl {
+    goodifier: Goodifier,
+    acknowledger: Acknowledger,
     finalizer: Finalizer,
     block_maker: BlockMaker,
     notary: Notary,
@@ -52,18 +54,22 @@ pub struct ConsensusImpl {
     validator: Validator,
     time_source: Arc<dyn TimeSource>,
     schedule: RoundRobin,
+    subnet_params: SubnetParams,
 }
 
 impl ConsensusImpl {
-    pub fn new(node_number: u8, time_source: Arc<dyn TimeSource>) -> Self {
+    pub fn new(replica_number: u8, subnet_params: SubnetParams, time_source: Arc<dyn TimeSource>) -> Self {
         Self {
-            finalizer: Finalizer::new(node_number),
-            block_maker: BlockMaker::new(node_number, Arc::clone(&time_source) as Arc<_>),
-            notary: Notary::new(node_number, Arc::clone(&time_source) as Arc<_>),
-            aggregator: ShareAggregator::new(node_number),
+            goodifier: Goodifier::new(replica_number, subnet_params.clone(), Arc::clone(&time_source) as Arc<_>),
+            acknowledger: Acknowledger::new(replica_number, subnet_params.clone()),
+            finalizer: Finalizer::new(replica_number, subnet_params.clone()),
+            block_maker: BlockMaker::new(replica_number,subnet_params.clone(), Arc::clone(&time_source) as Arc<_>),
+            notary: Notary::new(replica_number, subnet_params.clone(), Arc::clone(&time_source) as Arc<_>),
+            aggregator: ShareAggregator::new(replica_number, subnet_params.clone()),
             validator: Validator::new(Arc::clone(&time_source)),
             time_source,
             schedule: RoundRobin::default(),
+            subnet_params,
         }
     }
 
@@ -90,16 +96,38 @@ impl ConsensusImpl {
 
         let pool_reader = PoolReader::new(pool);
 
+        let acknowledge = || {
+            if self.subnet_params.consensus_on_demand == true {
+                let change_set = add_all_to_validated(self.acknowledger.on_state_change(&pool_reader));
+                let to_broadcast = true;
+                return (change_set, to_broadcast);
+            }
+            else {
+                return (vec![], false);
+            }
+        };
+
         let finalize = || {
             let change_set = add_all_to_validated(self.finalizer.on_state_change(&pool_reader));
             let to_broadcast = true;
             (change_set, to_broadcast)
         };
 
+        let goodify = || {
+            if self.subnet_params.consensus_on_demand == true {
+                let change_set = add_all_to_validated(self.goodifier.on_state_change(&pool_reader));
+                let to_broadcast = false;
+                return (change_set, to_broadcast);
+            }
+            else {
+                return (vec![], false);
+            }
+        };
+
         let aggregate = || {
             let change_set = add_all_to_validated(self.aggregator.on_state_change(&pool_reader));
             // aggregation of shares does not have to be broadcasted as each node can compute it locally based on its consensus pool
-            let to_broadcast = false;
+            let to_broadcast = true;
             (change_set, to_broadcast)
         };
 
@@ -115,13 +143,14 @@ impl ConsensusImpl {
             (change_set, to_broadcast)
         };
 
-
         let validate = || {
             self.validator.on_state_change(&pool_reader)
         };
 
-        let calls: [&'_ dyn Fn() -> (ChangeSet, bool); 5] = [
+        let calls: [&'_ dyn Fn() -> (ChangeSet, bool); 7] = [
+            &acknowledge,
             &finalize,
+            &goodify,
             &aggregate,
             &notarize,
             &make_block,

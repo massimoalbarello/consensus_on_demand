@@ -15,7 +15,7 @@ use super::{
     consensus_subcomponents::{
         notary::NotarizationShare,
         aggregator::{Notarization, Finalization},
-        block_maker::{BlockProposal, Block}, finalizer::FinalizationShare
+        block_maker::{BlockProposal, Block}, finalizer::FinalizationShare, goodifier::GoodnessArtifact
     }
 };
 
@@ -43,7 +43,7 @@ impl<T: IntoInner<ConsensusMessage> + HasTimestamp + Clone + Debug> InMemoryPool
         for op in ops.ops {
             match op {
                 PoolSectionOp::Insert(artifact) => {
-                    // println!("Inserting artifact");
+                    // println!("Inserting artifact: {:?}", artifact);
                     self.insert(artifact);
                 },
                 PoolSectionOp::Remove(msg_id) => {
@@ -124,6 +124,9 @@ impl<T: IntoInner<ConsensusMessage> + HasTimestamp + Clone + Debug> InMemoryPool
         self
     }
     fn finalization(&self) -> &dyn HeightIndexedPool<Finalization> {
+        self
+    }
+    pub fn goodness_artifact(&self) -> &dyn HeightIndexedPool<GoodnessArtifact> {
         self
     }
 }
@@ -215,6 +218,8 @@ impl ConsensusPoolImpl {
     }
 
     pub fn insert(&mut self, unvalidated_artifact: UnvalidatedConsensusArtifact) {
+        // println!("\n########## Consensus pool ##########");
+        // println!("Inserting received artifact in unvalidated section of the consensus pool: {:?}", unvalidated_artifact);
         let mut ops = PoolSectionOps::new();
         ops.insert(unvalidated_artifact);
         self.apply_changes_unvalidated(ops);
@@ -254,6 +259,16 @@ impl ConsensusPoolImpl {
     
     pub fn finalized_block(&self) -> Option<Block> {
         get_highest_finalized_block(self)
+    }
+
+    pub fn finalized_block_hash_at_height(&self, height: Height) -> Option<String> {
+        match self.validated().finalization().get_by_height(height).count() {
+            0 => None,
+            1 => {
+                Some(self.validated().finalization().get_by_height(height).last().unwrap().content.block.get_ref().to_owned())
+            },
+            _ => panic!("more than one finalized blocks at the same height"),
+        }
     }
 
     fn apply_changes_validated(&mut self, ops: PoolSectionOps<ValidatedConsensusArtifact>) {

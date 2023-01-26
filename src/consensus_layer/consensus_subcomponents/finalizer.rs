@@ -2,21 +2,21 @@ use std::cell::RefCell;
 
 use serde::{Serialize, Deserialize};
 
-use crate::{consensus_layer::{height_index::Height, pool_reader::PoolReader, artifacts::ConsensusMessage}, crypto::{CryptoHashOf, Signed, Hashed}};
+use crate::{consensus_layer::{height_index::Height, pool_reader::PoolReader, artifacts::ConsensusMessage}, crypto::{CryptoHashOf, Signed, Hashed}, SubnetParams};
 
-use super::block_maker::Block;
+use super::{block_maker::Block, notary::NotarizationShareContent, goodifier::block_is_good};
 
 
-/// FinalizationContent holds the values that are signed in a finalization
+/// FinalizationShareContent holds the values that are signed in a finalization share
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct FinalizationContent {
+pub struct FinalizationShareContent {
     pub height: Height,
     pub block: CryptoHashOf<Block>,
 }
 
-impl FinalizationContent {
+impl FinalizationShareContent {
     pub fn new(height: Height, block: CryptoHashOf<Block>) -> Self {
-        FinalizationContent {
+        FinalizationShareContent {
             height,
             block,
         }
@@ -26,18 +26,20 @@ impl FinalizationContent {
 /// A finalization share is a multi-signature share on a finalization content.
 /// If sufficiently many replicas create finalization shares, the shares can be
 /// aggregated into a full finalization.
-pub type FinalizationShare = Signed<FinalizationContent, u8>;
+pub type FinalizationShare = Signed<FinalizationShareContent, u8>;
 
 pub struct Finalizer {
     node_id: u8,
+    subnet_params: SubnetParams,
     prev_finalized_height: RefCell<Height>,
 }
 
 impl Finalizer {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(node_id: u8) -> Self {
+    pub fn new(node_id: u8, subnet_params: SubnetParams) -> Self {
         Self {
             node_id,
+            subnet_params,
             prev_finalized_height: RefCell::new(0),
         }
     }
@@ -46,6 +48,7 @@ impl Finalizer {
     /// * deliver finalized blocks (as `Batch`s) via `Messaging`
     /// * publish finalization shares for relevant rounds
     pub fn on_state_change(&self, pool: &PoolReader<'_>) -> Vec<ConsensusMessage> {
+        // println!("\n########## Finalizer ##########");
         let notarized_height = pool.get_notarized_height();
         let finalized_height = pool.get_finalized_height();
 
@@ -53,14 +56,14 @@ impl Finalizer {
             *self.prev_finalized_height.borrow_mut() = finalized_height;
         }
 
-        // Try to finalize rounds from finalized_height + 1 up to (and including)
-        // notarized_height
+        // Try to finalize rounds from finalized_height + 1 up to (and including) notarized_height
+        // if received a finalization for a block at height h+1 before a notarization for the same height
+        // in rounds in which the CoD fast path is used, the range will be empty and thus no finalization shares will be created
         (finalized_height+1..=notarized_height)
             .filter_map(|h| match self.finalize_height(pool, h) {
                 Some(f) => {
                     let finalization_share = ConsensusMessage::FinalizationShare(f);
-                    println!("\n########## Finalizer ##########");
-                    println!("Created finalization share: {:?}", finalization_share);
+                    println!("\nCreated finalization share: {:?}", finalization_share);
                     Some(finalization_share)
                 },
                 None => None,
@@ -71,7 +74,7 @@ impl Finalizer {
     /// Try to create a finalization share for a notarized block at the given
     /// height
     fn finalize_height(&self, pool: &PoolReader<'_>, height: Height) -> Option<FinalizationShare> {
-        let content = FinalizationContent::new(
+        let content = FinalizationShareContent::new(
             height,
             CryptoHashOf::new(Hashed::crypto_hash(&self.pick_block_to_finality_sign(pool, height)?)),
         );
@@ -120,11 +123,24 @@ impl Finalizer {
             }
         };
 
+        if self.subnet_params.consensus_on_demand {
+            // CoD rule 3b: send finalization share only for "good" block
+            if !block_is_good(pool, &notarized_block) {
+                return None;
+            }
+        }
+
         // If notarization shares exists created by this replica at height `h`
         // that sign a block different than `notarized_block`, do not finalize.
         let other_notarized_shares_exists = pool.get_notarization_shares(h).any(|x| {
-            x.signature == self.node_id
-                && x.content.block != CryptoHashOf::new(Hashed::crypto_hash(&notarized_block))
+            match x.content {
+                NotarizationShareContent::COD(share_content) => {
+                    x.signature == self.node_id && share_content.block != CryptoHashOf::new(Hashed::crypto_hash(&notarized_block))
+                },
+                NotarizationShareContent::ICC(share_content) => {
+                    x.signature == self.node_id && share_content.block != CryptoHashOf::new(Hashed::crypto_hash(&notarized_block))
+                },
+            }
         });
         if other_notarized_shares_exists {
             return None;

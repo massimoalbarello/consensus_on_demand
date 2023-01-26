@@ -4,10 +4,10 @@ use serde::{Serialize, Deserialize};
 
 use crate::{consensus_layer::{
     pool_reader::PoolReader,
-    artifacts::{ConsensusMessage, N}, height_index::Height
-}, crypto::{Signed, Hashed}, time_source::TimeSource};
+    artifacts::ConsensusMessage, height_index::Height
+}, crypto::{Signed, Hashed}, time_source::TimeSource, SubnetParams};
 
-use super::notary::NOTARIZATION_UNIT_DELAY;
+use super::{notary::NOTARIZATION_UNIT_DELAY, goodifier::block_is_good};
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub struct Payload {}
@@ -23,7 +23,7 @@ impl Payload {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct Block {
     // the parent block that this block extends, forming a block chain
-    parent: String,
+    pub parent: String,
     // the payload of the block
     payload: Payload,
     // the height of the block, which is the height of the parent + 1
@@ -58,22 +58,25 @@ pub struct RandomBeacon {}
 
 pub struct BlockMaker {
     node_id: u8,
+    subnet_params: SubnetParams,
     time_source: Arc<dyn TimeSource>,
 }
 
 impl BlockMaker {
-    pub fn new(node_id: u8, time_source: Arc<dyn TimeSource>) -> Self {
+    pub fn new(node_id: u8, subnet_params: SubnetParams, time_source: Arc<dyn TimeSource>) -> Self {
         Self {
             node_id,
+            subnet_params,
             time_source,
         }
     }
 
     pub fn on_state_change(&self, pool: &PoolReader<'_>) -> Option<ConsensusMessage> {
+        // println!("\n########## Block maker ##########");
         let my_node_id = self.node_id;
-        let (beacon, parent) = get_dependencies(pool).unwrap();
+        let (beacon, parent) = get_dependencies(pool, self.subnet_params.consensus_on_demand).unwrap();
         let height: u64 = parent.height + 1;
-        match get_block_maker_rank(height, &beacon, my_node_id)
+        match self.get_block_maker_rank(height, &beacon, my_node_id)
         {
             rank => {
                 if !already_proposed(pool, height, my_node_id)
@@ -89,8 +92,7 @@ impl BlockMaker {
                     let block_proposal = self.propose_block(pool, rank, parent).map(|proposal| {
                         ConsensusMessage::BlockProposal(proposal)
                     });
-                    println!("\n########## Block maker ##########");
-                    println!("Created block proposal: {:?}", block_proposal);
+                    println!("\nCreated block proposal: {:?}", block_proposal);
                     block_proposal
                 }
                 else {
@@ -98,6 +100,12 @@ impl BlockMaker {
                 }
             }
         }
+    }
+
+    fn get_block_maker_rank(&self, height: u64, beacon: &RandomBeacon, my_node_id: u8) -> u8 {
+        let rank = ((height + my_node_id as u64 - 2) % self.subnet_params.total_nodes_number as u64) as u8;
+        // println!("Local rank for height {} is: {}", height, rank);
+        rank
     }
 
     /// Return true if the validated pool contains a better (lower ranked) block
@@ -157,11 +165,25 @@ impl BlockMaker {
 // Return the parent random beacon and block of the latest round for which
 // this node might propose a block.
 // Return None otherwise.
-fn get_dependencies(pool: &PoolReader<'_>) -> Option<(RandomBeacon, Block)> {
+fn get_dependencies(pool: &PoolReader<'_>, is_consensus_on_demand: bool) -> Option<(RandomBeacon, Block)> {
     let notarized_height = pool.get_notarized_height();
     // println!("Last block notarized at height: {}", notarized_height);
+    // the only "good" block might not be the rank 0 block
+    // therefore, we must first filter out the notarized blocks that are not "good"
+    // and then choose the one with the smallest rank among the "good" ones
     let parent = pool
         .get_notarized_blocks(notarized_height)
+        .filter(|block| {
+            if is_consensus_on_demand {
+                // CoD rule 3a: extend only "good" blocks
+                let is_good = block_is_good(pool, &block);
+                // println!("Notarized block {:?} is good: {}", block, is_good);
+                is_good
+            }
+            else {
+                true
+            }
+        })
         .min_by(|block1, block2| block1.rank.cmp(&block2.rank));
     match parent {
         Some(parent) => {
@@ -183,12 +205,6 @@ fn get_dependencies(pool: &PoolReader<'_>) -> Option<(RandomBeacon, Block)> {
             ))
         }
     }
-}
-
-fn get_block_maker_rank(height: u64, beacon: &RandomBeacon, my_node_id: u8) -> u8 {
-    let rank = ((height + my_node_id as u64 - 2) % N as u64) as u8;
-    // println!("Local rank for height {} is: {}", height, rank);
-    rank
 }
 
 // Return true if this node has already made a proposal at the given height.
