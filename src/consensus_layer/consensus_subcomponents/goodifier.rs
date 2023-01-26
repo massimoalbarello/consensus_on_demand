@@ -72,7 +72,7 @@ impl Goodifier {
                     }
                 }
                 else {
-                    panic!("component called in original IC consensus")
+                    panic!("goodifier called while running original IC consensus");
                 }
                 grouped_acks_by_parent
             });

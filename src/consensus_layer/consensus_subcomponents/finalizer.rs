@@ -2,7 +2,7 @@ use std::cell::RefCell;
 
 use serde::{Serialize, Deserialize};
 
-use crate::{consensus_layer::{height_index::Height, pool_reader::PoolReader, artifacts::ConsensusMessage}, crypto::{CryptoHashOf, Signed, Hashed}};
+use crate::{consensus_layer::{height_index::Height, pool_reader::PoolReader, artifacts::ConsensusMessage}, crypto::{CryptoHashOf, Signed, Hashed}, SubnetParams};
 
 use super::{block_maker::Block, notary::NotarizationShareContent, goodifier::block_is_good};
 
@@ -30,14 +30,16 @@ pub type FinalizationShare = Signed<FinalizationShareContent, u8>;
 
 pub struct Finalizer {
     node_id: u8,
+    subnet_params: SubnetParams,
     prev_finalized_height: RefCell<Height>,
 }
 
 impl Finalizer {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(node_id: u8) -> Self {
+    pub fn new(node_id: u8, subnet_params: SubnetParams) -> Self {
         Self {
             node_id,
+            subnet_params,
             prev_finalized_height: RefCell::new(0),
         }
     }
@@ -56,7 +58,7 @@ impl Finalizer {
 
         // Try to finalize rounds from finalized_height + 1 up to (and including) notarized_height
         // if received a finalization for a block at height h+1 before a notarization for the same height
-        // (due to CoD fast path), the range will be empty and thus no finalization shares will be created
+        // in rounds in which the CoD fast path is used, the range will be empty and thus no finalization shares will be created
         (finalized_height+1..=notarized_height)
             .filter_map(|h| match self.finalize_height(pool, h) {
                 Some(f) => {
@@ -121,9 +123,11 @@ impl Finalizer {
             }
         };
 
-        // CoD rule 3b: send finalization share only for "good" block
-        if !block_is_good(pool, &notarized_block) {
-            return None;
+        if self.subnet_params.consensus_on_demand {
+            // CoD rule 3b: send finalization share only for "good" block
+            if !block_is_good(pool, &notarized_block) {
+                return None;
+            }
         }
 
         // If notarization shares exists created by this replica at height `h`

@@ -104,16 +104,23 @@ impl ShareAggregator {
                 }
             };
             if shares.len() >= (self.subnet_params.total_nodes_number - self.subnet_params.byzantine_nodes_number) as usize {
-                // println!("\nBlock with hash: {} received at least n-f notarization shares", notary_content.block.get_ref());
-                let block = get_block_by_hash_and_height(pool, &notary_content.block, notary_content.height);
-                // println!("Block: {:?}", block);
-                if block_is_good(pool, &block.expect("block must be in pool")) {
-                    println!("Notarization of block with hash: {} at height {} by committee: {:?}", notary_content.block.get_ref(), notary_content.height, shares);
-                    Some(notary_content)
+                if self.subnet_params.consensus_on_demand {
+                    // println!("\nBlock with hash: {} received at least n-f notarization shares", notary_content.block.get_ref());
+                    let block = get_block_by_hash_and_height(pool, &notary_content.block, notary_content.height);
+                    // CoD rule 3c: notarize only 'good' blocks
+                    match block_is_good(pool, &block.expect("block must be in pool")) {
+                        true => {
+                            println!("\nNotarization of block with hash: {} at height {} by committee: {:?}", notary_content.block.get_ref(), notary_content.height, shares);
+                            Some(notary_content.clone())
+                        },
+                        false => {
+                            None
+                        }
+                    }
                 }
                 else {
-                    // println!("Ignoring notarization of block with hash : {} as it is not 'good'", notary_content.block.get_ref());
-                    None
+                    println!("\nNotarization of block with hash: {} at height {} by committee: {:?}", notary_content.block.get_ref(), notary_content.height, shares);
+                    Some(notary_content)
                 }
             }
             else {
@@ -143,7 +150,7 @@ impl ShareAggregator {
         let grouped_shares = aggregate(finalization_shares);
         grouped_shares.into_iter().filter_map(|(finalization_content, shares)| {
             if shares.len() >= (self.subnet_params.total_nodes_number - self.subnet_params.byzantine_nodes_number) as usize {
-                println!("Finalization of block with hash: {} at height {} by committee: {:?}", finalization_content.block.get_ref(), finalization_content.height, shares);
+                println!("\nFinalization of block with hash: {} at height {} by committee: {:?}", finalization_content.block.get_ref(), finalization_content.height, shares);
                 Some(finalization_content)
             }
             else {

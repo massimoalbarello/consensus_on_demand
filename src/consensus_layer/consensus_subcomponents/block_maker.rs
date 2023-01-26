@@ -74,7 +74,7 @@ impl BlockMaker {
     pub fn on_state_change(&self, pool: &PoolReader<'_>) -> Option<ConsensusMessage> {
         // println!("\n########## Block maker ##########");
         let my_node_id = self.node_id;
-        let (beacon, parent) = get_dependencies(pool).unwrap();
+        let (beacon, parent) = get_dependencies(pool, self.subnet_params.consensus_on_demand).unwrap();
         let height: u64 = parent.height + 1;
         match self.get_block_maker_rank(height, &beacon, my_node_id)
         {
@@ -165,7 +165,7 @@ impl BlockMaker {
 // Return the parent random beacon and block of the latest round for which
 // this node might propose a block.
 // Return None otherwise.
-fn get_dependencies(pool: &PoolReader<'_>) -> Option<(RandomBeacon, Block)> {
+fn get_dependencies(pool: &PoolReader<'_>, is_consensus_on_demand: bool) -> Option<(RandomBeacon, Block)> {
     let notarized_height = pool.get_notarized_height();
     // println!("Last block notarized at height: {}", notarized_height);
     // the only "good" block might not be the rank 0 block
@@ -174,10 +174,15 @@ fn get_dependencies(pool: &PoolReader<'_>) -> Option<(RandomBeacon, Block)> {
     let parent = pool
         .get_notarized_blocks(notarized_height)
         .filter(|block| {
-            // CoD rule 3a: extend only "good" blocks
-            let is_good = block_is_good(pool, &block);
-            // println!("Notarized block {:?} is good: {}", block, is_good);
-            is_good
+            if is_consensus_on_demand {
+                // CoD rule 3a: extend only "good" blocks
+                let is_good = block_is_good(pool, &block);
+                // println!("Notarized block {:?} is good: {}", block, is_good);
+                is_good
+            }
+            else {
+                true
+            }
         })
         .min_by(|block1, block2| block1.rank.cmp(&block2.rank));
     match parent {

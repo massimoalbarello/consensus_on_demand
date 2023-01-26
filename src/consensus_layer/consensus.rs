@@ -62,7 +62,7 @@ impl ConsensusImpl {
         Self {
             goodifier: Goodifier::new(replica_number, subnet_params.clone(), Arc::clone(&time_source) as Arc<_>),
             acknowledger: Acknowledger::new(replica_number, subnet_params.clone()),
-            finalizer: Finalizer::new(replica_number),
+            finalizer: Finalizer::new(replica_number, subnet_params.clone()),
             block_maker: BlockMaker::new(replica_number,subnet_params.clone(), Arc::clone(&time_source) as Arc<_>),
             notary: Notary::new(replica_number, subnet_params.clone(), Arc::clone(&time_source) as Arc<_>),
             aggregator: ShareAggregator::new(replica_number, subnet_params.clone()),
@@ -113,6 +113,17 @@ impl ConsensusImpl {
             (change_set, to_broadcast)
         };
 
+        let goodify = || {
+            if self.subnet_params.consensus_on_demand == true {
+                let change_set = add_all_to_validated(self.goodifier.on_state_change(&pool_reader));
+                let to_broadcast = false;
+                return (change_set, to_broadcast);
+            }
+            else {
+                return (vec![], false);
+            }
+        };
+
         let aggregate = || {
             let change_set = add_all_to_validated(self.aggregator.on_state_change(&pool_reader));
             // aggregation of shares does not have to be broadcasted as each node can compute it locally based on its consensus pool
@@ -135,26 +146,15 @@ impl ConsensusImpl {
         let validate = || {
             self.validator.on_state_change(&pool_reader)
         };
-        
-        let goodify = || {
-            if self.subnet_params.consensus_on_demand == true {
-                let change_set = add_all_to_validated(self.goodifier.on_state_change(&pool_reader));
-                let to_broadcast = false;
-                return (change_set, to_broadcast);
-            }
-            else {
-                return (vec![], false);
-            }
-        };
 
         let calls: [&'_ dyn Fn() -> (ChangeSet, bool); 7] = [
             &acknowledge,
             &finalize,
+            &goodify,
             &aggregate,
             &notarize,
             &make_block,
             &validate,
-            &goodify,
         ];
 
         let (changeset, to_broadcast) = self.schedule.call_next(&calls);

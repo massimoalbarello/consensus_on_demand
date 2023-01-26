@@ -72,7 +72,7 @@ impl Acknowledger {
                 })
             }
             else {
-                None
+                panic!("acknowledger called while running original IC consensus");
             }
         }).flatten().collect()
     }

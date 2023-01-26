@@ -81,7 +81,9 @@ impl Notary {
         let notarized_height = pool.get_notarized_height();
         let mut notarization_shares = Vec::new();
         let height = notarized_height + 1;
-        // for proposal in find_lowest_ranked_proposals(pool, height) {
+        // CoD implementation change: cannot use find_lowest_ranked_proposals.
+        // in case there is only one 'good' block, it might not be the one with the lowest rank
+        // therefore, we consider all proposals
         for proposal in get_proposals(pool, height) {
             let rank = proposal.content.value.rank;
             if self.time_to_notarize(pool, height, rank) {
