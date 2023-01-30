@@ -3,18 +3,14 @@ use std::sync::Arc;
 use crate::{time_source::TimeSource, SubnetParams};
 
 use super::{
-    pool::ConsensusPoolImpl, 
-    artifacts::{ChangeSet, ChangeAction, ConsensusMessage},
-    pool_reader::PoolReader,
+    artifacts::{ChangeAction, ChangeSet, ConsensusMessage},
     consensus_subcomponents::{
-        notary::Notary,
-        finalizer::Finalizer,
-        block_maker::BlockMaker,
-        validator::Validator,
-        aggregator::ShareAggregator, acknowledger::Acknowledger, goodifier::Goodifier,
+        acknowledger::Acknowledger, aggregator::ShareAggregator, block_maker::BlockMaker,
+        finalizer::Finalizer, goodifier::Goodifier, notary::Notary, validator::Validator,
     },
+    pool::ConsensusPoolImpl,
+    pool_reader::PoolReader,
 };
-
 
 // Rotate on_state_change calls with a round robin schedule to ensure fairness.
 #[derive(Default)]
@@ -58,13 +54,29 @@ pub struct ConsensusImpl {
 }
 
 impl ConsensusImpl {
-    pub fn new(replica_number: u8, subnet_params: SubnetParams, time_source: Arc<dyn TimeSource>) -> Self {
+    pub fn new(
+        replica_number: u8,
+        subnet_params: SubnetParams,
+        time_source: Arc<dyn TimeSource>,
+    ) -> Self {
         Self {
-            goodifier: Goodifier::new(replica_number, subnet_params.clone(), Arc::clone(&time_source) as Arc<_>),
+            goodifier: Goodifier::new(
+                replica_number,
+                subnet_params.clone(),
+                Arc::clone(&time_source) as Arc<_>,
+            ),
             acknowledger: Acknowledger::new(replica_number, subnet_params.clone()),
             finalizer: Finalizer::new(replica_number, subnet_params.clone()),
-            block_maker: BlockMaker::new(replica_number,subnet_params.clone(), Arc::clone(&time_source) as Arc<_>),
-            notary: Notary::new(replica_number, subnet_params.clone(), Arc::clone(&time_source) as Arc<_>),
+            block_maker: BlockMaker::new(
+                replica_number,
+                subnet_params.clone(),
+                Arc::clone(&time_source) as Arc<_>,
+            ),
+            notary: Notary::new(
+                replica_number,
+                subnet_params.clone(),
+                Arc::clone(&time_source) as Arc<_>,
+            ),
             aggregator: ShareAggregator::new(replica_number, subnet_params.clone()),
             validator: Validator::new(Arc::clone(&time_source)),
             time_source,
@@ -98,11 +110,11 @@ impl ConsensusImpl {
 
         let acknowledge = || {
             if self.subnet_params.consensus_on_demand == true {
-                let change_set = add_all_to_validated(self.acknowledger.on_state_change(&pool_reader));
+                let change_set =
+                    add_all_to_validated(self.acknowledger.on_state_change(&pool_reader));
                 let to_broadcast = true;
                 return (change_set, to_broadcast);
-            }
-            else {
+            } else {
                 return (vec![], false);
             }
         };
@@ -111,17 +123,6 @@ impl ConsensusImpl {
             let change_set = add_all_to_validated(self.finalizer.on_state_change(&pool_reader));
             let to_broadcast = true;
             (change_set, to_broadcast)
-        };
-
-        let goodify = || {
-            if self.subnet_params.consensus_on_demand == true {
-                let change_set = add_all_to_validated(self.goodifier.on_state_change(&pool_reader));
-                let to_broadcast = false;
-                return (change_set, to_broadcast);
-            }
-            else {
-                return (vec![], false);
-            }
         };
 
         let aggregate = || {
@@ -143,18 +144,29 @@ impl ConsensusImpl {
             (change_set, to_broadcast)
         };
 
-        let validate = || {
-            self.validator.on_state_change(&pool_reader)
+        let validate = || self.validator.on_state_change(&pool_reader);
+
+        // must be the last component called as it can return the same artifact in multiple iterations
+        // running it before the other components might starve them as we break out of the loop
+        // as soon as a component returns an artifact
+        let goodify = || {
+            if self.subnet_params.consensus_on_demand == true {
+                let change_set = add_all_to_validated(self.goodifier.on_state_change(&pool_reader));
+                let to_broadcast = false;
+                return (change_set, to_broadcast);
+            } else {
+                return (vec![], false);
+            }
         };
 
         let calls: [&'_ dyn Fn() -> (ChangeSet, bool); 7] = [
             &acknowledge,
             &finalize,
-            &goodify,
             &aggregate,
             &notarize,
             &make_block,
             &validate,
+            &goodify,
         ];
 
         let (changeset, to_broadcast) = self.schedule.call_next(&calls);
@@ -162,7 +174,6 @@ impl ConsensusImpl {
         (changeset, to_broadcast)
     }
 }
-
 
 fn add_all_to_validated(messages: Vec<ConsensusMessage>) -> ChangeSet {
     messages

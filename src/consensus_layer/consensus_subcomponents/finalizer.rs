@@ -1,11 +1,14 @@
 use std::cell::RefCell;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-use crate::{consensus_layer::{height_index::Height, pool_reader::PoolReader, artifacts::ConsensusMessage}, crypto::{CryptoHashOf, Signed, Hashed}, SubnetParams};
+use crate::{
+    consensus_layer::{artifacts::ConsensusMessage, height_index::Height, pool_reader::PoolReader},
+    crypto::{CryptoHashOf, Hashed, Signed},
+    SubnetParams,
+};
 
-use super::{block_maker::Block, notary::NotarizationShareContent, goodifier::block_is_good};
-
+use super::{block_maker::Block, goodifier::block_is_good, notary::NotarizationShareContent};
 
 /// FinalizationShareContent holds the values that are signed in a finalization share
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -16,10 +19,7 @@ pub struct FinalizationShareContent {
 
 impl FinalizationShareContent {
     pub fn new(height: Height, block: CryptoHashOf<Block>) -> Self {
-        FinalizationShareContent {
-            height,
-            block,
-        }
+        FinalizationShareContent { height, block }
     }
 }
 
@@ -59,13 +59,13 @@ impl Finalizer {
         // Try to finalize rounds from finalized_height + 1 up to (and including) notarized_height
         // if received a finalization for a block at height h+1 before a notarization for the same height
         // in rounds in which the CoD fast path is used, the range will be empty and thus no finalization shares will be created
-        (finalized_height+1..=notarized_height)
+        (finalized_height + 1..=notarized_height)
             .filter_map(|h| match self.finalize_height(pool, h) {
                 Some(f) => {
                     let finalization_share = ConsensusMessage::FinalizationShare(f);
                     println!("\nCreated finalization share: {:?}", finalization_share);
                     Some(finalization_share)
-                },
+                }
                 None => None,
             })
             .collect()
@@ -76,7 +76,9 @@ impl Finalizer {
     fn finalize_height(&self, pool: &PoolReader<'_>, height: Height) -> Option<FinalizationShare> {
         let content = FinalizationShareContent::new(
             height,
-            CryptoHashOf::new(Hashed::crypto_hash(&self.pick_block_to_finality_sign(pool, height)?)),
+            CryptoHashOf::new(Hashed::crypto_hash(
+                &self.pick_block_to_finality_sign(pool, height)?,
+            )),
         );
         // add 10 to make the hash of the finalization share different from the one of the notarization share
         let signature = 10 + self.node_id;
@@ -93,14 +95,11 @@ impl Finalizer {
     /// In this case, the the single notarized block is returned. Otherwise,
     /// return `None`
     fn pick_block_to_finality_sign(&self, pool: &PoolReader<'_>, h: Height) -> Option<Block> {
-
         // if this replica already created a finalization share for height `h`, we do
         // not need to finality sign a block anymore
         if pool
             .get_finalization_shares(h, h)
-            .any(|share| {
-                share.signature == 10 + self.node_id
-            })
+            .any(|share| share.signature == 10 + self.node_id)
         {
             return None;
         }
@@ -113,7 +112,10 @@ impl Finalizer {
             0 => {
                 // If there are no notarized blocks at height `h`, we panic, as we should only
                 // try to finalize heights that are notarized.
-                panic!("Trying to finalize height {:?} but no notarized block found", h);
+                panic!(
+                    "Trying to finalize height {:?} but no notarized block found",
+                    h
+                );
             }
             1 => notarized_blocks.remove(0),
             _ => {
@@ -132,16 +134,19 @@ impl Finalizer {
 
         // If notarization shares exists created by this replica at height `h`
         // that sign a block different than `notarized_block`, do not finalize.
-        let other_notarized_shares_exists = pool.get_notarization_shares(h).any(|x| {
-            match x.content {
+        let other_notarized_shares_exists =
+            pool.get_notarization_shares(h).any(|x| match x.content {
                 NotarizationShareContent::COD(share_content) => {
-                    x.signature == self.node_id && share_content.block != CryptoHashOf::new(Hashed::crypto_hash(&notarized_block))
-                },
+                    x.signature == self.node_id
+                        && share_content.block
+                            != CryptoHashOf::new(Hashed::crypto_hash(&notarized_block))
+                }
                 NotarizationShareContent::ICC(share_content) => {
-                    x.signature == self.node_id && share_content.block != CryptoHashOf::new(Hashed::crypto_hash(&notarized_block))
-                },
-            }
-        });
+                    x.signature == self.node_id
+                        && share_content.block
+                            != CryptoHashOf::new(Hashed::crypto_hash(&notarized_block))
+                }
+            });
         if other_notarized_shares_exists {
             return None;
         }

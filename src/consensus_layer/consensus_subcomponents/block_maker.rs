@@ -1,13 +1,15 @@
 use std::{sync::Arc, time::Duration};
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-use crate::{consensus_layer::{
-    pool_reader::PoolReader,
-    artifacts::ConsensusMessage, height_index::Height
-}, crypto::{Signed, Hashed}, time_source::TimeSource, SubnetParams};
+use crate::{
+    consensus_layer::{artifacts::ConsensusMessage, height_index::Height, pool_reader::PoolReader},
+    crypto::{Hashed, Signed},
+    time_source::TimeSource,
+    SubnetParams,
+};
 
-use super::{notary::NOTARIZATION_UNIT_DELAY, goodifier::block_is_good};
+use super::{goodifier::block_is_good, notary::NOTARIZATION_UNIT_DELAY};
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub struct Payload {}
@@ -34,12 +36,7 @@ pub struct Block {
 
 impl Block {
     // Create a new block
-    pub fn new(
-        parent: String,
-        payload: Payload,
-        height: u64,
-        rank: u8,
-    ) -> Self {
+    pub fn new(parent: String, payload: Payload, height: u64, rank: u8) -> Self {
         Block {
             parent,
             payload,
@@ -74,10 +71,10 @@ impl BlockMaker {
     pub fn on_state_change(&self, pool: &PoolReader<'_>) -> Option<ConsensusMessage> {
         // println!("\n########## Block maker ##########");
         let my_node_id = self.node_id;
-        let (beacon, parent) = get_dependencies(pool, self.subnet_params.consensus_on_demand).unwrap();
+        let (beacon, parent) =
+            get_dependencies(pool, self.subnet_params.consensus_on_demand).unwrap();
         let height: u64 = parent.height + 1;
-        match self.get_block_maker_rank(height, &beacon, my_node_id)
-        {
+        match self.get_block_maker_rank(height, &beacon, my_node_id) {
             rank => {
                 if !already_proposed(pool, height, my_node_id)
                     && !self.is_better_block_proposal_available(pool, height, rank)
@@ -86,16 +83,15 @@ impl BlockMaker {
                         height,
                         rank,
                         self.time_source.as_ref(),
-                        my_node_id
+                        my_node_id,
                     )
                 {
-                    let block_proposal = self.propose_block(pool, rank, parent).map(|proposal| {
-                        ConsensusMessage::BlockProposal(proposal)
-                    });
+                    let block_proposal = self
+                        .propose_block(pool, rank, parent)
+                        .map(|proposal| ConsensusMessage::BlockProposal(proposal));
                     println!("\nCreated block proposal: {:?}", block_proposal);
                     block_proposal
-                }
-                else {
+                } else {
                     None
                 }
             }
@@ -103,7 +99,8 @@ impl BlockMaker {
     }
 
     fn get_block_maker_rank(&self, height: u64, beacon: &RandomBeacon, my_node_id: u8) -> u8 {
-        let rank = ((height + my_node_id as u64 - 2) % self.subnet_params.total_nodes_number as u64) as u8;
+        let rank =
+            ((height + my_node_id as u64 - 2) % self.subnet_params.total_nodes_number as u64) as u8;
         // println!("Local rank for height {} is: {}", height, rank);
         rank
     }
@@ -131,13 +128,7 @@ impl BlockMaker {
     ) -> Option<BlockProposal> {
         let parent_hash = Hashed::crypto_hash(&parent);
         let height: u64 = parent.height + 1;
-        self.construct_block_proposal(
-            pool,
-            parent,
-            parent_hash,
-            height,
-            rank,
-        )
+        self.construct_block_proposal(pool, parent, parent_hash, height, rank)
     }
 
     // Construct a block proposal with specified validation context, parent
@@ -161,11 +152,13 @@ impl BlockMaker {
     }
 }
 
-
 // Return the parent random beacon and block of the latest round for which
 // this node might propose a block.
 // Return None otherwise.
-fn get_dependencies(pool: &PoolReader<'_>, is_consensus_on_demand: bool) -> Option<(RandomBeacon, Block)> {
+fn get_dependencies(
+    pool: &PoolReader<'_>,
+    is_consensus_on_demand: bool,
+) -> Option<(RandomBeacon, Block)> {
     let notarized_height = pool.get_notarized_height();
     // println!("Last block notarized at height: {}", notarized_height);
     // the only "good" block might not be the rank 0 block
@@ -179,8 +172,7 @@ fn get_dependencies(pool: &PoolReader<'_>, is_consensus_on_demand: bool) -> Opti
                 let is_good = block_is_good(pool, &block);
                 // println!("Notarized block {:?} is good: {}", block, is_good);
                 is_good
-            }
-            else {
+            } else {
                 true
             }
         })
@@ -188,22 +180,17 @@ fn get_dependencies(pool: &PoolReader<'_>, is_consensus_on_demand: bool) -> Opti
     match parent {
         Some(parent) => {
             // println!("Parent block: {:?}", parent);
-            Some((
-                RandomBeacon {},
-                parent
-            ))
-        },
-        None => {
-            Some((
-                RandomBeacon {},
-                Block {
-                    parent: String::from("Genesis has no parent"),
-                    payload: Payload::new(),
-                    height: 0,
-                    rank: 0,
-                }
-            ))
+            Some((RandomBeacon {}, parent))
         }
+        None => Some((
+            RandomBeacon {},
+            Block {
+                parent: String::from("Genesis has no parent"),
+                payload: Payload::new(),
+                height: 0,
+                rank: 0,
+            },
+        )),
     }
 }
 
@@ -223,10 +210,9 @@ fn is_time_to_make_block(
     height: u64,
     rank: u8,
     time_source: &dyn TimeSource,
-    node_id: u8
+    node_id: u8,
 ) -> bool {
-    let block_maker_delay =
-    match get_block_maker_delay(rank) {
+    let block_maker_delay = match get_block_maker_delay(rank) {
         Some(delay) => delay,
         _ => return false,
     };
@@ -234,25 +220,23 @@ fn is_time_to_make_block(
         Some(start_time) => {
             let current_time = time_source.get_relative_time();
             if current_time >= start_time + block_maker_delay {
-                return true
+                return true;
             }
             false
         }
         None => {
             // if there is no previous notarization, node 1 proposes the first block (has rank 0 in the first round)
             if node_id == 1 && rank == 0 {
-                return true
+                return true;
             }
             false
-        },
+        }
     }
 }
 
 /// Calculate the required delay for block making based on the block maker's
 /// rank.
-fn get_block_maker_delay(
-    rank: u8,
-) -> Option<Duration> {
+fn get_block_maker_delay(rank: u8) -> Option<Duration> {
     Some(NOTARIZATION_UNIT_DELAY * rank as u32)
 }
 

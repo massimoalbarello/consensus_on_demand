@@ -1,22 +1,23 @@
 use std::{collections::BTreeMap, fmt::Debug};
 
-use crate::{crypto::{CryptoHash, CryptoHashOf}, time_source::{Time, TimeSource}};
+use crate::{
+    crypto::{CryptoHash, CryptoHashOf},
+    time_source::{Time, TimeSource},
+};
 
 use super::{
     artifacts::{
-        UnvalidatedArtifact, ValidatedArtifact, ConsensusMessage, 
-        ChangeSet, ChangeAction, IntoInner, 
-        ConsensusMessageId, ConsensusMessageHashable, HasTimestamp
-    }, 
-    height_index::{
-        Indexes, HeightIndexedPool, SelectIndex,
-        HeightRange, Height, HeightIndex
+        ChangeAction, ChangeSet, ConsensusMessage, ConsensusMessageHashable, ConsensusMessageId,
+        HasTimestamp, IntoInner, UnvalidatedArtifact, ValidatedArtifact,
     },
     consensus_subcomponents::{
+        aggregator::{Finalization, Notarization},
+        block_maker::{Block, BlockProposal},
+        finalizer::FinalizationShare,
+        goodifier::GoodnessArtifact,
         notary::NotarizationShare,
-        aggregator::{Notarization, Finalization},
-        block_maker::{BlockProposal, Block}, finalizer::FinalizationShare, goodifier::GoodnessArtifact
-    }
+    },
+    height_index::{Height, HeightIndex, HeightIndexedPool, HeightRange, Indexes, SelectIndex},
 };
 
 type UnvalidatedConsensusArtifact = UnvalidatedArtifact<ConsensusMessage>;
@@ -45,17 +46,15 @@ impl<T: IntoInner<ConsensusMessage> + HasTimestamp + Clone + Debug> InMemoryPool
                 PoolSectionOp::Insert(artifact) => {
                     // println!("Inserting artifact: {:?}", artifact);
                     self.insert(artifact);
-                },
+                }
                 PoolSectionOp::Remove(msg_id) => {
                     if self.remove(&msg_id).is_none() {
                         println!("Error removing artifact {:?}", &msg_id);
-                    }
-                    else {
+                    } else {
                         // println!("Removing artifact");
                     }
                 }
             }
-            
         }
     }
 
@@ -119,7 +118,7 @@ impl<T: IntoInner<ConsensusMessage> + HasTimestamp + Clone + Debug> InMemoryPool
     pub fn block_proposal(&self) -> &dyn HeightIndexedPool<BlockProposal> {
         self
     }
- 
+
     pub fn finalization_share(&self) -> &dyn HeightIndexedPool<FinalizationShare> {
         self
     }
@@ -224,7 +223,7 @@ impl ConsensusPoolImpl {
         ops.insert(unvalidated_artifact);
         self.apply_changes_unvalidated(ops);
     }
-    
+
     pub fn apply_changes(&mut self, time_source: &dyn TimeSource, change_set: ChangeSet) {
         let mut unvalidated_ops = PoolSectionOps::new();
         let mut validated_ops = PoolSectionOps::new();
@@ -256,17 +255,30 @@ impl ConsensusPoolImpl {
         self.apply_changes_unvalidated(unvalidated_ops);
         self.apply_changes_validated(validated_ops);
     }
-    
+
     pub fn finalized_block(&self) -> Option<Block> {
         get_highest_finalized_block(self)
     }
 
     pub fn finalized_block_hash_at_height(&self, height: Height) -> Option<String> {
-        match self.validated().finalization().get_by_height(height).count() {
+        match self
+            .validated()
+            .finalization()
+            .get_by_height(height)
+            .count()
+        {
             0 => None,
-            1 => {
-                Some(self.validated().finalization().get_by_height(height).last().unwrap().content.block.get_ref().to_owned())
-            },
+            1 => Some(
+                self.validated()
+                    .finalization()
+                    .get_by_height(height)
+                    .last()
+                    .unwrap()
+                    .content
+                    .block
+                    .get_ref()
+                    .to_owned(),
+            ),
             _ => panic!("more than one finalized blocks at the same height"),
         }
     }
@@ -313,10 +325,7 @@ impl<T> PoolSectionOps<T> {
     }
 }
 
-
-fn get_highest_finalized_block(
-    pool: &ConsensusPoolImpl,
-) -> Option<Block> {
+fn get_highest_finalized_block(pool: &ConsensusPoolImpl) -> Option<Block> {
     match pool.validated().finalization().get_highest() {
         Ok(finalization) => {
             let h = finalization.content.height;

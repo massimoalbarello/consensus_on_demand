@@ -3,13 +3,14 @@ use std::{collections::BTreeMap, fmt::Debug};
 use crate::crypto::{CryptoHash, CryptoHashOf};
 
 use super::{
-    artifacts::ConsensusMessage, 
+    artifacts::ConsensusMessage,
     consensus_subcomponents::{
-        aggregator::{Notarization, Finalization},
+        aggregator::{Finalization, Notarization},
         block_maker::BlockProposal,
+        finalizer::FinalizationShare,
+        goodifier::GoodnessArtifact,
         notary::{NotarizationShare, NotarizationShareContent},
-        finalizer::FinalizationShare, goodifier::GoodnessArtifact,
-    }
+    },
 };
 
 #[derive(Debug)]
@@ -84,7 +85,7 @@ pub struct Indexes {
     pub notarization: HeightIndex<CryptoHashOf<Notarization>>,
     pub finalization_share: HeightIndex<CryptoHashOf<FinalizationShare>>,
     pub finalization: HeightIndex<CryptoHashOf<Finalization>>,
-    pub goodness_artifact: HeightIndex<CryptoHashOf<GoodnessArtifact>>
+    pub goodness_artifact: HeightIndex<CryptoHashOf<GoodnessArtifact>>,
 }
 
 #[allow(clippy::new_without_default)]
@@ -102,75 +103,57 @@ impl Indexes {
 
     pub fn insert(&mut self, msg: &ConsensusMessage, hash: CryptoHash) {
         match msg {
-            ConsensusMessage::BlockProposal(artifact) => {
-                self.block_proposal
-                .insert(artifact.content.value.height, &CryptoHashOf::from(hash))
+            ConsensusMessage::BlockProposal(artifact) => self
+                .block_proposal
+                .insert(artifact.content.value.height, &CryptoHashOf::from(hash)),
+            ConsensusMessage::NotarizationShare(artifact) => match artifact.content.to_owned() {
+                NotarizationShareContent::COD(share_content) => self
+                    .notarization_share
+                    .insert(share_content.height, &CryptoHashOf::from(hash)),
+                NotarizationShareContent::ICC(share_content) => self
+                    .notarization_share
+                    .insert(share_content.height, &CryptoHashOf::from(hash)),
             },
-            ConsensusMessage::NotarizationShare(artifact) => {
-                match artifact.content.to_owned() {
-                    NotarizationShareContent::COD(share_content) => {
-                        self.notarization_share
-                            .insert(share_content.height, &CryptoHashOf::from(hash))
-                    },
-                    NotarizationShareContent::ICC(share_content) => {
-                        self.notarization_share
-                            .insert(share_content.height, &CryptoHashOf::from(hash))
-                    }
-                }
-            },
-            ConsensusMessage::Notarization(artifact) => {
-                self.notarization
-                    .insert(artifact.content.height, &CryptoHashOf::from(hash))
-            },
-            ConsensusMessage::FinalizationShare(artifact) => {
-                self.finalization_share
-                    .insert(artifact.content.height, &CryptoHashOf::from(hash))
-            },
-            ConsensusMessage::Finalization(artifact) => {
-                self.finalization
-                    .insert(artifact.content.height, &CryptoHashOf::from(hash))
-            },
-            ConsensusMessage::GoodnessArtifact(artifact) => {
-                self.goodness_artifact
-                    .insert(artifact.children_height, &CryptoHashOf::from(hash))
-            }
+            ConsensusMessage::Notarization(artifact) => self
+                .notarization
+                .insert(artifact.content.height, &CryptoHashOf::from(hash)),
+            ConsensusMessage::FinalizationShare(artifact) => self
+                .finalization_share
+                .insert(artifact.content.height, &CryptoHashOf::from(hash)),
+            ConsensusMessage::Finalization(artifact) => self
+                .finalization
+                .insert(artifact.content.height, &CryptoHashOf::from(hash)),
+            ConsensusMessage::GoodnessArtifact(artifact) => self
+                .goodness_artifact
+                .insert(artifact.children_height, &CryptoHashOf::from(hash)),
         };
     }
 
     pub fn remove(&mut self, msg: &ConsensusMessage, hash: CryptoHash) {
         match msg {
-            ConsensusMessage::BlockProposal(artifact) => {
-                self.block_proposal
-                .remove(artifact.content.value.height, &CryptoHashOf::from(hash))
+            ConsensusMessage::BlockProposal(artifact) => self
+                .block_proposal
+                .remove(artifact.content.value.height, &CryptoHashOf::from(hash)),
+            ConsensusMessage::NotarizationShare(artifact) => match artifact.content.to_owned() {
+                NotarizationShareContent::COD(share_content) => self
+                    .notarization_share
+                    .remove(share_content.height, &CryptoHashOf::from(hash)),
+                NotarizationShareContent::ICC(share_content) => self
+                    .notarization_share
+                    .remove(share_content.height, &CryptoHashOf::from(hash)),
             },
-            ConsensusMessage::NotarizationShare(artifact) => {
-                match artifact.content.to_owned() {
-                    NotarizationShareContent::COD(share_content) => {
-                        self.notarization_share
-                            .remove(share_content.height, &CryptoHashOf::from(hash))
-                    },
-                    NotarizationShareContent::ICC(share_content) => {
-                        self.notarization_share
-                            .remove(share_content.height, &CryptoHashOf::from(hash))
-                    }
-                }
-            },
-            ConsensusMessage::Notarization(artifact) => {
-                self.notarization
-                    .remove(artifact.content.height, &CryptoHashOf::from(hash))
-            },
-            ConsensusMessage::FinalizationShare(artifact) => {
-                self.finalization_share
-                    .remove(artifact.content.height, &CryptoHashOf::from(hash))
-            },
-            ConsensusMessage::Finalization(artifact) => {
-                self.finalization
-                    .remove(artifact.content.height, &CryptoHashOf::from(hash))
-            },
-            ConsensusMessage::GoodnessArtifact(artifact) => {
-                self.goodness_artifact
-                    .remove(artifact.children_height, &CryptoHashOf::from(hash))
-            }
+            ConsensusMessage::Notarization(artifact) => self
+                .notarization
+                .remove(artifact.content.height, &CryptoHashOf::from(hash)),
+            ConsensusMessage::FinalizationShare(artifact) => self
+                .finalization_share
+                .remove(artifact.content.height, &CryptoHashOf::from(hash)),
+            ConsensusMessage::Finalization(artifact) => self
+                .finalization
+                .remove(artifact.content.height, &CryptoHashOf::from(hash)),
+            ConsensusMessage::GoodnessArtifact(artifact) => self
+                .goodness_artifact
+                .remove(artifact.children_height, &CryptoHashOf::from(hash)),
         };
     }
 }

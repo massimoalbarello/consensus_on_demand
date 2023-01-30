@@ -48,6 +48,9 @@ impl Acknowledger {
                 else {
                     None
                 }.map(|notarization_content| {
+                    // if a block is acknowledged (>= n-f acks) it must be the only G child
+                    // therefore, we can send the notarization even before checking whether it is G or not
+                    // as we know it will be as soon as the 'goodifier' component is run
                     vec![
                         ConsensusMessage::Notarization(
                             Notarization {

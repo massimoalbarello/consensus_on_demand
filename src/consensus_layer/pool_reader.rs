@@ -1,14 +1,14 @@
-use crate::{
-    consensus_layer::pool::ConsensusPoolImpl,
-    crypto::CryptoHashOf, time_source::Time
-};
+use crate::{consensus_layer::pool::ConsensusPoolImpl, crypto::CryptoHashOf, time_source::Time};
 
 use super::{
+    artifacts::ConsensusMessageHashable,
     consensus_subcomponents::{
-        notary::{NotarizationShare, NotarizationShareContent}, 
-        block_maker::{Block, BlockProposal}, finalizer::FinalizationShare, goodifier::GoodnessArtifact
+        block_maker::{Block, BlockProposal},
+        finalizer::FinalizationShare,
+        goodifier::GoodnessArtifact,
+        notary::{NotarizationShare, NotarizationShareContent},
     },
-    height_index::{Height, HeightRange}, artifacts::ConsensusMessageHashable
+    height_index::{Height, HeightRange},
 };
 
 // A struct and corresponding impl with helper methods to obtain particular
@@ -20,9 +20,7 @@ pub struct PoolReader<'a> {
 impl<'a> PoolReader<'a> {
     // Create a PoolReader for a ConsensusPool.
     pub fn new(pool: &'a ConsensusPoolImpl) -> Self {
-        Self {
-            pool,
-        }
+        Self { pool }
     }
 
     /// Get the underlying pool.
@@ -38,28 +36,24 @@ impl<'a> PoolReader<'a> {
         self.pool.validated().notarization_share().get_by_height(h)
     }
 
-    pub fn count_acknowledgements_at_height(
-        &self,
-        h: Height,
-    ) -> usize {
+    pub fn count_acknowledgements_at_height(&self, h: Height) -> usize {
         self.get_notarization_shares(h)
-            .filter(|share| if let NotarizationShareContent::COD(_) = share.content { true } else { false })
+            .filter(|share| {
+                if let NotarizationShareContent::COD(_) = share.content {
+                    true
+                } else {
+                    false
+                }
+            })
             .count()
     }
 
     // Get max height of valid notarized blocks.
     pub fn get_notarized_height(&self) -> Height {
-        let notarized_height = self.pool
-            .validated()
-            .notarization()
-            .max_height();
+        let notarized_height = self.pool.validated().notarization().max_height();
         match notarized_height {
-            Some(height) => {
-                height
-            }
-            None => {
-                0
-            }
+            Some(height) => height,
+            None => 0,
         }
     }
 
@@ -79,9 +73,7 @@ impl<'a> PoolReader<'a> {
     pub fn get_finalized_height(&self) -> Height {
         match self.get_finalized_tip() {
             Some(block) => block.height,
-            None => {
-                0
-            }
+            None => 0,
         }
     }
 
@@ -121,7 +113,8 @@ impl<'a> PoolReader<'a> {
     }
 
     pub fn print_goodness_artifacts_at_height(&self, height: Height) {
-        for good in self.pool
+        for good in self
+            .pool
             .validated()
             .goodness_artifact()
             .get_by_height(height)
@@ -131,17 +124,17 @@ impl<'a> PoolReader<'a> {
     }
 
     pub fn get_goodness_height(&self) -> Height {
-        match self.pool
-            .validated()
-            .goodness_artifact()
-            .max_height()
-        {
+        match self.pool.validated().goodness_artifact().max_height() {
             None => 0,
-            Some(height) => height 
+            Some(height) => height,
         }
     }
 
-    pub fn get_latest_goodness_artifact_for_parent(&self, parent_hash: &String, children_height: Height) -> Option<GoodnessArtifact> {
+    pub fn get_latest_goodness_artifact_for_parent(
+        &self,
+        parent_hash: &String,
+        children_height: Height,
+    ) -> Option<GoodnessArtifact> {
         self.pool
             .validated()
             .goodness_artifact()
@@ -150,7 +143,11 @@ impl<'a> PoolReader<'a> {
             .max_by(|first, second| first.timestamp.cmp(&second.timestamp))
     }
 
-    pub fn exists_goodness_artifact_for_parent(&self, parent_hash: &String, height: Height) -> bool {
+    pub fn exists_goodness_artifact_for_parent(
+        &self,
+        parent_hash: &String,
+        height: Height,
+    ) -> bool {
         match self.get_latest_goodness_artifact_for_parent(parent_hash, height) {
             Some(_) => true,
             None => false,
@@ -171,7 +168,6 @@ impl<'a> PoolReader<'a> {
                 .min()
         };
         let prev_height = height - 1;
-        get_notarization_time(prev_height)
-            .map(|notarization_time| notarization_time)
+        get_notarization_time(prev_height).map(|notarization_time| notarization_time)
     }
 }

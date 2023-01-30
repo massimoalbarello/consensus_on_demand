@@ -1,13 +1,12 @@
 use std::{sync::Arc, time::Duration};
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::{
-    consensus_layer::{
-        pool_reader::PoolReader, 
-        artifacts::ConsensusMessage, 
-        height_index::Height
-    }, crypto::{Signed, Hashed, CryptoHashOf}, time_source::TimeSource, SubnetParams
+    consensus_layer::{artifacts::ConsensusMessage, height_index::Height, pool_reader::PoolReader},
+    crypto::{CryptoHashOf, Hashed, Signed},
+    time_source::TimeSource,
+    SubnetParams,
 };
 
 use super::block_maker::{Block, BlockProposal};
@@ -16,8 +15,8 @@ pub const NOTARIZATION_UNIT_DELAY: Duration = Duration::from_millis(600);
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum NotarizationShareContent {
-    COD(NotarizationShareContentCOD),   // content of notarization share when Consensus on Demand is used
-    ICC(NotarizationShareContentICC)    // content of notarization share when only Internet Computer Consensus is used
+    COD(NotarizationShareContentCOD), // content of notarization share when Consensus on Demand is used
+    ICC(NotarizationShareContentICC), // content of notarization share when only Internet Computer Consensus is used
 }
 
 // NotarizationShareContentICC holds the values that are signed in a notarization share when only IC Consensus is used
@@ -28,7 +27,11 @@ pub struct NotarizationShareContentICC {
 }
 
 impl NotarizationShareContentICC {
-    pub fn new(block_height: Height, block_hash: CryptoHashOf<Block>, is_ack: Option<bool>) -> Self {
+    pub fn new(
+        block_height: Height,
+        block_hash: CryptoHashOf<Block>,
+        is_ack: Option<bool>,
+    ) -> Self {
         Self {
             height: block_height,
             block: block_hash,
@@ -46,7 +49,12 @@ pub struct NotarizationShareContentCOD {
 }
 
 impl NotarizationShareContentCOD {
-    pub fn new(block_height: Height, block_hash: CryptoHashOf<Block>, block_parent_hash: String, is_ack: Option<bool>) -> Self {
+    pub fn new(
+        block_height: Height,
+        block_hash: CryptoHashOf<Block>,
+        block_parent_hash: String,
+        is_ack: Option<bool>,
+    ) -> Self {
         Self {
             height: block_height,
             block: block_hash,
@@ -89,7 +97,10 @@ impl Notary {
             if self.time_to_notarize(pool, height, rank) {
                 if !self.is_proposal_already_notarized_by_me(pool, &proposal) {
                     if let Some(s) = self.notarize_block(pool, proposal) {
-                        println!("\nCreated notarization share: {:?} for proposal of rank: {:?}", s, rank);
+                        println!(
+                            "\nCreated notarization share: {:?} for proposal of rank: {:?}",
+                            s, rank
+                        );
                         notarization_shares.push(ConsensusMessage::NotarizationShare(s));
                     }
                 }
@@ -100,22 +111,13 @@ impl Notary {
 
     /// Return the time since round start, if it is greater than required
     /// notarization delay for the given block rank, or None otherwise.
-    fn time_to_notarize(
-        &self,
-        pool: &PoolReader<'_>,
-        height: Height,
-        rank: u8,
-    ) -> bool {
-        let adjusted_notary_delay = get_adjusted_notary_delay(
-            pool,
-            height,
-            rank,
-        );
+    fn time_to_notarize(&self, pool: &PoolReader<'_>, height: Height, rank: u8) -> bool {
+        let adjusted_notary_delay = get_adjusted_notary_delay(pool, height, rank);
         if let Some(start_time) = pool.get_round_start_time(height) {
             let now = self.time_source.get_relative_time();
             return now >= start_time + adjusted_notary_delay;
         }
-            height == 1
+        height == 1
     }
 
     /// Return true if this node has already published a notarization share
@@ -128,10 +130,12 @@ impl Notary {
         let height = proposal.content.value.height;
         pool.get_notarization_shares(height)
             .filter(|s| s.signature == self.node_id)
-            .any(|s| {
-                match s.content {
-                    NotarizationShareContent::COD(share_content) => proposal.content.hash.eq(share_content.block.get_ref()),
-                    NotarizationShareContent::ICC(share_content) => proposal.content.hash.eq(share_content.block.get_ref()),
+            .any(|s| match s.content {
+                NotarizationShareContent::COD(share_content) => {
+                    proposal.content.hash.eq(share_content.block.get_ref())
+                }
+                NotarizationShareContent::ICC(share_content) => {
+                    proposal.content.hash.eq(share_content.block.get_ref())
                 }
             })
     }
@@ -157,11 +161,19 @@ impl Notary {
                         panic!("no notarization shares of ICC variant when consensus_on_demand parameter is true");
                     }
                 })
-                .count() == 0;  // set 'is_ack' to true if 'proposal' is the first child of its parent for which the local replica creates a notarization share, the latter is also an acknowledgement
-            content = NotarizationShareContent::COD(NotarizationShareContentCOD::new(proposal.content.value.height, CryptoHashOf::from(proposal.content.hash), proposal.content.value.parent, Some(is_ack)));
-        }
-        else {
-            content = NotarizationShareContent::ICC(NotarizationShareContentICC::new(proposal.content.value.height, CryptoHashOf::from(proposal.content.hash), None));
+                .count() == 0; // set 'is_ack' to true if 'proposal' is the first child of its parent for which the local replica creates a notarization share, the latter is also an acknowledgement
+            content = NotarizationShareContent::COD(NotarizationShareContentCOD::new(
+                proposal.content.value.height,
+                CryptoHashOf::from(proposal.content.hash),
+                proposal.content.value.parent,
+                Some(is_ack),
+            ));
+        } else {
+            content = NotarizationShareContent::ICC(NotarizationShareContentICC::new(
+                proposal.content.value.height,
+                CryptoHashOf::from(proposal.content.hash),
+                None,
+            ));
         }
         let signature = self.node_id;
         Some(NotarizationShare { content, signature })
@@ -169,8 +181,7 @@ impl Notary {
 }
 
 fn get_proposals(pool: &PoolReader<'_>, h: Height) -> Vec<BlockProposal> {
-    pool
-        .pool()
+    pool.pool()
         .validated()
         .block_proposal()
         .get_by_height(h)
@@ -202,11 +213,7 @@ fn find_lowest_ranked_proposals(pool: &PoolReader<'_>, h: Height) -> Vec<BlockPr
 
 /// Calculate the required delay for notary based on the rank of block to
 /// notarize
-pub fn get_adjusted_notary_delay(
-    pool: &PoolReader<'_>,
-    height: Height,
-    rank: u8,
-) -> Duration {
+pub fn get_adjusted_notary_delay(pool: &PoolReader<'_>, height: Height, rank: u8) -> Duration {
     let ranked_delay = NOTARIZATION_UNIT_DELAY.as_millis() as u64 * rank as u64;
     Duration::from_millis(ranked_delay)
 }
