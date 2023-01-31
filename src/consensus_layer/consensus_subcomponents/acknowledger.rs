@@ -1,10 +1,12 @@
+use std::{sync::{Arc, RwLock}, collections::BTreeMap, time::Duration};
+
 use crate::{
     consensus_layer::{
         pool_reader::PoolReader, artifacts::ConsensusMessage, consensus_subcomponents::{aggregator::{
             aggregate, 
             Notarization, NotarizationContent, 
             Finalization, FinalizationContent, 
-        }, notary::NotarizationShareContent}
+        }, notary::NotarizationShareContent}, height_index::Height
     },
     crypto::{Signed}, SubnetParams
 };
@@ -29,7 +31,7 @@ impl Acknowledger {
         }
     }
 
-    pub fn on_state_change(&self, pool: &PoolReader<'_>) -> Vec<ConsensusMessage> {
+    pub fn on_state_change(&self, pool: &PoolReader<'_>, finalization_times: Arc<RwLock<BTreeMap<Height, Duration>>>) -> Vec<ConsensusMessage> {
         // println!("\n########## Acknowledger ##########");
         let height = pool.get_notarized_height() + 1;
         let notarization_shares = pool.get_notarization_shares(height);
@@ -43,7 +45,9 @@ impl Acknowledger {
                     is_parent_finalized(pool, &notarization_content)
                 {
                     println!("\nAcknowledgement of block with hash: {} at height {} by committee: {:?}", notarization_content.block.get_ref(), notarization_content.height, committee);
-                    pool.print_finalization_time(notarization_content.height);
+                    if let Some(finalization_time) = pool.get_finalization_time(notarization_content.height) {
+                        finalization_times.write().unwrap().insert(notarization_content.height, finalization_time);
+                    }
                     Some(notarization_content)
                 }
                 else {

@@ -21,7 +21,11 @@ pub mod height_index;
 
 pub mod consensus_subcomponents;
 
+use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock};
+use std::time::Duration;
+
+use self::height_index::Height;
 
 pub struct ConsensusProcessor {
     consensus_pool: Arc<RwLock<ConsensusPoolImpl>>,
@@ -39,7 +43,8 @@ impl ConsensusProcessor {
     pub fn process_changes(
         &self,
         time_source: &dyn TimeSource,
-        artifacts: Vec<UnvalidatedArtifact<ConsensusMessage>>
+        artifacts: Vec<UnvalidatedArtifact<ConsensusMessage>>,
+        finalization_times: Arc<RwLock<BTreeMap<Height, Duration>>>
     ) -> (Vec<ConsensusMessage>, ProcessingResult) {
         {
             let mut consensus_pool = self.consensus_pool.write().unwrap();
@@ -50,7 +55,7 @@ impl ConsensusProcessor {
         let mut adverts = Vec::new();
         let (change_set, to_broadcast) = {
             let consensus_pool = self.consensus_pool.read().unwrap();
-            self.client.on_state_change(&*consensus_pool)
+            self.client.on_state_change(&*consensus_pool, finalization_times)
         };
         let changed = if !change_set.is_empty() {
             ProcessingResult::StateChanged

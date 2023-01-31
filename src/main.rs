@@ -5,10 +5,10 @@ use futures::{
     select,
 };
 use structopt::StructOpt;
-use std::time::Duration;
+use std::{time::Duration, sync::{RwLock, Arc}, collections::BTreeMap};
 
 pub mod network_layer;
-use crate::{network_layer::Peer, time_source::{system_time_now, Time, get_absolute_end_time}};
+use crate::{network_layer::Peer, time_source::{system_time_now, get_absolute_end_time}, consensus_layer::height_index::Height};
 pub mod artifact_manager;
 pub mod crypto;
 pub mod consensus_layer;
@@ -58,7 +58,10 @@ async fn broadcast_message_future() {
 async fn main() {
     let opt = Opt::from_args();
 
-    let mut my_peer = Peer::new(opt.r, SubnetParams::new(opt.n, opt.f, opt.p, opt.cod), "gossip_blocks").await;
+    let finalizations_times = Arc::new(RwLock::new(BTreeMap::<Height, Duration>::new()));
+    let cloned_finalization_times = Arc::clone(&finalizations_times);
+
+    let mut my_peer = Peer::new(opt.r, SubnetParams::new(opt.n, opt.f, opt.p, opt.cod), "gossip_blocks", cloned_finalization_times).await;
 
     // Listen on all interfaces and whatever port the OS assigns
     my_peer.listen_for_dialing();
@@ -85,7 +88,8 @@ async fn main() {
             }
         }
         else {
-            println!("Stopped replica");
+            println!("\nStopped replica");
+            println!("\n{:?}", finalizations_times.read().unwrap());
             break;
         }
     }

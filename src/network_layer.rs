@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::{Arc, RwLock}, collections::BTreeMap, time::Duration};
 
 use async_std::task;
 use crossbeam_channel::Receiver;
@@ -14,7 +14,7 @@ use serde::{Serialize, Deserialize};
 
 use crate::{
     artifact_manager::ArtifactProcessorManager, 
-    consensus_layer::artifacts::{ConsensusMessage, UnvalidatedArtifact}, time_source::{SysTimeSource, TimeSource}, SubnetParams,
+    consensus_layer::{artifacts::{ConsensusMessage, UnvalidatedArtifact}, height_index::Height}, time_source::{SysTimeSource, TimeSource}, SubnetParams,
 };
 
 // We create a custom network behaviour that combines floodsub and mDNS.
@@ -64,7 +64,7 @@ pub struct Peer {
 }
 
 impl Peer {
-    pub async fn new(replica_number: u8, subnet_params: SubnetParams, topic: &str) -> Self {
+    pub async fn new(replica_number: u8, subnet_params: SubnetParams, topic: &str, finalization_times: Arc<RwLock<BTreeMap<Height, Duration>>>) -> Self {
         let starting_round = 1;
         // Create a random PeerId
         let local_key = Keypair::generate_ed25519();
@@ -101,7 +101,7 @@ impl Peer {
             },
             receiver_outgoing_artifact,
             time_source: time_source.clone(),
-            manager: ArtifactProcessorManager::new(replica_number, subnet_params, time_source, sender_outgoing_artifact),
+            manager: ArtifactProcessorManager::new(replica_number, subnet_params, time_source, sender_outgoing_artifact, finalization_times),
         };
         println!(
             "Local node initialized with number: {} and peer id: {:?}",

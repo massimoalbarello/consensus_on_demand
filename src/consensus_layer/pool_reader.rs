@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use crate::{consensus_layer::pool::ConsensusPoolImpl, crypto::CryptoHashOf, time_source::{Time, system_time_now}};
 
 use super::{
@@ -171,10 +173,13 @@ impl<'a> PoolReader<'a> {
         get_notarization_time(prev_height).map(|notarization_time| notarization_time)
     }
 
-    pub fn print_finalization_time(&self, height: Height) {
+    pub fn get_finalization_time(&self, height: Height) -> Option<Duration> {
         if let Some(round_start_time) = self.get_round_start_time(height) {
             let current_time = system_time_now();
-            println!("Time to finalize block: {:?}", current_time - round_start_time);
+            let finalization_time =  current_time - round_start_time;
+            println!("Time to finalize block: {:?}", finalization_time);
+            return Some(finalization_time);
         }
+        None
     }
 }

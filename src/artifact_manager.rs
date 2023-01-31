@@ -1,11 +1,11 @@
 
-use std::sync::{Arc, Mutex};
+use std::{sync::{Arc, Mutex, RwLock}, collections::BTreeMap, time::Duration};
 use crossbeam_channel::{Receiver, RecvTimeoutError, Sender};
 use std::thread::{Builder as ThreadBuilder, JoinHandle};
 
 use crate::{consensus_layer::{
     ConsensusProcessor,
-    artifacts::{ConsensusMessage, UnvalidatedArtifact}
+    artifacts::{ConsensusMessage, UnvalidatedArtifact}, height_index::Height
 }, time_source::{TimeSource, SysTimeSource}, SubnetParams};
 
 // Periodic duration of `PollEvent` in milliseconds.
@@ -34,7 +34,7 @@ pub struct ArtifactProcessorManager {
 }
 
 impl ArtifactProcessorManager {
-    pub fn new(replica_number: u8, subnet_params: SubnetParams, time_source: Arc<SysTimeSource>, sender_outgoing_artifact: Sender<ConsensusMessage>) -> Self {
+    pub fn new(replica_number: u8, subnet_params: SubnetParams, time_source: Arc<SysTimeSource>, sender_outgoing_artifact: Sender<ConsensusMessage>, finalization_times: Arc<RwLock<BTreeMap<Height, Duration>>>) -> Self {
 
         let pending_artifacts = Arc::new(Mutex::new(Vec::new()));
         let (sender_incoming_request, receiver_incoming_request) = crossbeam_channel::unbounded::<ProcessRequest>();
@@ -44,6 +44,7 @@ impl ArtifactProcessorManager {
         // Spawn the processor thread
         let sender_incoming_request_cl = sender_incoming_request.clone();
         let pending_artifacts_cl = pending_artifacts.clone();
+
         let handle = ThreadBuilder::new()
             .spawn(move || {
                 Self::process_messages(
@@ -53,6 +54,7 @@ impl ArtifactProcessorManager {
                     sender_incoming_request_cl,
                     receiver_incoming_request,
                     sender_outgoing_artifact,
+                    finalization_times,
                 );
             })
             .unwrap();
@@ -71,6 +73,7 @@ impl ArtifactProcessorManager {
         sender_incoming_request: Sender<ProcessRequest>,
         receiver_incoming_request: Receiver<ProcessRequest>,
         sender_outgoing_artifact: Sender<ConsensusMessage>,
+        finalization_times: Arc<RwLock<BTreeMap<Height, Duration>>>,
     ) {
         println!("Incoming artifacts thread loop started");
         let recv_timeout = std::time::Duration::from_millis(ARTIFACT_MANAGER_TIMER_DURATION_MSEC);
@@ -88,7 +91,7 @@ impl ArtifactProcessorManager {
                         artifacts
                     };
 
-                    let (adverts, result) = client.process_changes(time_source.as_ref(), artifacts);
+                    let (adverts, result) = client.process_changes(time_source.as_ref(), artifacts, Arc::clone(&finalization_times));
 
                     if let ProcessingResult::StateChanged = result {
                         sender_incoming_request
