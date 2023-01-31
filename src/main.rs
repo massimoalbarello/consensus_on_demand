@@ -1,4 +1,4 @@
-use async_std::{io, task::sleep};
+use async_std::{io, task::sleep, fs::File};
 use futures::{
     future::FutureExt,
     prelude::{stream::StreamExt, *},
@@ -6,6 +6,13 @@ use futures::{
 };
 use structopt::StructOpt;
 use std::{time::Duration, sync::{RwLock, Arc}, collections::BTreeMap};
+use serde::{Serialize, Deserialize};
+use serde_json::to_string;
+
+#[derive(Serialize, Deserialize, Debug)]
+struct BenchmarkResult {
+    results: BTreeMap<Height, Duration>,
+}
 
 pub mod network_layer;
 use crate::{network_layer::Peer, time_source::{system_time_now, get_absolute_end_time}, consensus_layer::height_index::Height};
@@ -89,9 +96,17 @@ async fn main() {
         }
         else {
             println!("\nStopped replica");
-            println!("\n{:?}", finalizations_times.read().unwrap());
+
+            let benchmark_result = BenchmarkResult {
+                results: finalizations_times.read().unwrap().clone(),
+            };
+
+            let encoded = to_string(&benchmark_result).unwrap();
+            let mut file = File::create(format!("benchmark_result_{}.json", opt.r)).await.unwrap();
+            file.write_all(encoded.as_bytes()).await.unwrap();
+
             break;
         }
     }
-                                               
+
 }
