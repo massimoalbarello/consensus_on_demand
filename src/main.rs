@@ -7,7 +7,7 @@ use futures::{
 use std::time::Duration;
 
 pub mod network_layer;
-use crate::network_layer::Peer;
+use crate::{network_layer::Peer, time_source::{system_time_now, Time, get_absolute_end_time}};
 pub mod artifact_manager;
 pub mod crypto;
 pub mod consensus_layer;
@@ -71,25 +71,45 @@ async fn main() {
                                                 .parse()
                                                 .expect("cannot parse input from command line into enable/disable CoD");
 
-                                            let mut my_peer = Peer::new(replica_number, SubnetParams::new(n, f, p, cod), "gossip_blocks").await;
+                                            match cmd_line_args.next() {
+                                                Some(time) => {
+                                                    let time: u64 = time
+                                                        .parse()
+                                                        .expect("cannot parse input from command line into time to run replica");
 
-                                            // Listen on all interfaces and whatever port the OS assigns
-                                            my_peer.listen_for_dialing();
-                                
-                                            // Read full lines from stdin
-                                            let mut stdin = io::BufReader::new(io::stdin()).lines().fuse();
-                                
-                                            // Process events
-                                            loop {
-                                                select! {
-                                                    _ = stdin.select_next_some() => (),
-                                                    _ = broadcast_message_future().fuse() => {
-                                                        // prevent Mdns expiration event by periodically broadcasting keep alive messages to peers
-                                                        // if any locally generated artifact, broadcast it
-                                                        my_peer.broadcast_message();
-                                                    },
-                                                    event = my_peer.get_next_event() => my_peer.match_event(event),
-                                                }
+                                                    let mut my_peer = Peer::new(replica_number, SubnetParams::new(n, f, p, cod), "gossip_blocks").await;
+
+                                                    // Listen on all interfaces and whatever port the OS assigns
+                                                    my_peer.listen_for_dialing();
+                                        
+                                                    // Read full lines from stdin
+                                                    let mut stdin = io::BufReader::new(io::stdin()).lines().fuse();
+                                        
+                                                    let starting_time = system_time_now();
+                                                    let relative_duration = Duration::from_millis(time * 1000);
+                                                    let absolute_end_time = get_absolute_end_time(starting_time, relative_duration);
+
+                                                    // Process events
+                                                    loop {
+                                                        // if !my_peer.manager.handle.as_ref().unwrap().is_finished() {
+                                                        if system_time_now() < absolute_end_time {
+                                                            select! {
+                                                                _ = stdin.select_next_some() => (),
+                                                                _ = broadcast_message_future().fuse() => {
+                                                                    // prevent Mdns expiration event by periodically broadcasting keep alive messages to peers
+                                                                    // if any locally generated artifact, broadcast it
+                                                                    my_peer.broadcast_message();
+                                                                },
+                                                                event = my_peer.get_next_event() => my_peer.match_event(event),
+                                                            }
+                                                        }
+                                                        else {
+                                                            println!("Stopped replica");
+                                                            break;
+                                                        }
+                                                    }
+                                                },
+                                                None => panic!("must receive time to run replica from the command line"),
                                             }
                                         },
                                         None => panic!("must receive boolean to enable/disable CoD from the command line"),
