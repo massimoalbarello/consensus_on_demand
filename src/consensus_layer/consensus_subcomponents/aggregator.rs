@@ -155,6 +155,7 @@ impl ShareAggregator {
                         finalization_content.height,
                         shares
                     );
+                    pool.print_finalization_time(finalization_content.height);
                     Some(finalization_content)
                 } else {
                     None
