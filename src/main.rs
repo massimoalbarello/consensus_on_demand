@@ -107,7 +107,7 @@ async fn main() {
                 event = my_peer.get_next_event() => my_peer.match_event(event),
             }
         } else {
-            println!("\nStopped replica");
+            // println!("\nStopped replica");
 
             let benchmark_result = BenchmarkResult {
                 results: finalizations_times.read().unwrap().clone(),

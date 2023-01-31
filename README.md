@@ -13,3 +13,5 @@ The following flags allow you to modify other parameters of the subnet:
 - `--p`: number of disagreeing nodes (only when running FIC Consensus)
 
 You can remove the `--cod` flag to run the original IC Consensus.
+
+To benchmark, run: `python3 src/benchmark.py`

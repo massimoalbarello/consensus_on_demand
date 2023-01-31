@@ -126,10 +126,10 @@ impl Peer {
                 finalization_times,
             ),
         };
-        println!(
-            "Local node initialized with number: {} and peer id: {:?}",
-            local_peer.replica_number, local_peer_id
-        );
+        // println!(
+        //     "Local node initialized with number: {} and peer id: {:?}",
+        //     local_peer.replica_number, local_peer_id
+        // );
         local_peer
     }
 
@@ -172,7 +172,7 @@ impl Peer {
                 address.push(Protocol::P2p(
                     Multihash::from_bytes(&self.id.to_bytes()[..]).unwrap(),
                 ));
-                println!("Listening on {:?}", address);
+                // println!("Listening on {:?}", address);
             }
             SwarmEvent::Behaviour(OutEvent::Floodsub(FloodsubEvent::Message(floodsub_message))) => {
                 let floodsub_content = String::from_utf8_lossy(&floodsub_message.data);

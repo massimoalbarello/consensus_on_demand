@@ -63,7 +63,7 @@ impl Finalizer {
             .filter_map(|h| match self.finalize_height(pool, h) {
                 Some(f) => {
                     let finalization_share = ConsensusMessage::FinalizationShare(f);
-                    println!("\nCreated finalization share: {:?}", finalization_share);
+                    // println!("\nCreated finalization share: {:?}", finalization_share);
                     Some(finalization_share)
                 }
                 None => None,

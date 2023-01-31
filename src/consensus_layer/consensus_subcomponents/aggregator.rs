@@ -90,55 +90,56 @@ impl ShareAggregator {
                                                                                  // println!("Grouped shares separated from acks {:?}", grouped_shares_separated_from_acks);
         let grouped_shares = group_shares_and_acks(grouped_shares_separated_from_acks);
         // println!("Grouped shares: {:?}", grouped_shares);
-        let notarizations = grouped_shares.into_iter().filter_map(|(notary_content, shares)| {
-            let notary_content = match notary_content {
-                NotarizationShareContent::COD(notary_content) => {
-                    NotarizationContent {
+        let notarizations = grouped_shares
+            .into_iter()
+            .filter_map(|(notary_content, shares)| {
+                let notary_content = match notary_content {
+                    NotarizationShareContent::COD(notary_content) => NotarizationContent {
                         height: notary_content.height,
-                        block: notary_content.block
-                    }
-                }
-                NotarizationShareContent::ICC(notary_content) => {
-                    NotarizationContent {
+                        block: notary_content.block,
+                    },
+                    NotarizationShareContent::ICC(notary_content) => NotarizationContent {
                         height: notary_content.height,
-                        block: notary_content.block
-                    }
-                }
-            };
-            if shares.len() >= (self.subnet_params.total_nodes_number - self.subnet_params.byzantine_nodes_number) as usize {
-                if self.subnet_params.consensus_on_demand {
-                    // println!("\nBlock with hash: {} received at least n-f notarization shares", notary_content.block.get_ref());
-                    let block = get_block_by_hash_and_height(pool, &notary_content.block, notary_content.height);
-                    // CoD rule 3c: notarize only 'good' blocks
-                    match block_is_good(pool, &block.expect("block must be in pool")) {
-                        true => {
-                            println!("\nNotarization of block with hash: {} at height {} by committee: {:?}", notary_content.block.get_ref(), notary_content.height, shares);
-                            Some(notary_content.clone())
-                        },
-                        false => {
-                            None
+                        block: notary_content.block,
+                    },
+                };
+                if shares.len()
+                    >= (self.subnet_params.total_nodes_number
+                        - self.subnet_params.byzantine_nodes_number) as usize
+                {
+                    if self.subnet_params.consensus_on_demand {
+                        // println!("\nBlock with hash: {} received at least n-f notarization shares", notary_content.block.get_ref());
+                        let block = get_block_by_hash_and_height(
+                            pool,
+                            &notary_content.block,
+                            notary_content.height,
+                        );
+                        // CoD rule 3c: notarize only 'good' blocks
+                        match block_is_good(pool, &block.expect("block must be in pool")) {
+                            true => {
+                                // println!("\nNotarization of block with hash: {} at height {} by committee: {:?}", notary_content.block.get_ref(), notary_content.height, shares);
+                                Some(notary_content.clone())
+                            }
+                            false => None,
                         }
+                    } else {
+                        // println!("\nNotarization of block with hash: {} at height {} by committee: {:?}", notary_content.block.get_ref(), notary_content.height, shares);
+                        Some(notary_content)
                     }
+                } else {
+                    None
                 }
-                else {
-                    println!("\nNotarization of block with hash: {} at height {} by committee: {:?}", notary_content.block.get_ref(), notary_content.height, shares);
-                    Some(notary_content)
-                }
-            }
-            else {
-                None
-            }.map(|notary_content| {
-                ConsensusMessage::Notarization(
-                    Notarization {
+                .map(|notary_content| {
+                    ConsensusMessage::Notarization(Notarization {
                         content: NotarizationContent {
                             height: notary_content.height,
                             block: notary_content.block,
                         },
-                        signature: 0,   // committee signature
-                    }
-                )
+                        signature: 0, // committee signature
+                    })
+                })
             })
-        }).collect();
+            .collect();
         // println!("Notarizations: {:?}", notarizations);
         notarizations
     }
@@ -159,12 +160,12 @@ impl ShareAggregator {
                     >= (self.subnet_params.total_nodes_number
                         - self.subnet_params.byzantine_nodes_number) as usize
                 {
-                    println!(
-                        "\nFinalization of block with hash: {} at height {} by committee: {:?}",
-                        finalization_content.block.get_ref(),
-                        finalization_content.height,
-                        shares
-                    );
+                    // println!(
+                    //     "\nFinalization of block with hash: {} at height {} by committee: {:?}",
+                    //     finalization_content.block.get_ref(),
+                    //     finalization_content.height,
+                    //     shares
+                    // );
                     if let Some(finalization_time) =
                         pool.get_finalization_time(finalization_content.height)
                     {

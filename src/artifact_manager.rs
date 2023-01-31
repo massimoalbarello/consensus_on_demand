@@ -93,7 +93,7 @@ impl ArtifactProcessorManager {
         sender_outgoing_artifact: Sender<ConsensusMessage>,
         finalization_times: Arc<RwLock<BTreeMap<Height, Duration>>>,
     ) {
-        println!("Incoming artifacts thread loop started");
+        // println!("Incoming artifacts thread loop started");
         let recv_timeout = std::time::Duration::from_millis(ARTIFACT_MANAGER_TIMER_DURATION_MSEC);
         loop {
             let ret = receiver_incoming_request.recv_timeout(recv_timeout);

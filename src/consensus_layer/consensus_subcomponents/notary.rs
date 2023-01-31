@@ -97,10 +97,10 @@ impl Notary {
             if self.time_to_notarize(pool, height, rank) {
                 if !self.is_proposal_already_notarized_by_me(pool, &proposal) {
                     if let Some(s) = self.notarize_block(pool, proposal) {
-                        println!(
-                            "\nCreated notarization share: {:?} for proposal of rank: {:?}",
-                            s, rank
-                        );
+                        // println!(
+                        //     "\nCreated notarization share: {:?} for proposal of rank: {:?}",
+                        //     s, rank
+                        // );
                         notarization_shares.push(ConsensusMessage::NotarizationShare(s));
                     }
                 }

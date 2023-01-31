@@ -125,7 +125,7 @@ impl<'a> PoolReader<'a> {
             .goodness_artifact()
             .get_by_height(height)
         {
-            println!("{:?}", good);
+            // println!("{:?}", good);
         }
     }
 
@@ -181,7 +181,7 @@ impl<'a> PoolReader<'a> {
         if let Some(round_start_time) = self.get_round_start_time(height) {
             let current_time = system_time_now();
             let finalization_time = current_time - round_start_time;
-            println!("Time to finalize block: {:?}", finalization_time);
+            // println!("Time to finalize block: {:?}", finalization_time);
             return Some(finalization_time);
         }
         None
