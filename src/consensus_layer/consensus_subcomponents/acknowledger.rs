@@ -43,6 +43,7 @@ impl Acknowledger {
                     is_parent_finalized(pool, &notarization_content)
                 {
                     println!("\nAcknowledgement of block with hash: {} at height {} by committee: {:?}", notarization_content.block.get_ref(), notarization_content.height, committee);
+                    pool.print_finalization_time(notarization_content.height);
                     Some(notarization_content)
                 }
                 else {
