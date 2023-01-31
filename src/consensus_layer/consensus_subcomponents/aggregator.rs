@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
-use std::sync::{RwLock, Arc};
+use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use crate::consensus_layer::consensus_subcomponents::goodifier::{
@@ -70,7 +70,11 @@ impl ShareAggregator {
 
     /// Attempt to construct artifacts from artifact shares in the artifact
     /// pool
-    pub fn on_state_change(&self, pool: &PoolReader<'_>, finalization_times: Arc<RwLock<BTreeMap<Height, Duration>>>) -> Vec<ConsensusMessage> {
+    pub fn on_state_change(
+        &self,
+        pool: &PoolReader<'_>,
+        finalization_times: Arc<RwLock<BTreeMap<Height, Duration>>>,
+    ) -> Vec<ConsensusMessage> {
         // println!("\n########## Aggregator ##########");
         let mut messages = Vec::new();
         messages.append(&mut self.aggregate_notarization_shares(pool));
@@ -140,7 +144,11 @@ impl ShareAggregator {
     }
 
     /// Attempt to construct `Finalization`s
-    fn aggregate_finalization_shares(&self, pool: &PoolReader<'_>, finalization_times: Arc<RwLock<BTreeMap<Height, Duration>>>) -> Vec<ConsensusMessage> {
+    fn aggregate_finalization_shares(
+        &self,
+        pool: &PoolReader<'_>,
+        finalization_times: Arc<RwLock<BTreeMap<Height, Duration>>>,
+    ) -> Vec<ConsensusMessage> {
         let finalization_shares = pool
             .get_finalization_shares(pool.get_finalized_height() + 1, pool.get_notarized_height());
         let grouped_shares = aggregate(finalization_shares);
@@ -157,8 +165,13 @@ impl ShareAggregator {
                         finalization_content.height,
                         shares
                     );
-                    if let Some(finalization_time) = pool.get_finalization_time(finalization_content.height) {
-                        finalization_times.write().unwrap().insert(finalization_content.height, finalization_time);
+                    if let Some(finalization_time) =
+                        pool.get_finalization_time(finalization_content.height)
+                    {
+                        finalization_times
+                            .write()
+                            .unwrap()
+                            .insert(finalization_content.height, finalization_time);
                     }
                     Some(finalization_content)
                 } else {
