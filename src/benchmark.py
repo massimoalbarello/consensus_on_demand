@@ -1,12 +1,13 @@
 import subprocess
 import time
 import json
+import matplotlib.pyplot as plt
+
+
 
 def startReplica(procs, i):
-    if COD:
-        procs.append(subprocess.Popen(['cargo run --quiet -- --cod --n ' + str(N) + ' --f ' + str(F) + ' --p ' + str(P) + ' --t ' + str(T) + ' --r ' + str(i)], shell=True, stderr=subprocess.DEVNULL))
-    else:
-        procs.append(subprocess.Popen(['cargo run --quiet -- --n ' + str(N) + ' --f ' + str(F) + ' --p ' + str(P) + ' --t ' + str(T) + ' --r ' + str(i)], shell=True, stderr=subprocess.DEVNULL))
+    shellCommand = 'cargo run --quiet -- --n ' + str(N) + ' --f ' + str(F) + ' --p ' + str(P) + ' --t ' + str(T) + ' --r ' + str(i) + (' --cod' if COD else '')
+    procs.append(subprocess.Popen([shellCommand], shell=True, stderr=subprocess.DEVNULL))
 
 def startSubnet():
     procs = []
@@ -29,11 +30,27 @@ def getBenchmarks():
             results.append(json.loads(f.read()))
     return results
 
+def plotResults():
+    fig, ax = plt.subplots()
+    for i, benchmark in enumerate(benchmarks):
+        x = [iteration for iteration, _ in benchmark["results"].items()]
+        y = [time["secs"]+time["nanos"]*1e-9 for _, time in benchmark["results"].items()]
+        if len(y) != 0:
+            average = sum(y) / len(y)
+            print("The average time for block finalization for replica", i+1, "is:", average)
+        ax.plot(x, y, label=str(i+1))
+        ax.legend()
+    plt.show()
+
+
+
 COD = True
 N = 6
 F = 1
 P = 1
-T = 2000
+T = 300
+
+print("Runnning " + ("Fast IC Consensus" if COD else "original IC Consensus"))
 
 processes = startSubnet()
 
@@ -41,5 +58,4 @@ waitForSubnetTermination()
 
 benchmarks = getBenchmarks()
 
-for benchmark in benchmarks:
-    print("\n", benchmark["results"])
+plotResults()
