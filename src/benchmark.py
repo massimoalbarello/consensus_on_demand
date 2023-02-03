@@ -11,7 +11,7 @@ def startReplica(procs, i):
 
 def startSubnet():
     procs = []
-    for i in range(2, 7):
+    for i in range(2, N+1):
         startReplica(procs, i)
     # replica number 1 must be start last
     time.sleep(5)
@@ -48,7 +48,7 @@ COD = True
 N = 6
 F = 1
 P = 1
-T = 300
+T = 180
 
 print("Runnning " + ("Fast IC Consensus" if COD else "original IC Consensus"))
 
