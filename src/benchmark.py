@@ -38,13 +38,12 @@ def plotResults():
         if len(y) != 0:
             average = sum(y) / len(y)
             print("The average time for block finalization for replica", i+1, "is:", average)
-        plt.subplot(2, 1, 1)
+        plt.subplot(N, 1, i+1)
         plt.plot(x, y)
 
         y = [1 if metrics["fp_finalization"] == True else 0 for _, metrics in benchmark["results"].items()]
-        plt.subplot(2, 1, 2)
+        plt.subplot(N, 1, i+1)
         plt.plot(x, y)
-
     plt.show()
 
 
@@ -53,7 +52,7 @@ COD = True
 N = 6
 F = 1
 P = 1
-T = 30
+T = 100
 
 print("Runnning " + ("Fast IC Consensus" if COD else "original IC Consensus"))
 
