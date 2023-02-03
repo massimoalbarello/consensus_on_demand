@@ -3,16 +3,16 @@ use std::thread::{Builder as ThreadBuilder, JoinHandle};
 use std::{
     collections::BTreeMap,
     sync::{Arc, Mutex, RwLock},
-    time::Duration,
 };
 
+use crate::HeightMetrics;
 use crate::{
     consensus_layer::{
         artifacts::{ConsensusMessage, UnvalidatedArtifact},
         height_index::Height,
         ConsensusProcessor,
     },
-    time_source::{SysTimeSource, TimeSource},
+    time_source::SysTimeSource,
     SubnetParams,
 };
 
@@ -47,7 +47,7 @@ impl ArtifactProcessorManager {
         subnet_params: SubnetParams,
         time_source: Arc<SysTimeSource>,
         sender_outgoing_artifact: Sender<ConsensusMessage>,
-        finalization_times: Arc<RwLock<BTreeMap<Height, Duration>>>,
+        finalization_times: Arc<RwLock<BTreeMap<Height, Option<HeightMetrics>>>>,
     ) -> Self {
         let pending_artifacts = Arc::new(Mutex::new(Vec::new()));
         let (sender_incoming_request, receiver_incoming_request) =
@@ -91,7 +91,7 @@ impl ArtifactProcessorManager {
         sender_incoming_request: Sender<ProcessRequest>,
         receiver_incoming_request: Receiver<ProcessRequest>,
         sender_outgoing_artifact: Sender<ConsensusMessage>,
-        finalization_times: Arc<RwLock<BTreeMap<Height, Duration>>>,
+        finalization_times: Arc<RwLock<BTreeMap<Height, Option<HeightMetrics>>>>,
     ) {
         // println!("Incoming artifacts thread loop started");
         let recv_timeout = std::time::Duration::from_millis(ARTIFACT_MANAGER_TIMER_DURATION_MSEC);

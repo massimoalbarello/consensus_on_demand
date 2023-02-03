@@ -1,7 +1,6 @@
 use std::{
     collections::BTreeMap,
     sync::{Arc, RwLock},
-    time::Duration,
 };
 
 use super::{finalizer::FinalizationShareContent, notary::NotarizationShareContentCOD};
@@ -18,7 +17,7 @@ use crate::{
         pool_reader::PoolReader,
     },
     crypto::Signed,
-    SubnetParams,
+    SubnetParams, HeightMetrics,
 };
 
 /// A finalization share is a multi-signature share on a finalization content.
@@ -43,7 +42,7 @@ impl Acknowledger {
     pub fn on_state_change(
         &self,
         pool: &PoolReader<'_>,
-        finalization_times: Arc<RwLock<BTreeMap<Height, Duration>>>,
+        finalization_times: Arc<RwLock<BTreeMap<Height, Option<HeightMetrics>>>>,
     ) -> Vec<ConsensusMessage> {
         // println!("\n########## Acknowledger ##########");
         let height = pool.get_notarized_height() + 1;
@@ -65,10 +64,15 @@ impl Acknowledger {
                         if let Some(finalization_time) =
                             pool.get_finalization_time(notarization_content.height)
                         {
+                            let height_metrics = HeightMetrics {
+                                latency: finalization_time,
+                                fp_finalization: true,
+                            };
+
                             finalization_times
                                 .write()
                                 .unwrap()
-                                .insert(notarization_content.height, finalization_time);
+                                .insert(notarization_content.height, Some(height_metrics));
                         }
                         Some(notarization_content)
                     } else {

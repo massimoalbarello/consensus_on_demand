@@ -1,7 +1,6 @@
 use std::{
     collections::BTreeMap,
     sync::{Arc, RwLock},
-    time::Duration,
 };
 
 use async_std::task;
@@ -25,7 +24,7 @@ use crate::{
         height_index::Height,
     },
     time_source::{SysTimeSource, TimeSource},
-    SubnetParams,
+    SubnetParams, HeightMetrics,
 };
 
 // We create a custom network behaviour that combines floodsub and mDNS.
@@ -79,7 +78,7 @@ impl Peer {
         replica_number: u8,
         subnet_params: SubnetParams,
         topic: &str,
-        finalization_times: Arc<RwLock<BTreeMap<Height, Duration>>>,
+        finalization_times: Arc<RwLock<BTreeMap<Height, Option<HeightMetrics>>>>,
     ) -> Self {
         let starting_round = 1;
         // Create a random PeerId

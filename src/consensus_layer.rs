@@ -1,5 +1,5 @@
 use crate::artifact_manager::ProcessingResult;
-use crate::SubnetParams;
+use crate::{SubnetParams, HeightMetrics};
 
 pub mod pool;
 use crate::consensus_layer::pool::ConsensusPoolImpl;
@@ -19,7 +19,6 @@ pub mod consensus_subcomponents;
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock};
-use std::time::Duration;
 
 use self::height_index::Height;
 
@@ -48,7 +47,7 @@ impl ConsensusProcessor {
         &self,
         time_source: &dyn TimeSource,
         artifacts: Vec<UnvalidatedArtifact<ConsensusMessage>>,
-        finalization_times: Arc<RwLock<BTreeMap<Height, Duration>>>,
+        finalization_times: Arc<RwLock<BTreeMap<Height, Option<HeightMetrics>>>>,
     ) -> (Vec<ConsensusMessage>, ProcessingResult) {
         {
             let mut consensus_pool = self.consensus_pool.write().unwrap();

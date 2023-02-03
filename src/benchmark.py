@@ -31,15 +31,20 @@ def getBenchmarks():
     return results
 
 def plotResults():
-    fig, ax = plt.subplots()
+    plt.figure()
     for i, benchmark in enumerate(benchmarks):
         x = [iteration for iteration, _ in benchmark["results"].items()]
-        y = [time["secs"]+time["nanos"]*1e-9 for _, time in benchmark["results"].items()]
+        y = [metrics["latency"]["secs"]+metrics["latency"]["nanos"]*1e-9 for _, metrics in benchmark["results"].items()]
         if len(y) != 0:
             average = sum(y) / len(y)
             print("The average time for block finalization for replica", i+1, "is:", average)
-        ax.plot(x, y, label=str(i+1))
-        ax.legend()
+        plt.subplot(2, 1, 1)
+        plt.plot(x, y)
+
+        y = [1 if metrics["fp_finalization"] == True else 0 for _, metrics in benchmark["results"].items()]
+        plt.subplot(2, 1, 2)
+        plt.plot(x, y)
+
     plt.show()
 
 
@@ -48,7 +53,7 @@ COD = True
 N = 6
 F = 1
 P = 1
-T = 180
+T = 30
 
 print("Runnning " + ("Fast IC Consensus" if COD else "original IC Consensus"))
 

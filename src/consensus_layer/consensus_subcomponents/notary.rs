@@ -11,7 +11,7 @@ use crate::{
 
 use super::block_maker::{Block, BlockProposal};
 
-pub const NOTARIZATION_UNIT_DELAY: Duration = Duration::from_millis(600);
+pub const NOTARIZATION_UNIT_DELAY: Duration = Duration::from_millis(1000);
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum NotarizationShareContent {

@@ -13,9 +13,16 @@ use std::{
 };
 use structopt::StructOpt;
 
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct HeightMetrics {
+    latency: Duration,
+    fp_finalization: bool,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 struct BenchmarkResult {
-    results: BTreeMap<Height, Duration>,
+    results: BTreeMap<Height, Option<HeightMetrics>>,
 }
 
 pub mod network_layer;
@@ -72,7 +79,7 @@ async fn broadcast_message_future() {
 async fn main() {
     let opt = Opt::from_args();
 
-    let finalizations_times = Arc::new(RwLock::new(BTreeMap::<Height, Duration>::new()));
+    let finalizations_times = Arc::new(RwLock::new(BTreeMap::<Height, Option<HeightMetrics>>::new()));
     let cloned_finalization_times = Arc::clone(&finalizations_times);
 
     let mut my_peer = Peer::new(

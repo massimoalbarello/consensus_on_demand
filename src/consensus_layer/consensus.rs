@@ -1,10 +1,9 @@
 use std::{
     collections::BTreeMap,
     sync::{Arc, RwLock},
-    time::Duration,
 };
 
-use crate::{time_source::TimeSource, SubnetParams};
+use crate::{time_source::TimeSource, SubnetParams, HeightMetrics};
 
 use super::{
     artifacts::{ChangeAction, ChangeSet, ConsensusMessage},
@@ -93,7 +92,7 @@ impl ConsensusImpl {
     pub fn on_state_change(
         &self,
         pool: &ConsensusPoolImpl,
-        finalization_times: Arc<RwLock<BTreeMap<Height, Duration>>>,
+        finalization_times: Arc<RwLock<BTreeMap<Height, Option<HeightMetrics>>>>,
     ) -> (ChangeSet, bool) {
         // Invoke `on_state_change` on each subcomponent in order.
         // Return the first non-empty [ChangeSet] as returned by a subcomponent.

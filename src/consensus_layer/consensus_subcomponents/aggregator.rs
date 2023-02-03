@@ -6,7 +6,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, RwLock};
-use std::time::Duration;
 
 use crate::consensus_layer::consensus_subcomponents::goodifier::{
     block_is_good, get_block_by_hash_and_height,
@@ -14,7 +13,7 @@ use crate::consensus_layer::consensus_subcomponents::goodifier::{
 use crate::consensus_layer::height_index::Height;
 use crate::consensus_layer::{artifacts::ConsensusMessage, pool_reader::PoolReader};
 use crate::crypto::{CryptoHashOf, Signed};
-use crate::SubnetParams;
+use crate::{SubnetParams, HeightMetrics};
 
 use super::block_maker::Block;
 use super::notary::{NotarizationShareContent, NotarizationShareContentCOD};
@@ -73,7 +72,7 @@ impl ShareAggregator {
     pub fn on_state_change(
         &self,
         pool: &PoolReader<'_>,
-        finalization_times: Arc<RwLock<BTreeMap<Height, Duration>>>,
+        finalization_times: Arc<RwLock<BTreeMap<Height, Option<HeightMetrics>>>>,
     ) -> Vec<ConsensusMessage> {
         // println!("\n########## Aggregator ##########");
         let mut messages = Vec::new();
@@ -148,7 +147,7 @@ impl ShareAggregator {
     fn aggregate_finalization_shares(
         &self,
         pool: &PoolReader<'_>,
-        finalization_times: Arc<RwLock<BTreeMap<Height, Duration>>>,
+        finalization_times: Arc<RwLock<BTreeMap<Height, Option<HeightMetrics>>>>,
     ) -> Vec<ConsensusMessage> {
         let finalization_shares = pool
             .get_finalization_shares(pool.get_finalized_height() + 1, pool.get_notarized_height());
@@ -169,10 +168,15 @@ impl ShareAggregator {
                     if let Some(finalization_time) =
                         pool.get_finalization_time(finalization_content.height)
                     {
+                        let height_metrics = HeightMetrics {
+                            latency: finalization_time,
+                            fp_finalization: false,
+                        };
+
                         finalization_times
                             .write()
                             .unwrap()
-                            .insert(finalization_content.height, finalization_time);
+                            .insert(finalization_content.height, Some(height_metrics));
                     }
                     Some(finalization_content)
                 } else {
