@@ -80,6 +80,17 @@ def countFpSequences(first_index_offset, arr):
 
     return sequences
 
+def plotSequenceLengthDistribution(i, arr):
+    frequencies = {}
+    for j in arr:
+        if j in frequencies:
+            frequencies[j] += 1
+        else:
+            frequencies[j] = 1
+
+    plt.subplot(2*N, 1, i+1)
+    plt.bar(frequencies.keys(), frequencies.values(), color='blue')
+
 def printStatistics(i, first_index_offset, latencies, filled_finalization_types):
     print("\n### Replica", i+1, "###")
     if len(latencies) != 0:
@@ -93,10 +104,13 @@ def printStatistics(i, first_index_offset, latencies, filled_finalization_types)
     print("- IC finalized:", total_ic_finalizations)
     print("- not explicitly finalized:", total_non_finalizations)
     if COD:
+        sequences_length = []
         sequences = countFpSequences(first_index_offset, filled_finalization_types)
         print("Found", len(sequences), "sequences:")
         for sequence in sequences:
             print("- starting at", sequence["IC_index"], "with length", sequence["length"])
+            sequences_length.append(sequence["length"])
+        plotSequenceLengthDistribution(i, sequences_length)
 
 def plotResults():
     plt.figure()
@@ -107,7 +121,7 @@ def plotResults():
         finalization_types = ["FP" if metrics["fp_finalization"] == True else "IC" for metrics in benchmark["results"].values()]
         _, filled_finalization_types = fillMissingElements(iterations, finalization_types, "-")
         printStatistics(i, filled_iterations[0], latencies, filled_finalization_types)
-        ax = plt.subplot(N, 1, i+1)
+        ax = plt.subplot(2*N, 1, N+i+1)
         for j, type in enumerate(filled_finalization_types):
             if type == "FP":
                 ax.bar(filled_iterations[j], filled_latencies[j], width=1, color='green')
