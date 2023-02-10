@@ -105,7 +105,7 @@ def plotResults():
         latencies = [metrics["latency"]["secs"]+metrics["latency"]["nanos"]*1e-9 for metrics in benchmark["results"].values()]
         filled_iterations, filled_latencies = fillMissingElements(iterations, latencies, 0)
         finalization_types = ["FP" if metrics["fp_finalization"] == True else "IC" for metrics in benchmark["results"].values()]
-        _, filled_finalization_types = fill_missing_elements(iterations, finalization_types, "-")
+        _, filled_finalization_types = fillMissingElements(iterations, finalization_types, "-")
         printStatistics(i, filled_iterations[0], latencies, filled_finalization_types)
         ax = plt.subplot(N, 1, i+1)
         for j, type in enumerate(filled_finalization_types):
@@ -125,7 +125,7 @@ COD = True
 N = 6
 F = 1
 P = 1
-T = 100
+T = 300
 
 print("Runnning " + ("Fast IC Consensus" if COD else "original IC Consensus"))
 
