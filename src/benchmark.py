@@ -196,12 +196,12 @@ def getResults():
 
 
 ADVERSARY_TYPE = 1  # 0: no adversary, 1: passive adversary
-COD = True
-N = 6
-F = 1
-P = 1
-T = 600
-D = 1000
+COD = True          # use FICC (True) or ICC (False)
+N = 6               # total number of replicas
+F = 1               # number of corrupt replicas
+P = 1               # number of replicas that can disagree during fast-path finalization
+T = 600             # subnet simulation time (seconds)
+D = 1000            # artifct delay for block proposals and notarization shares
 
 if N <= 3*F + 2*P:
     print("Wrong parameters: must satisfy: N > 3F + 2P")
