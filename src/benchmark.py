@@ -35,7 +35,6 @@ def waitForSubnetTermination():
     for p in processes:
         p.communicate() # waits for replica to finish and return result (none)
 
-
 def getBenchmarks():
     results = []
     for i, _ in enumerate(processes):
@@ -92,25 +91,14 @@ def countFpSequences(first_index_offset, arr):
 
     return sequences
 
-def plotSequenceLengthDistribution(i, arr):
-    frequencies = {}
-    for j in arr:
-        if j in frequencies:
-            frequencies[j] += 1
-        else:
-            frequencies[j] = 1
-
-    plt.subplot(2*N, 1, N+i+1)
-    plt.bar(frequencies.keys(), frequencies.values(), width=1, color='orange')
-
 def printMetrics(
-        i,
-        average_latency,
-        total_fp_finalizations,
-        total_ic_finalizations,
-        total_non_finalizations,
-        sequences,
-    ):
+    i,
+    average_latency,
+    total_fp_finalizations,
+    total_ic_finalizations,
+    total_non_finalizations,
+    sequences,
+):
     print("\n### Replica", i+1, "###")
     print("The average time for block finalization is:", average_latency)
     print("The number of iterations in which the block is:")
@@ -144,13 +132,22 @@ def processResults(latencies, filled_iterations, filled_finalization_types):
         sequences_length
     )
 
-def plotResults(i, ax, filled_iterations, filled_latencies, filled_finalization_types, sequences_length):
+def plotSequenceLengthDistribution(ax, arr):
+    frequencies = {}
+    for j in arr:
+        if j in frequencies:
+            frequencies[j] += 1
+        else:
+            frequencies[j] = 1
+
+    ax.bar(frequencies.keys(), frequencies.values(), width=1, color='orange')
+
+def plotLatencies(i, ax, filled_iterations, filled_latencies, filled_finalization_types):
     for j, type in enumerate(filled_finalization_types):
         if type == "FP":
             ax.bar(filled_iterations[j], filled_latencies[j], width=1, color='green')
         elif type == "IC":
             ax.bar(filled_iterations[j], filled_latencies[j], width=1, color="blue" )
-    plotSequenceLengthDistribution(i, sequences_length)
 
 def getResults():
     plt.figure()
@@ -179,23 +176,31 @@ def getResults():
             sequences,
         )
 
-        ax = plt.subplot(2*N, 1, i+1)
-        plotResults(i, ax, filled_iterations, filled_latencies, filled_finalization_types, sequences_length)
+        ax_lat = plt.subplot(2*N if COD else N, 1, i+1)
+        plotLatencies(i, ax_lat, filled_iterations, filled_latencies, filled_finalization_types)
         if i == 0:
-            xlim = ax.get_xlim()
+            xlim_lat = ax_lat.get_xlim()
         else:
-            ax.set_xlim(xlim)
+            ax_lat.set_xlim(xlim_lat)
+
+        if COD:
+            ax_distr = plt.subplot(2*N, 1, N+i+1)
+            plotSequenceLengthDistribution(ax_distr, sequences_length)
+            if i == 0:
+                xlim_distr = ax_distr.get_xlim()
+            else:
+                ax_distr.set_xlim(xlim_distr)
 
     plt.show()
 
 
 
-ADVERSARY_TYPE = 0  # 0: no adversary, 1: passive adversary
+ADVERSARY_TYPE = 1  # 0: no adversary, 1: passive adversary
 COD = True
 N = 6
 F = 1
 P = 1
-T = 60
+T = 600
 D = 1000
 
 if N <= 3*F + 2*P:
