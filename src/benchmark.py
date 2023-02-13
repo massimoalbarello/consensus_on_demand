@@ -200,11 +200,11 @@ COD = True          # use FICC (True) or ICC (False)
 N = 6               # total number of replicas
 F = 1               # number of corrupt replicas
 P = 1               # number of replicas that can disagree during fast-path finalization
-T = 600             # subnet simulation time (seconds)
-D = 1500            # artifct delay for block proposals and notarization shares
+T = 100             # subnet simulation time (seconds)
+D = 1500            # artifct delay for block proposals and notarization shares (milliseconds)
 
-if N <= 3*F + 2*P:
-    print("Wrong parameters: must satisfy: N > 3F + 2P")
+if N <= 3*F + 2*P or P > F:
+    print("Wrong parameters: must satisfy: N > 3F + 2P and P <= F")
 elif T < 60:
     print("Subnet must be run for at least 60 seconds")
 elif D < 100:
