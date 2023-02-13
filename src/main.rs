@@ -50,6 +50,8 @@ struct Opt {
     cod: bool, // enable Fast IC Consensus
     #[structopt(short, long, default_value = "300")]
     t: u64, // time to run replica
+    #[structopt(short, long, default_value = "500")]
+    d: u64, // notary delay
 }
 
 #[derive(Clone)]
@@ -58,15 +60,17 @@ pub struct SubnetParams {
     byzantine_nodes_number: u8,
     disagreeing_nodes_number: u8,
     consensus_on_demand: bool,
+    artifact_delay: u64,
 }
 
 impl SubnetParams {
-    fn new(n: u8, f: u8, p: u8, cod: bool) -> Self {
+    fn new(n: u8, f: u8, p: u8, cod: bool, d: u64) -> Self {
         Self {
             total_nodes_number: n,
             byzantine_nodes_number: f,
             disagreeing_nodes_number: p,
             consensus_on_demand: cod,
+            artifact_delay: d,
         }
     }
 }
@@ -84,7 +88,7 @@ async fn main() {
 
     let mut my_peer = Peer::new(
         opt.r,
-        SubnetParams::new(opt.n, opt.f, opt.p, opt.cod),
+        SubnetParams::new(opt.n, opt.f, opt.p, opt.cod, opt.d),
         "gossip_blocks",
         cloned_finalization_times,
     )
