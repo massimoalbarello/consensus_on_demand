@@ -201,7 +201,7 @@ N = 6               # total number of replicas
 F = 1               # number of corrupt replicas
 P = 1               # number of replicas that can disagree during fast-path finalization
 T = 600             # subnet simulation time (seconds)
-D = 1000            # artifct delay for block proposals and notarization shares
+D = 1500            # artifct delay for block proposals and notarization shares
 
 if N <= 3*F + 2*P:
     print("Wrong parameters: must satisfy: N > 3F + 2P")
