@@ -24,12 +24,12 @@ pub struct HeightMetrics {
 #[derive(Serialize, Deserialize, Debug)]
 struct BenchmarkResult {
     finalization_times: BTreeMap<Height, Option<HeightMetrics>>,
-    network_delays: BTreeMap<CryptoHash, ArtifactDelyInfo>,
+    network_delays: BTreeMap<CryptoHash, ArtifactDelayInfo>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ArtifactDelyInfo {
-    sent: Time,
+pub struct ArtifactDelayInfo {
+    sent: Option<Time>,
     received: Option<Time>,
 }
 
@@ -94,7 +94,7 @@ async fn main() {
     let finalizations_times = Arc::new(RwLock::new(BTreeMap::<Height, Option<HeightMetrics>>::new()));
     let cloned_finalization_times = Arc::clone(&finalizations_times);
 
-    let network_delays = Arc::new(RwLock::new(BTreeMap::<CryptoHash, ArtifactDelyInfo>::new()));
+    let network_delays = Arc::new(RwLock::new(BTreeMap::<CryptoHash, ArtifactDelayInfo>::new()));
     let cloned_network_delays = Arc::clone(&network_delays);
 
     let mut my_peer = Peer::new(

@@ -24,7 +24,7 @@ use crate::{
         height_index::Height,
     },
     time_source::{SysTimeSource, TimeSource},
-    SubnetParams, HeightMetrics, crypto::CryptoHash, ArtifactDelyInfo,
+    SubnetParams, HeightMetrics, crypto::CryptoHash, ArtifactDelayInfo,
 };
 
 // We create a custom network behaviour that combines floodsub and mDNS.
@@ -71,7 +71,7 @@ pub struct Peer {
     receiver_outgoing_artifact: Receiver<ConsensusMessage>,
     time_source: Arc<SysTimeSource>,
     manager: ArtifactProcessorManager,
-    network_delays: Arc<RwLock<BTreeMap<CryptoHash, ArtifactDelyInfo>>>,
+    network_delays: Arc<RwLock<BTreeMap<CryptoHash, ArtifactDelayInfo>>>,
 }
 
 impl Peer {
@@ -80,7 +80,7 @@ impl Peer {
         subnet_params: SubnetParams,
         topic: &str,
         finalization_times: Arc<RwLock<BTreeMap<Height, Option<HeightMetrics>>>>,
-        network_delays: Arc<RwLock<BTreeMap<CryptoHash, ArtifactDelyInfo>>>,
+        network_delays: Arc<RwLock<BTreeMap<CryptoHash, ArtifactDelayInfo>>>,
     ) -> Self {
         let starting_round = 1;
         // Create a random PeerId
@@ -152,8 +152,8 @@ impl Peer {
                 match &outgoing_artifact {
                     ConsensusMessage::BlockProposal(block_proposal) => {
                         let block_hash = block_proposal.content.hash.clone();
-                        let artifact_delay_info = ArtifactDelyInfo {
-                            sent: self.time_source.get_relative_time(),
+                        let artifact_delay_info = ArtifactDelayInfo {
+                            sent: Some(self.time_source.get_relative_time()),
                             received: None,
                         };
                         self.network_delays
@@ -225,9 +225,25 @@ impl Peer {
     pub fn handle_incoming_message(&mut self, message_variant: Message) {
         match message_variant {
             Message::KeepAliveMessage => (),
-            Message::ConsensusMessage(consensus_message) => self.manager.on_artifact(
-                UnvalidatedArtifact::new(consensus_message, self.time_source.get_relative_time()),
-            ),
+            Message::ConsensusMessage(consensus_message) => {
+                match &consensus_message {
+                    ConsensusMessage::BlockProposal(block_proposal) => {
+                        let block_hash = block_proposal.content.hash.clone();
+                        let artifact_delay_info = ArtifactDelayInfo {
+                            sent: None,
+                            received: Some(self.time_source.get_relative_time()),
+                        };
+                        self.network_delays
+                            .write()
+                            .unwrap()
+                            .insert(block_hash, artifact_delay_info);
+                    },
+                    _ => ()
+                };
+                self.manager.on_artifact(
+                    UnvalidatedArtifact::new(consensus_message, self.time_source.get_relative_time()),
+                );
+            }
         }
     }
 }

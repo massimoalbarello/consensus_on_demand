@@ -159,10 +159,16 @@ def getResults():
         _, filled_finalization_types = fillMissingElements(iterations, finalization_types, "-")
 
         proposed_blocks_hashes = [hash for hash in benchmark["network_delays"].keys()]
-        proposal_time = [network_delays["sent"] for network_delays in benchmark["network_delays"].values()]
+        sent_time = [network_delays["sent"] for network_delays in benchmark["network_delays"].values()]
+        received_time = [network_delays["received"] for network_delays in benchmark["network_delays"].values()]
 
+        print("Block proposals sent")
         for j, hash in enumerate(proposed_blocks_hashes):
-            print(hash, proposal_time[j])
+            print(hash, sent_time[j])
+        
+        print("Block proposals received")
+        for j, hash in enumerate(proposed_blocks_hashes):
+            print(hash, received_time[j])
 
         (
             average_latency,
