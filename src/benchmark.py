@@ -2,6 +2,7 @@ import subprocess
 import time
 import json
 import matplotlib.pyplot as plt
+import statistics
 
 
 
@@ -110,7 +111,7 @@ def printMetrics(
         print("- starting at", sequence["IC_index"], "with length", sequence["length"])
 
 
-def processResults(latencies, filled_iterations, filled_finalization_types):
+def processResults(latencies, filled_iterations, filled_finalization_types, delays_info, proposals_timings):
     average_latency = None
     if len(latencies) != 0:
         average_latency = sum(latencies) / len(latencies)
@@ -123,6 +124,20 @@ def processResults(latencies, filled_iterations, filled_finalization_types):
         sequences = countFpSequences(filled_iterations[0], filled_finalization_types)
         for sequence in sequences:
             sequences_length.append(sequence["length"])
+
+    for hash, timings in proposals_timings.items():
+        if hash not in delays_info:
+            delays_info[hash] = {
+                "sent": None,
+                "received": [],
+            }
+        if timings["sent"] != None:
+            delays_info[hash]["sent"] = timings["sent"]
+        elif timings["received"] != None:
+            delays_info[hash]["received"].append(timings["received"])
+        else:
+            print("Replica didn't send nor receive block", hash)
+
     return (
         average_latency,
         total_fp_finalizations,
@@ -149,26 +164,22 @@ def plotLatencies(i, ax, filled_iterations, filled_latencies, filled_finalizatio
         elif type == "IC":
             ax.bar(filled_iterations[j], filled_latencies[j], width=1, color="blue" )
 
+def computeNetworkDelays(delays_info):
+    for hash, delay_info in delays_info.items():
+        delays_info[hash]["network_delays"] = [(received_time-delay_info["sent"])*1e-9 for received_time in delay_info["received"]]
+        delays_info[hash]["average_network_delay"] = statistics.mean(delays_info[hash]["network_delays"]) if len(delays_info[hash]["network_delays"]) > 0 else None
+    proposals_network_delays = [proposal_info["average_network_delay"] for proposal_info in delays_info.values() if proposal_info["average_network_delay"] is not None]
+    return proposals_network_delays
+
 def getResults():
     plt.figure()
+    delays_info = {}
     for i, benchmark in enumerate(benchmarks):
         iterations = [int(iteration) for iteration in benchmark["finalization_times"].keys()]
         latencies = [metrics["latency"]["secs"]+metrics["latency"]["nanos"]*1e-9 for metrics in benchmark["finalization_times"].values()]
         filled_iterations, filled_latencies = fillMissingElements(iterations, latencies, 0)
         finalization_types = ["FP" if metrics["fp_finalization"] == True else "IC" for metrics in benchmark["finalization_times"].values()]
         _, filled_finalization_types = fillMissingElements(iterations, finalization_types, "-")
-
-        proposed_blocks_hashes = [hash for hash in benchmark["network_delays"].keys()]
-        sent_time = [network_delays["sent"] for network_delays in benchmark["network_delays"].values()]
-        received_time = [network_delays["received"] for network_delays in benchmark["network_delays"].values()]
-
-        print("Block proposals sent")
-        for j, hash in enumerate(proposed_blocks_hashes):
-            print(hash, sent_time[j])
-        
-        print("Block proposals received")
-        for j, hash in enumerate(proposed_blocks_hashes):
-            print(hash, received_time[j])
 
         (
             average_latency,
@@ -177,7 +188,7 @@ def getResults():
             total_non_finalizations,
             sequences,
             sequences_length
-        ) = processResults(latencies, filled_iterations, filled_finalization_types)
+        ) = processResults(latencies, filled_iterations, filled_finalization_types, delays_info, benchmark["proposals_timings"])
 
         printMetrics(
             i,
@@ -202,6 +213,10 @@ def getResults():
                 xlim_distr = ax_distr.get_xlim()
             else:
                 ax_distr.set_xlim(xlim_distr)
+
+    proposals_network_delays = computeNetworkDelays(delays_info)
+    average_network_delay = statistics.mean(proposals_network_delays)
+    print("\nThe average network delay is:", average_network_delay)
 
     plt.show()
 

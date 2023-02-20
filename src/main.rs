@@ -24,7 +24,7 @@ pub struct HeightMetrics {
 #[derive(Serialize, Deserialize, Debug)]
 struct BenchmarkResult {
     finalization_times: BTreeMap<Height, Option<HeightMetrics>>,
-    network_delays: BTreeMap<CryptoHash, ArtifactDelayInfo>,
+    proposals_timings: BTreeMap<CryptoHash, ArtifactDelayInfo>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -94,15 +94,15 @@ async fn main() {
     let finalizations_times = Arc::new(RwLock::new(BTreeMap::<Height, Option<HeightMetrics>>::new()));
     let cloned_finalization_times = Arc::clone(&finalizations_times);
 
-    let network_delays = Arc::new(RwLock::new(BTreeMap::<CryptoHash, ArtifactDelayInfo>::new()));
-    let cloned_network_delays = Arc::clone(&network_delays);
+    let proposals_timings = Arc::new(RwLock::new(BTreeMap::<CryptoHash, ArtifactDelayInfo>::new()));
+    let cloned_proposals_timings = Arc::clone(&proposals_timings);
 
     let mut my_peer = Peer::new(
         opt.r,
         SubnetParams::new(opt.n, opt.f, opt.p, opt.cod, opt.d),
         "gossip_blocks",
         cloned_finalization_times,
-        cloned_network_delays,
+        cloned_proposals_timings,
     )
     .await;
 
@@ -134,7 +134,7 @@ async fn main() {
 
             let benchmark_result = BenchmarkResult {
                 finalization_times: finalizations_times.read().unwrap().clone(),
-                network_delays: network_delays.read().unwrap().clone(),
+                proposals_timings: proposals_timings.read().unwrap().clone(),
             };
 
             let encoded = to_string(&benchmark_result).unwrap();

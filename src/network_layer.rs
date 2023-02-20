@@ -23,7 +23,7 @@ use crate::{
         artifacts::{ConsensusMessage, UnvalidatedArtifact},
         height_index::Height,
     },
-    time_source::{SysTimeSource, TimeSource},
+    time_source::{SysTimeSource, TimeSource, system_time_now},
     SubnetParams, HeightMetrics, crypto::CryptoHash, ArtifactDelayInfo,
 };
 
@@ -71,7 +71,7 @@ pub struct Peer {
     receiver_outgoing_artifact: Receiver<ConsensusMessage>,
     time_source: Arc<SysTimeSource>,
     manager: ArtifactProcessorManager,
-    network_delays: Arc<RwLock<BTreeMap<CryptoHash, ArtifactDelayInfo>>>,
+    proposals_timings: Arc<RwLock<BTreeMap<CryptoHash, ArtifactDelayInfo>>>,
 }
 
 impl Peer {
@@ -80,7 +80,7 @@ impl Peer {
         subnet_params: SubnetParams,
         topic: &str,
         finalization_times: Arc<RwLock<BTreeMap<Height, Option<HeightMetrics>>>>,
-        network_delays: Arc<RwLock<BTreeMap<CryptoHash, ArtifactDelayInfo>>>,
+        proposals_timings: Arc<RwLock<BTreeMap<CryptoHash, ArtifactDelayInfo>>>,
     ) -> Self {
         let starting_round = 1;
         // Create a random PeerId
@@ -126,7 +126,7 @@ impl Peer {
                 sender_outgoing_artifact,
                 finalization_times,
             ),
-            network_delays,
+            proposals_timings,
         };
         // println!(
         //     "Local node initialized with number: {} and peer id: {:?}",
@@ -153,10 +153,10 @@ impl Peer {
                     ConsensusMessage::BlockProposal(block_proposal) => {
                         let block_hash = block_proposal.content.hash.clone();
                         let artifact_delay_info = ArtifactDelayInfo {
-                            sent: Some(self.time_source.get_relative_time()),
+                            sent: Some(system_time_now()),
                             received: None,
                         };
-                        self.network_delays
+                        self.proposals_timings
                             .write()
                             .unwrap()
                             .insert(block_hash, artifact_delay_info);
@@ -231,9 +231,9 @@ impl Peer {
                         let block_hash = block_proposal.content.hash.clone();
                         let artifact_delay_info = ArtifactDelayInfo {
                             sent: None,
-                            received: Some(self.time_source.get_relative_time()),
+                            received: Some(system_time_now()),
                         };
-                        self.network_delays
+                        self.proposals_timings
                             .write()
                             .unwrap()
                             .insert(block_hash, artifact_delay_info);
