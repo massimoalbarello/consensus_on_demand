@@ -49,7 +49,7 @@ impl<T: IntoInner<ConsensusMessage> + HasTimestamp + Clone + Debug> InMemoryPool
                 }
                 PoolSectionOp::Remove(msg_id) => {
                     if self.remove(&msg_id).is_none() {
-                        println!("Error removing artifact {:?}", &msg_id);
+                        // println!("Error removing artifact {:?}", &msg_id);
                     } else {
                         // println!("Removing artifact");
                     }

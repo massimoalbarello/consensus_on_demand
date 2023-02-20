@@ -1,12 +1,20 @@
-
-use std::sync::{Arc, Mutex};
 use crossbeam_channel::{Receiver, RecvTimeoutError, Sender};
 use std::thread::{Builder as ThreadBuilder, JoinHandle};
+use std::{
+    collections::BTreeMap,
+    sync::{Arc, Mutex, RwLock},
+};
 
-use crate::{consensus_layer::{
-    ConsensusProcessor,
-    artifacts::{ConsensusMessage, UnvalidatedArtifact}
-}, time_source::{TimeSource, SysTimeSource}, SubnetParams};
+use crate::HeightMetrics;
+use crate::{
+    consensus_layer::{
+        artifacts::{ConsensusMessage, UnvalidatedArtifact},
+        height_index::Height,
+        ConsensusProcessor,
+    },
+    time_source::SysTimeSource,
+    SubnetParams,
+};
 
 // Periodic duration of `PollEvent` in milliseconds.
 const ARTIFACT_MANAGER_TIMER_DURATION_MSEC: u64 = 200;
@@ -34,16 +42,27 @@ pub struct ArtifactProcessorManager {
 }
 
 impl ArtifactProcessorManager {
-    pub fn new(replica_number: u8, subnet_params: SubnetParams, time_source: Arc<SysTimeSource>, sender_outgoing_artifact: Sender<ConsensusMessage>) -> Self {
-
+    pub fn new(
+        replica_number: u8,
+        subnet_params: SubnetParams,
+        time_source: Arc<SysTimeSource>,
+        sender_outgoing_artifact: Sender<ConsensusMessage>,
+        finalization_times: Arc<RwLock<BTreeMap<Height, Option<HeightMetrics>>>>,
+    ) -> Self {
         let pending_artifacts = Arc::new(Mutex::new(Vec::new()));
-        let (sender_incoming_request, receiver_incoming_request) = crossbeam_channel::unbounded::<ProcessRequest>();
+        let (sender_incoming_request, receiver_incoming_request) =
+            crossbeam_channel::unbounded::<ProcessRequest>();
 
-        let client = Box::new(ConsensusProcessor::new(replica_number, subnet_params, Arc::clone(&time_source) as Arc<_>));
+        let client = Box::new(ConsensusProcessor::new(
+            replica_number,
+            subnet_params,
+            Arc::clone(&time_source) as Arc<_>,
+        ));
 
         // Spawn the processor thread
         let sender_incoming_request_cl = sender_incoming_request.clone();
         let pending_artifacts_cl = pending_artifacts.clone();
+
         let handle = ThreadBuilder::new()
             .spawn(move || {
                 Self::process_messages(
@@ -53,6 +72,7 @@ impl ArtifactProcessorManager {
                     sender_incoming_request_cl,
                     receiver_incoming_request,
                     sender_outgoing_artifact,
+                    finalization_times,
                 );
             })
             .unwrap();
@@ -71,8 +91,9 @@ impl ArtifactProcessorManager {
         sender_incoming_request: Sender<ProcessRequest>,
         receiver_incoming_request: Receiver<ProcessRequest>,
         sender_outgoing_artifact: Sender<ConsensusMessage>,
+        finalization_times: Arc<RwLock<BTreeMap<Height, Option<HeightMetrics>>>>,
     ) {
-        println!("Incoming artifacts thread loop started");
+        // println!("Incoming artifacts thread loop started");
         let recv_timeout = std::time::Duration::from_millis(ARTIFACT_MANAGER_TIMER_DURATION_MSEC);
         loop {
             let ret = receiver_incoming_request.recv_timeout(recv_timeout);
@@ -88,7 +109,11 @@ impl ArtifactProcessorManager {
                         artifacts
                     };
 
-                    let (adverts, result) = client.process_changes(time_source.as_ref(), artifacts);
+                    let (adverts, result) = client.process_changes(
+                        time_source.as_ref(),
+                        artifacts,
+                        Arc::clone(&finalization_times),
+                    );
 
                     if let ProcessingResult::StateChanged = result {
                         sender_incoming_request
@@ -97,9 +122,11 @@ impl ArtifactProcessorManager {
                     }
                     adverts.into_iter().for_each(|adv| {
                         // use channel to send locally generated artifacts to network layer so that it can broadcast them
-                        sender_outgoing_artifact.send(adv).unwrap_or_else(|err| panic!("Failed to send artifact: {:?}", err));
+                        sender_outgoing_artifact
+                            .send(adv)
+                            .unwrap_or_else(|err| panic!("Failed to send artifact: {:?}", err));
                     });
-                },
+                }
                 Err(RecvTimeoutError::Disconnected) => return,
             }
         }
@@ -108,6 +135,8 @@ impl ArtifactProcessorManager {
     pub fn on_artifact(&self, artifact: UnvalidatedArtifact<ConsensusMessage>) {
         let mut pending_artifacts = self.pending_artifacts.lock().unwrap();
         pending_artifacts.push(artifact);
-        self.sender_incoming_request.send(ProcessRequest).unwrap_or_else(|err| panic!("Failed to send request: {:?}", err));
+        self.sender_incoming_request
+            .send(ProcessRequest)
+            .unwrap_or_else(|err| panic!("Failed to send request: {:?}", err));
     }
 }

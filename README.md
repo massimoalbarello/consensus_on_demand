@@ -1,8 +1,17 @@
 # Fast IC Consensus
 
-This is an implementation of a consensus algorithm based on the Internet Computer Consensus which improves the latency of block finalization.
+This is an implementation of a new consensus algorithm based on the Internet Computer Consensus which improves the latency of block finalization.
 
-Using different terminal windows, start six instances and pass as a parameter a different number in `[1,6]`. This will identify the node number of each replica.
-The other parameters can be set to `6 1 1 false` to use the original IC Consensus, or to `6 1 1 true` to use the Fast IC Consensus.
+To create a local test subnet, using different terminal windows, start `6` instances by running `cargo run -- --r <replica_number> --cod`, where `<replica_number` must be an integer within `[1, 6]`.
 
-Example: to start replica 2 with FICC, run: `cargo run 2 6 1 1 true`. Then repeat for all the other replicas by changing only the first parameter. Start node number 1 last. If your local network allows mDNS, they will automatically connect.
+By default, replicas run for `300` seconds and them automatically exit. You can modify this by adding the flag `--t <time_in_seconds>`.
+
+The following flags allow you to modify other parameters of the subnet:
+
+- `--n`: total number of nodes (`n > 3f + 2p`)
+- `--f`: number of byzantine nodes
+- `--p`: number of disagreeing nodes (only when running FIC Consensus)
+
+You can remove the `--cod` flag to run the original IC Consensus.
+
+To benchmark, run: `python3 src/benchmark.py`

@@ -1,4 +1,10 @@
-use crate::{consensus_layer::pool::ConsensusPoolImpl, crypto::CryptoHashOf, time_source::Time};
+use std::time::Duration;
+
+use crate::{
+    consensus_layer::pool::ConsensusPoolImpl,
+    crypto::CryptoHashOf,
+    time_source::{system_time_now, Time},
+};
 
 use super::{
     artifacts::ConsensusMessageHashable,
@@ -119,7 +125,7 @@ impl<'a> PoolReader<'a> {
             .goodness_artifact()
             .get_by_height(height)
         {
-            println!("{:?}", good);
+            // println!("{:?}", good);
         }
     }
 
@@ -169,5 +175,15 @@ impl<'a> PoolReader<'a> {
         };
         let prev_height = height - 1;
         get_notarization_time(prev_height).map(|notarization_time| notarization_time)
+    }
+
+    pub fn get_finalization_time(&self, height: Height) -> Option<Duration> {
+        if let Some(round_start_time) = self.get_round_start_time(height) {
+            let current_time = system_time_now();
+            let finalization_time = current_time - round_start_time;
+            // println!("Time to finalize block: {:?}", finalization_time);
+            return Some(finalization_time);
+        }
+        None
     }
 }

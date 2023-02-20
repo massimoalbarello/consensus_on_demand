@@ -5,6 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::{Arc, RwLock};
 
 use crate::consensus_layer::consensus_subcomponents::goodifier::{
     block_is_good, get_block_by_hash_and_height,
@@ -12,7 +13,7 @@ use crate::consensus_layer::consensus_subcomponents::goodifier::{
 use crate::consensus_layer::height_index::Height;
 use crate::consensus_layer::{artifacts::ConsensusMessage, pool_reader::PoolReader};
 use crate::crypto::{CryptoHashOf, Signed};
-use crate::SubnetParams;
+use crate::{SubnetParams, HeightMetrics};
 
 use super::block_maker::Block;
 use super::notary::{NotarizationShareContent, NotarizationShareContentCOD};
@@ -68,11 +69,15 @@ impl ShareAggregator {
 
     /// Attempt to construct artifacts from artifact shares in the artifact
     /// pool
-    pub fn on_state_change(&self, pool: &PoolReader<'_>) -> Vec<ConsensusMessage> {
+    pub fn on_state_change(
+        &self,
+        pool: &PoolReader<'_>,
+        finalization_times: Arc<RwLock<BTreeMap<Height, Option<HeightMetrics>>>>,
+    ) -> Vec<ConsensusMessage> {
         // println!("\n########## Aggregator ##########");
         let mut messages = Vec::new();
         messages.append(&mut self.aggregate_notarization_shares(pool));
-        messages.append(&mut self.aggregate_finalization_shares(pool));
+        messages.append(&mut self.aggregate_finalization_shares(pool, finalization_times));
         messages
     }
 
@@ -84,61 +89,66 @@ impl ShareAggregator {
                                                                                  // println!("Grouped shares separated from acks {:?}", grouped_shares_separated_from_acks);
         let grouped_shares = group_shares_and_acks(grouped_shares_separated_from_acks);
         // println!("Grouped shares: {:?}", grouped_shares);
-        let notarizations = grouped_shares.into_iter().filter_map(|(notary_content, shares)| {
-            let notary_content = match notary_content {
-                NotarizationShareContent::COD(notary_content) => {
-                    NotarizationContent {
+        let notarizations = grouped_shares
+            .into_iter()
+            .filter_map(|(notary_content, shares)| {
+                let notary_content = match notary_content {
+                    NotarizationShareContent::COD(notary_content) => NotarizationContent {
                         height: notary_content.height,
-                        block: notary_content.block
-                    }
-                }
-                NotarizationShareContent::ICC(notary_content) => {
-                    NotarizationContent {
+                        block: notary_content.block,
+                    },
+                    NotarizationShareContent::ICC(notary_content) => NotarizationContent {
                         height: notary_content.height,
-                        block: notary_content.block
-                    }
-                }
-            };
-            if shares.len() >= (self.subnet_params.total_nodes_number - self.subnet_params.byzantine_nodes_number) as usize {
-                if self.subnet_params.consensus_on_demand {
-                    // println!("\nBlock with hash: {} received at least n-f notarization shares", notary_content.block.get_ref());
-                    let block = get_block_by_hash_and_height(pool, &notary_content.block, notary_content.height);
-                    // CoD rule 3c: notarize only 'good' blocks
-                    match block_is_good(pool, &block.expect("block must be in pool")) {
-                        true => {
-                            println!("\nNotarization of block with hash: {} at height {} by committee: {:?}", notary_content.block.get_ref(), notary_content.height, shares);
-                            Some(notary_content.clone())
-                        },
-                        false => {
-                            None
+                        block: notary_content.block,
+                    },
+                };
+                if shares.len()
+                    >= (self.subnet_params.total_nodes_number
+                        - self.subnet_params.byzantine_nodes_number) as usize
+                {
+                    if self.subnet_params.consensus_on_demand {
+                        // println!("\nBlock with hash: {} received at least n-f notarization shares", notary_content.block.get_ref());
+                        let block = get_block_by_hash_and_height(
+                            pool,
+                            &notary_content.block,
+                            notary_content.height,
+                        );
+                        // CoD rule 3c: notarize only 'good' blocks
+                        match block_is_good(pool, &block.expect("block must be in pool")) {
+                            true => {
+                                // println!("\nNotarization of block with hash: {} at height {} by committee: {:?}", notary_content.block.get_ref(), notary_content.height, shares);
+                                Some(notary_content.clone())
+                            }
+                            false => None,
                         }
+                    } else {
+                        // println!("\nNotarization of block with hash: {} at height {} by committee: {:?}", notary_content.block.get_ref(), notary_content.height, shares);
+                        Some(notary_content)
                     }
+                } else {
+                    None
                 }
-                else {
-                    println!("\nNotarization of block with hash: {} at height {} by committee: {:?}", notary_content.block.get_ref(), notary_content.height, shares);
-                    Some(notary_content)
-                }
-            }
-            else {
-                None
-            }.map(|notary_content| {
-                ConsensusMessage::Notarization(
-                    Notarization {
+                .map(|notary_content| {
+                    ConsensusMessage::Notarization(Notarization {
                         content: NotarizationContent {
                             height: notary_content.height,
                             block: notary_content.block,
                         },
-                        signature: 0,   // committee signature
-                    }
-                )
+                        signature: 0, // committee signature
+                    })
+                })
             })
-        }).collect();
+            .collect();
         // println!("Notarizations: {:?}", notarizations);
         notarizations
     }
 
     /// Attempt to construct `Finalization`s
-    fn aggregate_finalization_shares(&self, pool: &PoolReader<'_>) -> Vec<ConsensusMessage> {
+    fn aggregate_finalization_shares(
+        &self,
+        pool: &PoolReader<'_>,
+        finalization_times: Arc<RwLock<BTreeMap<Height, Option<HeightMetrics>>>>,
+    ) -> Vec<ConsensusMessage> {
         let finalization_shares = pool
             .get_finalization_shares(pool.get_finalized_height() + 1, pool.get_notarized_height());
         let grouped_shares = aggregate(finalization_shares);
@@ -149,12 +159,25 @@ impl ShareAggregator {
                     >= (self.subnet_params.total_nodes_number
                         - self.subnet_params.byzantine_nodes_number) as usize
                 {
-                    println!(
-                        "\nFinalization of block with hash: {} at height {} by committee: {:?}",
-                        finalization_content.block.get_ref(),
-                        finalization_content.height,
-                        shares
-                    );
+                    // println!(
+                    //     "\nFinalization of block with hash: {} at height {} by committee: {:?}",
+                    //     finalization_content.block.get_ref(),
+                    //     finalization_content.height,
+                    //     shares
+                    // );
+                    if let Some(finalization_time) =
+                        pool.get_finalization_time(finalization_content.height)
+                    {
+                        let height_metrics = HeightMetrics {
+                            latency: finalization_time,
+                            fp_finalization: false,
+                        };
+
+                        finalization_times
+                            .write()
+                            .unwrap()
+                            .insert(finalization_content.height, Some(height_metrics));
+                    }
                     Some(finalization_content)
                 } else {
                     None

@@ -9,7 +9,7 @@ use crate::{
     SubnetParams,
 };
 
-use super::{goodifier::block_is_good, notary::NOTARIZATION_UNIT_DELAY};
+use super::goodifier::block_is_good;
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub struct Payload {}
@@ -84,12 +84,13 @@ impl BlockMaker {
                         rank,
                         self.time_source.as_ref(),
                         my_node_id,
+                        self.subnet_params.artifact_delay,
                     )
                 {
                     let block_proposal = self
                         .propose_block(pool, rank, parent)
                         .map(|proposal| ConsensusMessage::BlockProposal(proposal));
-                    println!("\nCreated block proposal: {:?}", block_proposal);
+                    // println!("\nCreated block proposal: {:?}", block_proposal);
                     block_proposal
                 } else {
                     None
@@ -211,8 +212,9 @@ fn is_time_to_make_block(
     rank: u8,
     time_source: &dyn TimeSource,
     node_id: u8,
+    proposer_delay: u64,
 ) -> bool {
-    let block_maker_delay = match get_block_maker_delay(rank) {
+    let block_maker_delay = match get_block_maker_delay(rank, proposer_delay) {
         Some(delay) => delay,
         _ => return false,
     };
@@ -236,8 +238,8 @@ fn is_time_to_make_block(
 
 /// Calculate the required delay for block making based on the block maker's
 /// rank.
-fn get_block_maker_delay(rank: u8) -> Option<Duration> {
-    Some(NOTARIZATION_UNIT_DELAY * rank as u32)
+fn get_block_maker_delay(rank: u8, proposer_delay: u64) -> Option<Duration> {
+    Some(Duration::from_millis(proposer_delay) * rank as u32)
 }
 
 /// Return the validated block proposals with the lowest rank at height `h`, if

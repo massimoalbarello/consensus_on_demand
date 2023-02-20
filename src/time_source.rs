@@ -80,9 +80,13 @@ impl TimeSource for SysTimeSource {
 
 /// Return the current system time. Note that the value returned is not
 /// guaranteed to be monotonic.
-fn system_time_now() -> Time {
+pub fn system_time_now() -> Time {
     UNIX_EPOCH
         + SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .expect("SystemTime is before UNIX EPOCH!")
+}
+
+pub fn get_absolute_end_time(starting_time: Time, relative_duration: Duration) -> Time {
+    starting_time + relative_duration
 }

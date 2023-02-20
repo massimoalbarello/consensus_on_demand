@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::{
+    collections::BTreeMap,
+    sync::{Arc, RwLock},
+};
 
 use async_std::task;
 use crossbeam_channel::Receiver;
@@ -7,14 +10,21 @@ use libp2p::{
     floodsub::{Floodsub, FloodsubEvent, Topic},
     identity::Keypair,
     mdns::{Mdns, MdnsConfig, MdnsEvent},
+    multiaddr::Protocol,
+    multihash::Multihash,
     swarm::SwarmEvent,
-    NetworkBehaviour, PeerId, Swarm, multiaddr::Protocol, multihash::Multihash,
+    NetworkBehaviour, PeerId, Swarm,
 };
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::{
-    artifact_manager::ArtifactProcessorManager, 
-    consensus_layer::artifacts::{ConsensusMessage, UnvalidatedArtifact}, time_source::{SysTimeSource, TimeSource}, SubnetParams,
+    artifact_manager::ArtifactProcessorManager,
+    consensus_layer::{
+        artifacts::{ConsensusMessage, UnvalidatedArtifact},
+        height_index::Height,
+    },
+    time_source::{SysTimeSource, TimeSource},
+    SubnetParams, HeightMetrics,
 };
 
 // We create a custom network behaviour that combines floodsub and mDNS.
@@ -64,7 +74,12 @@ pub struct Peer {
 }
 
 impl Peer {
-    pub async fn new(replica_number: u8, subnet_params: SubnetParams, topic: &str) -> Self {
+    pub async fn new(
+        replica_number: u8,
+        subnet_params: SubnetParams,
+        topic: &str,
+        finalization_times: Arc<RwLock<BTreeMap<Height, Option<HeightMetrics>>>>,
+    ) -> Self {
         let starting_round = 1;
         // Create a random PeerId
         let local_key = Keypair::generate_ed25519();
@@ -77,7 +92,8 @@ impl Peer {
         let floodsub_topic = Topic::new(topic);
 
         // channel used to transmit locally generated artifacts from the consensus layer to the network layer so that they can be broadcasted to other peers
-        let (sender_outgoing_artifact, receiver_outgoing_artifact) = crossbeam_channel::unbounded::<ConsensusMessage>();
+        let (sender_outgoing_artifact, receiver_outgoing_artifact) =
+            crossbeam_channel::unbounded::<ConsensusMessage>();
 
         // Initialize the time source.
         let time_source = Arc::new(SysTimeSource::new());
@@ -101,12 +117,18 @@ impl Peer {
             },
             receiver_outgoing_artifact,
             time_source: time_source.clone(),
-            manager: ArtifactProcessorManager::new(replica_number, subnet_params, time_source, sender_outgoing_artifact),
+            manager: ArtifactProcessorManager::new(
+                replica_number,
+                subnet_params,
+                time_source,
+                sender_outgoing_artifact,
+                finalization_times,
+            ),
         };
-        println!(
-            "Local node initialized with number: {} and peer id: {:?}",
-            local_peer.replica_number, local_peer_id
-        );
+        // println!(
+        //     "Local node initialized with number: {} and peer id: {:?}",
+        //     local_peer.replica_number, local_peer_id
+        // );
         local_peer
     }
 
@@ -126,15 +148,16 @@ impl Peer {
                 // println!("Broadcasted locally generated artifact");
                 self.swarm.behaviour_mut().floodsub.publish(
                     self.floodsub_topic.clone(),
-                    serde_json::to_string::<Message>(&Message::ConsensusMessage(outgoing_artifact)).unwrap(),
+                    serde_json::to_string::<Message>(&Message::ConsensusMessage(outgoing_artifact))
+                        .unwrap(),
                 );
-            },
+            }
             Err(_) => {
                 self.swarm.behaviour_mut().floodsub.publish(
                     self.floodsub_topic.clone(),
-                    serde_json::to_string::<Message>(&Message::KeepAliveMessage).unwrap()
+                    serde_json::to_string::<Message>(&Message::KeepAliveMessage).unwrap(),
                 );
-            },
+            }
         }
     }
 
@@ -145,13 +168,15 @@ impl Peer {
     pub fn match_event<T>(&mut self, event: SwarmEvent<OutEvent, T>) {
         match event {
             SwarmEvent::NewListenAddr { mut address, .. } => {
-                address.push(Protocol::P2p(Multihash::from_bytes(&self.id.to_bytes()[..]).unwrap()));
-                println!("Listening on {:?}", address);
+                address.push(Protocol::P2p(
+                    Multihash::from_bytes(&self.id.to_bytes()[..]).unwrap(),
+                ));
+                // println!("Listening on {:?}", address);
             }
             SwarmEvent::Behaviour(OutEvent::Floodsub(FloodsubEvent::Message(floodsub_message))) => {
                 let floodsub_content = String::from_utf8_lossy(&floodsub_message.data);
-                let message = serde_json::from_str::<Message>(&floodsub_content)
-                    .expect("can parse artifact");
+                let message =
+                    serde_json::from_str::<Message>(&floodsub_content).expect("can parse artifact");
                 self.handle_incoming_message(message);
             }
             SwarmEvent::Behaviour(OutEvent::Mdns(MdnsEvent::Discovered(list))) => {
@@ -182,7 +207,9 @@ impl Peer {
     pub fn handle_incoming_message(&mut self, message_variant: Message) {
         match message_variant {
             Message::KeepAliveMessage => (),
-            Message::ConsensusMessage(consensus_message) => self.manager.on_artifact(UnvalidatedArtifact::new(consensus_message, self.time_source.get_relative_time())),
+            Message::ConsensusMessage(consensus_message) => self.manager.on_artifact(
+                UnvalidatedArtifact::new(consensus_message, self.time_source.get_relative_time()),
+            ),
         }
     }
 }

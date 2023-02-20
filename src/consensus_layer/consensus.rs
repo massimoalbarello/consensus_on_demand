@@ -1,6 +1,9 @@
-use std::sync::Arc;
+use std::{
+    collections::BTreeMap,
+    sync::{Arc, RwLock},
+};
 
-use crate::{time_source::TimeSource, SubnetParams};
+use crate::{time_source::TimeSource, SubnetParams, HeightMetrics};
 
 use super::{
     artifacts::{ChangeAction, ChangeSet, ConsensusMessage},
@@ -8,6 +11,7 @@ use super::{
         acknowledger::Acknowledger, aggregator::ShareAggregator, block_maker::BlockMaker,
         finalizer::Finalizer, goodifier::Goodifier, notary::Notary, validator::Validator,
     },
+    height_index::Height,
     pool::ConsensusPoolImpl,
     pool_reader::PoolReader,
 };
@@ -85,7 +89,11 @@ impl ConsensusImpl {
         }
     }
 
-    pub fn on_state_change(&self, pool: &ConsensusPoolImpl) -> (ChangeSet, bool) {
+    pub fn on_state_change(
+        &self,
+        pool: &ConsensusPoolImpl,
+        finalization_times: Arc<RwLock<BTreeMap<Height, Option<HeightMetrics>>>>,
+    ) -> (ChangeSet, bool) {
         // Invoke `on_state_change` on each subcomponent in order.
         // Return the first non-empty [ChangeSet] as returned by a subcomponent.
         // Otherwise return an empty [ChangeSet] if all subcomponents return
@@ -110,8 +118,10 @@ impl ConsensusImpl {
 
         let acknowledge = || {
             if self.subnet_params.consensus_on_demand == true {
-                let change_set =
-                    add_all_to_validated(self.acknowledger.on_state_change(&pool_reader));
+                let change_set = add_all_to_validated(
+                    self.acknowledger
+                        .on_state_change(&pool_reader, Arc::clone(&finalization_times)),
+                );
                 let to_broadcast = true;
                 return (change_set, to_broadcast);
             } else {
@@ -126,7 +136,10 @@ impl ConsensusImpl {
         };
 
         let aggregate = || {
-            let change_set = add_all_to_validated(self.aggregator.on_state_change(&pool_reader));
+            let change_set = add_all_to_validated(
+                self.aggregator
+                    .on_state_change(&pool_reader, Arc::clone(&finalization_times)),
+            );
             // aggregation of shares does not have to be broadcasted as each node can compute it locally based on its consensus pool
             let to_broadcast = true;
             (change_set, to_broadcast)
