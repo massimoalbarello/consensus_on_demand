@@ -152,11 +152,17 @@ def plotLatencies(i, ax, filled_iterations, filled_latencies, filled_finalizatio
 def getResults():
     plt.figure()
     for i, benchmark in enumerate(benchmarks):
-        iterations = [int(iteration) for iteration in benchmark["results"].keys()]
-        latencies = [metrics["latency"]["secs"]+metrics["latency"]["nanos"]*1e-9 for metrics in benchmark["results"].values()]
+        iterations = [int(iteration) for iteration in benchmark["finalization_times"].keys()]
+        latencies = [metrics["latency"]["secs"]+metrics["latency"]["nanos"]*1e-9 for metrics in benchmark["finalization_times"].values()]
         filled_iterations, filled_latencies = fillMissingElements(iterations, latencies, 0)
-        finalization_types = ["FP" if metrics["fp_finalization"] == True else "IC" for metrics in benchmark["results"].values()]
+        finalization_types = ["FP" if metrics["fp_finalization"] == True else "IC" for metrics in benchmark["finalization_times"].values()]
         _, filled_finalization_types = fillMissingElements(iterations, finalization_types, "-")
+
+        proposed_blocks_hashes = [hash for hash in benchmark["network_delays"].keys()]
+        proposal_time = [network_delays["sent"] for network_delays in benchmark["network_delays"].values()]
+
+        for j, hash in enumerate(proposed_blocks_hashes):
+            print(hash, proposal_time[j])
 
         (
             average_latency,
@@ -200,7 +206,7 @@ COD = True          # use FICC (True) or ICC (False)
 N = 6               # total number of replicas
 F = 1               # number of corrupt replicas
 P = 1               # number of replicas that can disagree during fast-path finalization
-T = 100             # subnet simulation time (seconds)
+T = 60             # subnet simulation time (seconds)
 D = 500             # artifct delay for block proposals and notarization shares (milliseconds)
 
 if N <= 3*F + 2*P or P > F:

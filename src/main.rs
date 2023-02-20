@@ -6,6 +6,7 @@ use futures::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::to_string;
+use time_source::Time;
 use std::{
     collections::BTreeMap,
     sync::{Arc, RwLock},
@@ -22,14 +23,21 @@ pub struct HeightMetrics {
 
 #[derive(Serialize, Deserialize, Debug)]
 struct BenchmarkResult {
-    results: BTreeMap<Height, Option<HeightMetrics>>,
+    finalization_times: BTreeMap<Height, Option<HeightMetrics>>,
+    network_delays: BTreeMap<CryptoHash, ArtifactDelyInfo>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ArtifactDelyInfo {
+    sent: Time,
+    received: Option<Time>,
 }
 
 pub mod network_layer;
 use crate::{
     consensus_layer::height_index::Height,
     network_layer::Peer,
-    time_source::{get_absolute_end_time, system_time_now},
+    time_source::{get_absolute_end_time, system_time_now}, crypto::CryptoHash,
 };
 pub mod artifact_manager;
 pub mod consensus_layer;
@@ -86,11 +94,15 @@ async fn main() {
     let finalizations_times = Arc::new(RwLock::new(BTreeMap::<Height, Option<HeightMetrics>>::new()));
     let cloned_finalization_times = Arc::clone(&finalizations_times);
 
+    let network_delays = Arc::new(RwLock::new(BTreeMap::<CryptoHash, ArtifactDelyInfo>::new()));
+    let cloned_network_delays = Arc::clone(&network_delays);
+
     let mut my_peer = Peer::new(
         opt.r,
         SubnetParams::new(opt.n, opt.f, opt.p, opt.cod, opt.d),
         "gossip_blocks",
         cloned_finalization_times,
+        cloned_network_delays,
     )
     .await;
 
@@ -121,7 +133,8 @@ async fn main() {
             // println!("\nStopped replica");
 
             let benchmark_result = BenchmarkResult {
-                results: finalizations_times.read().unwrap().clone(),
+                finalization_times: finalizations_times.read().unwrap().clone(),
+                network_delays: network_delays.read().unwrap().clone(),
             };
 
             let encoded = to_string(&benchmark_result).unwrap();
