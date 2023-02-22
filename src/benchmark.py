@@ -228,9 +228,9 @@ N = 6               # total number of replicas
 F = 1               # number of corrupt replicas
 P = 1               # number of replicas that can disagree during fast-path finalization
 T = 60              # subnet simulation time (seconds)
-D = 100             # artifct delay for block proposals and notarization shares (milliseconds)
-M = 10              # mean of simulated network delay
-S = 1               # standard deviation of simulated network delay
+D = 400             # artifct delay for block proposals and notarization shares (milliseconds)
+M = 100             # mean of simulated network delay (milliseconds)
+S = 1               # standard deviation of simulated network delay (milliseconds)
 
 if N <= 3*F + 2*P or P > F:
     print("Wrong parameters: must satisfy: N > 3F + 2P and P <= F")
@@ -240,8 +240,10 @@ elif D < 100:
     print("Artifact delay must be at least 100 milliseconds")
 elif D < M:
     print("Artifact delay must be greater than network delay")
-elif M < 4*S:
-    print("Mean has to be greater than four times the standard deviation")
+elif M < 10*S:
+    print("Mean has to be greater than ten times the standard deviation")
+elif M + 10*S > 1000:
+    print("Network delay too high")
 else: 
     print(
         "Runnning " + 

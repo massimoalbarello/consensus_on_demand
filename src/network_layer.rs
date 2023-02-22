@@ -1,6 +1,6 @@
 use std::{
     collections::BTreeMap,
-    sync::{Arc, RwLock},
+    sync::{Arc, RwLock}, time::Duration, ops::Sub,
 };
 
 use async_std::task;
@@ -23,7 +23,7 @@ use crate::{
         artifacts::{ConsensusMessage, UnvalidatedArtifact},
         height_index::Height,
     },
-    time_source::{SysTimeSource, TimeSource, system_time_now},
+    time_source::{SysTimeSource, TimeSource, system_time_now, Time},
     SubnetParams, HeightMetrics, crypto::CryptoHash, ArtifactDelayInfo,
 };
 
@@ -145,7 +145,7 @@ impl Peer {
             .expect("swarm can be started");
     }
 
-    pub fn broadcast_message(&mut self) {
+    pub fn broadcast_message(&mut self, mean_simulated_network_delay: u64) {
         match self.receiver_outgoing_artifact.try_recv() {
             Ok(outgoing_artifact) => {
                 // println!("Broadcasted locally generated artifact");
@@ -153,7 +153,9 @@ impl Peer {
                     ConsensusMessage::BlockProposal(block_proposal) => {
                         let block_hash = block_proposal.content.hash.clone();
                         let artifact_delay_info = ArtifactDelayInfo {
-                            sent: Some(system_time_now()),
+                            // recording timestamp as if it was sent "mean_simulated_network_delay" milliseconds before
+                            // this is because in order to simulate the network delay, every artifact is delayed by "mean_simulated_network_delay" before being broadcasted
+                            sent: Some(Time::from_duration(system_time_now().sub(Time::from_duration(Duration::from_millis(mean_simulated_network_delay))))),
                             received: None,
                         };
                         self.proposals_timings

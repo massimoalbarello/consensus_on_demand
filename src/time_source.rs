@@ -10,7 +10,7 @@ pub struct Time(u64);
 
 impl Time {
     /// A private function to cast from [Duration] to [Time].
-    fn from_duration(t: Duration) -> Self {
+    pub fn from_duration(t: Duration) -> Self {
         Time(t.as_nanos() as u64)
     }
 }
