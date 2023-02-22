@@ -39,6 +39,10 @@ use crate::{
     network_layer::Peer,
     time_source::{get_absolute_end_time, system_time_now}, crypto::CryptoHash,
 };
+
+use rand::prelude::*;
+use rand_distr::StandardNormal;
+
 pub mod artifact_manager;
 pub mod consensus_layer;
 pub mod crypto;
@@ -60,6 +64,10 @@ struct Opt {
     t: u64, // time to run replica
     #[structopt(short, long, default_value = "500")]
     d: u64, // notary delay
+    #[structopt(short, long, default_value = "100")]
+    m: u64, // mean of simulated network delay
+    #[structopt(short, long, default_value = "10")]
+    s: u64, // standard deviation of simulated network delay
 }
 
 #[derive(Clone)]
@@ -83,8 +91,8 @@ impl SubnetParams {
     }
 }
 
-async fn broadcast_message_future() {
-    sleep(Duration::from_millis(100)).await;
+async fn broadcast_message_future(mean_simulated_network_delay: u64, std_dev_simulated_network_delay: u64) {
+    sleep(Duration::from_millis(sample_simulated_network_delay(mean_simulated_network_delay, std_dev_simulated_network_delay))).await;
 }
 
 #[async_std::main]
@@ -122,7 +130,7 @@ async fn main() {
         if system_time_now() < absolute_end_time {
             select! {
                 _ = stdin.select_next_some() => (),
-                _ = broadcast_message_future().fuse() => {
+                _ = broadcast_message_future(opt.m, opt.s).fuse() => {
                     // prevent Mdns expiration event by periodically broadcasting keep alive messages to peers
                     // if any locally generated artifact, broadcast it
                     my_peer.broadcast_message();
@@ -146,4 +154,9 @@ async fn main() {
             break;
         }
     }
+}
+
+fn sample_simulated_network_delay(mean_simulated_network_delay: u64, std_dev_simulated_network_delay: u64) -> u64 {
+    let network_delay = (mean_simulated_network_delay as f64 + std_dev_simulated_network_delay as f64 *thread_rng().sample::<f64,_>(StandardNormal)) as u64;
+    network_delay
 }
