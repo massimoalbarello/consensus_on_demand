@@ -131,7 +131,7 @@ impl Peer {
     pub fn listen_for_dialing(&mut self) {
         self.swarm
             .listen_on(
-                "/ip4/0.0.0.0/tcp/0"
+                "/ip4/127.0.0.1/tcp/56789"
                     .parse()
                     .expect("can get a local socket"),
             )
