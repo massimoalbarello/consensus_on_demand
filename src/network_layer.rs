@@ -1,19 +1,17 @@
 use std::{
-    collections::BTreeMap,
-    sync::{Arc, RwLock}, time::Duration, ops::Sub,
+    collections::{BTreeMap, BTreeSet},
+    sync::{Arc, RwLock},
 };
 
-use async_std::task;
 use crossbeam_channel::Receiver;
 use futures::{prelude::stream::StreamExt, stream::SelectNextSome};
 use libp2p::{
     floodsub::{Floodsub, FloodsubEvent, Topic},
     identity::Keypair,
-    mdns::{Mdns, MdnsConfig, MdnsEvent},
     multiaddr::Protocol,
     multihash::Multihash,
     swarm::SwarmEvent,
-    NetworkBehaviour, PeerId, Swarm,
+    NetworkBehaviour, PeerId, Swarm, Multiaddr,
 };
 use serde::{Deserialize, Serialize};
 
@@ -23,7 +21,7 @@ use crate::{
         artifacts::{ConsensusMessage, UnvalidatedArtifact},
         height_index::Height,
     },
-    time_source::{SysTimeSource, TimeSource, system_time_now, Time},
+    time_source::{SysTimeSource, TimeSource, system_time_now},
     SubnetParams, HeightMetrics, crypto::CryptoHash, ArtifactDelayInfo,
 };
 
@@ -33,20 +31,12 @@ use crate::{
 #[behaviour(out_event = "OutEvent")]
 pub struct P2PBehaviour {
     floodsub: Floodsub,
-    mdns: Mdns,
 }
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum OutEvent {
     Floodsub(FloodsubEvent),
-    Mdns(MdnsEvent),
-}
-
-impl From<MdnsEvent> for OutEvent {
-    fn from(v: MdnsEvent) -> Self {
-        Self::Mdns(v)
-    }
 }
 
 impl From<FloodsubEvent> for OutEvent {
@@ -68,6 +58,8 @@ pub struct Peer {
     rank: u64,
     floodsub_topic: Topic,
     swarm: Swarm<P2PBehaviour>,
+    peers_addresses: String,
+    subscribed_peers: BTreeSet<PeerId>,
     receiver_outgoing_artifact: Receiver<ConsensusMessage>,
     time_source: Arc<SysTimeSource>,
     manager: ArtifactProcessorManager,
@@ -77,6 +69,7 @@ pub struct Peer {
 impl Peer {
     pub async fn new(
         replica_number: u8,
+        peers_addresses: String,
         subnet_params: SubnetParams,
         topic: &str,
         finalization_times: Arc<RwLock<BTreeMap<Height, Option<HeightMetrics>>>>,
@@ -108,15 +101,15 @@ impl Peer {
             rank: 0, // updated after Peer object is instantiated
             floodsub_topic: floodsub_topic.clone(),
             swarm: {
-                let mdns = task::block_on(Mdns::new(MdnsConfig::default())).unwrap();
                 let mut behaviour = P2PBehaviour {
                     floodsub: Floodsub::new(local_peer_id),
-                    mdns,
                 };
 
                 behaviour.floodsub.subscribe(floodsub_topic);
                 Swarm::new(transport, behaviour, local_peer_id)
             },
+            peers_addresses,
+            subscribed_peers: BTreeSet::new(),
             receiver_outgoing_artifact,
             time_source: time_source.clone(),
             manager: ArtifactProcessorManager::new(
@@ -143,6 +136,17 @@ impl Peer {
                     .expect("can get a local socket"),
             )
             .expect("swarm can be started");
+        if self.replica_number == 1 {
+            let remote_peer_multiaddr: Multiaddr = self.peers_addresses.parse().expect("valid address");
+            self.swarm.dial(remote_peer_multiaddr.clone()).expect("known peer");
+            println!("Dialed remote peer: {:?}", self.peers_addresses);
+            let remote_peer_id = PeerId::try_from_multiaddr(&remote_peer_multiaddr).expect("multiaddress with peer ID");
+            self.swarm
+                .behaviour_mut()
+                .floodsub
+                .add_node_to_partial_view(remote_peer_id);
+            println!("Added peer with ID: {:?} to broadcast list", remote_peer_id);
+        }
     }
 
     pub fn broadcast_message(&mut self) {
@@ -191,33 +195,31 @@ impl Peer {
                 address.push(Protocol::P2p(
                     Multihash::from_bytes(&self.id.to_bytes()[..]).unwrap(),
                 ));
-                // println!("Listening on {:?}", address);
+                println!("Listening on {:?}", address);
             }
-            SwarmEvent::Behaviour(OutEvent::Floodsub(FloodsubEvent::Message(floodsub_message))) => {
-                let floodsub_content = String::from_utf8_lossy(&floodsub_message.data);
-                let message =
-                    serde_json::from_str::<Message>(&floodsub_content).expect("can parse artifact");
-                self.handle_incoming_message(message);
-            }
-            SwarmEvent::Behaviour(OutEvent::Mdns(MdnsEvent::Discovered(list))) => {
-                for (peer, _) in list {
-                    self.swarm
-                        .behaviour_mut()
-                        .floodsub
-                        .add_node_to_partial_view(peer);
+            SwarmEvent::Behaviour(OutEvent::Floodsub(floodsub_event)) => {
+                match floodsub_event {
+                    FloodsubEvent::Message(floodsub_message) => {
+                        let floodsub_content = String::from_utf8_lossy(&floodsub_message.data);
+                        let message =
+                            serde_json::from_str::<Message>(&floodsub_content).expect("can parse artifact");
+                        self.handle_incoming_message(message);
+                    },
+                    FloodsubEvent::Subscribed { peer_id, .. } => {
+                        if !self.subscribed_peers.contains(&peer_id) {
+                            self.swarm
+                                .behaviour_mut()
+                                .floodsub
+                                .add_node_to_partial_view(peer_id);
+                            self.subscribed_peers.insert(peer_id);
+                            println!("Added peer with ID: {:?} to broadcast list", peer_id);
+                        }
+                    },
+                    _ => println!("Unhandled floodsub event"), 
+
                 }
-            }
-            SwarmEvent::Behaviour(OutEvent::Mdns(MdnsEvent::Expired(list))) => {
-                for (peer, _) in list {
-                    if !self.swarm.behaviour_mut().mdns.has_node(&peer) {
-                        self.swarm
-                            .behaviour_mut()
-                            .floodsub
-                            .remove_node_from_partial_view(&peer);
-                    }
-                }
-                // println!("Ignoring Mdns expired event");
-            }
+                
+            },
             _ => {
                 // println!("Unhandled swarm event");
             }

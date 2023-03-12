@@ -40,9 +40,6 @@ use crate::{
     time_source::{get_absolute_end_time, system_time_now}, crypto::CryptoHash,
 };
 
-use rand::prelude::*;
-use rand_distr::StandardNormal;
-
 pub mod artifact_manager;
 pub mod consensus_layer;
 pub mod crypto;
@@ -64,6 +61,8 @@ struct Opt {
     t: u64, // time to run replica
     #[structopt(short, long, default_value = "500")]
     d: u64, // notary delay
+    #[structopt(short, long, default_value = "")]
+    addresses: String    // address of peer to connect to
 }
 
 #[derive(Clone)]
@@ -103,6 +102,7 @@ async fn main() {
 
     let mut my_peer = Peer::new(
         opt.r,
+        opt.addresses,
         SubnetParams::new(opt.n, opt.f, opt.p, opt.cod, opt.d),
         "gossip_blocks",
         cloned_finalization_times,
