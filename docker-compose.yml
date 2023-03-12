@@ -1,0 +1,10 @@
+version: '3'
+
+services:
+  consensus_on_demand:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: consensus_on_demand:latest
+    ports:
+      - "56789:56789"
