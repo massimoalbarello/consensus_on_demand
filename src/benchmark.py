@@ -158,11 +158,21 @@ def plotSequenceLengthDistribution(ax, arr):
     ax.bar(frequencies.keys(), frequencies.values(), width=1, color='orange')
 
 def plotLatencies(i, ax, filled_iterations, filled_latencies, filled_finalization_types):
+    colors = ["green", "blue"]
+    color_labels = {
+        "green": "FP-finalized block",
+        "blue": "IC-finalized block"
+    }
+    fp_bar = None
+    ic_bar = None
     for j, type in enumerate(filled_finalization_types):
         if type == "FP":
-            ax.bar(filled_iterations[j], filled_latencies[j], width=1, color='green')
+            fp_bar = ax.bar(filled_iterations[j], filled_latencies[j], width=1, color=colors[0], label=color_labels[colors[0]])
         elif type == "IC":
-            ax.bar(filled_iterations[j], filled_latencies[j], width=1, color="blue" )
+            ic_bar = ax.bar(filled_iterations[j], filled_latencies[j], width=1, color=colors[1], label=color_labels[colors[1]])
+    handles = [fp_bar, ic_bar]
+    labels = ["FP-finalized block", "IC-finalized block"]
+    ax.legend(handles, labels, loc="upper right")
 
 def computeNetworkDelays(delays_info):
     for hash, delay_info in delays_info.items():
@@ -172,7 +182,8 @@ def computeNetworkDelays(delays_info):
     return proposals_network_delays
 
 def getResults():
-    plt.figure()
+    fig, axs = plt.subplots(N, 1)
+    fig.suptitle("Block finalization latency using " + ("FICC" if COD else "ICC"))
     delays_info = {}
     for i, benchmark in enumerate(benchmarks):
         iterations = [int(iteration) for iteration in benchmark["finalization_times"].keys()]
@@ -199,20 +210,23 @@ def getResults():
             sequences,
         )
 
-        ax_lat = plt.subplot(2*N if COD else N, 1, i+1)
+        ax_lat = axs[i]
+        ax_lat.set_xlabel("Iteration")
+        ax_lat.set_ylabel("Latency [secs]")
+
         plotLatencies(i, ax_lat, filled_iterations, filled_latencies, filled_finalization_types)
         if i == 0:
             xlim_lat = ax_lat.get_xlim()
         else:
             ax_lat.set_xlim(xlim_lat)
 
-        if COD:
-            ax_distr = plt.subplot(2*N, 1, N+i+1)
-            plotSequenceLengthDistribution(ax_distr, sequences_length)
-            if i == 0:
-                xlim_distr = ax_distr.get_xlim()
-            else:
-                ax_distr.set_xlim(xlim_distr)
+        # if COD:
+        #     ax_distr = plt.subplot(2*N, 1, N+i+1)
+        #     plotSequenceLengthDistribution(ax_distr, sequences_length)
+        #     if i == 0:
+        #         xlim_distr = ax_distr.get_xlim()
+        #     else:
+        #         ax_distr.set_xlim(xlim_distr)
 
     proposals_network_delays = computeNetworkDelays(delays_info)
     average_network_delay = statistics.mean(proposals_network_delays)
@@ -222,19 +236,19 @@ def getResults():
 
 
 
-ADVERSARY_TYPE = 1  # 0: no adversary, 1: passive adversary
 COD = True          # use FICC (True) or ICC (False)
+ADVERSARY_TYPE = 0  # 0: no adversary, 1: passive adversary
 N = 6               # total number of replicas
 F = 1               # number of corrupt replicas
 P = 1               # number of replicas that can disagree during fast-path finalization
 T = 60              # subnet simulation time (seconds)
-D = 400             # artifct delay for block proposals and notarization shares (milliseconds)
-M = 100             # mean of simulated network delay (milliseconds)
-S = 1               # standard deviation of simulated network delay (milliseconds)
+D = 500             # artifct delay for block proposals and notarization shares (milliseconds)
+M = 20             # mean of simulated network delay (milliseconds)
+S = 0               # standard deviation of simulated network delay (milliseconds)
 
 if N <= 3*F + 2*P or P > F:
     print("Wrong parameters: must satisfy: N > 3F + 2P and P <= F")
-elif T < 60:
+elif T < 20:
     print("Subnet must be run for at least 60 seconds")
 elif D < 100:
     print("Artifact delay must be at least 100 milliseconds")

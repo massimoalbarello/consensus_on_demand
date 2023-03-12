@@ -92,7 +92,7 @@ impl SubnetParams {
 }
 
 async fn broadcast_message_future(mean_simulated_network_delay: u64, std_dev_simulated_network_delay: u64) {
-    sleep(Duration::from_millis(sample_simulated_network_delay(mean_simulated_network_delay, std_dev_simulated_network_delay))).await;
+    sleep(Duration::from_millis(10)).await;
 }
 
 #[async_std::main]
