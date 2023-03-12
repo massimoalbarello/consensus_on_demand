@@ -1,8 +1,10 @@
 FROM rust:bullseye
 
+WORKDIR /replica
+
 COPY ./ ./
-RUN cargo build --release
+RUN cargo build
 
 EXPOSE 56789
 
-ENTRYPOINT ["./target/release/consensus_on_demand"]
+ENTRYPOINT ["./target/debug/consensus_on_demand"]

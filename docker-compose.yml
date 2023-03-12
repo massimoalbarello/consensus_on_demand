@@ -6,6 +6,8 @@ services:
       context: .
       dockerfile: Dockerfile
     image: consensus_on_demand:latest
-    command: ["./target/release/consensus_on_demand", "--r", $REPLICA_NUMBER, "--n", $TOTAL_REPLICA_NUMBER, "--f", $FAULTY_REPLICAS, "--p", $DISAGREEING_REPLICA, "--t", $EXECUTION_TIME, "--d", $NOTARIZATION_DELAY, $COD]
+    command: ["--r", $REPLICA_NUMBER, "--n", $TOTAL_REPLICA_NUMBER, "--f", $FAULTY_REPLICAS, "--p", $DISAGREEING_REPLICA, "--t", $EXECUTION_TIME, "--d", $NOTARIZATION_DELAY, $COD]
     ports:
       - "56789:56789"
+    volumes:
+      - ./benchmark:/replica/benchmark

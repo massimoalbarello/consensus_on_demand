@@ -142,7 +142,7 @@ async fn main() {
             };
 
             let encoded = to_string(&benchmark_result).unwrap();
-            let mut file = File::create(format!("benchmark_result_{}.json", opt.r))
+            let mut file = File::create(format!("./benchmark/benchmark_result_{}.json", opt.r))
                 .await
                 .unwrap();
             file.write_all(encoded.as_bytes()).await.unwrap();
