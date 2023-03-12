@@ -145,7 +145,7 @@ impl Peer {
             .expect("swarm can be started");
     }
 
-    pub fn broadcast_message(&mut self, mean_simulated_network_delay: u64) {
+    pub fn broadcast_message(&mut self) {
         match self.receiver_outgoing_artifact.try_recv() {
             Ok(outgoing_artifact) => {
                 // println!("Broadcasted locally generated artifact");
@@ -155,7 +155,7 @@ impl Peer {
                         let artifact_delay_info = ArtifactDelayInfo {
                             // recording timestamp as if it was sent "mean_simulated_network_delay" milliseconds before
                             // this is because in order to simulate the network delay, every artifact is delayed by "mean_simulated_network_delay" before being broadcasted
-                            sent: Some(Time::from_duration(system_time_now().sub(Time::from_duration(Duration::from_millis(mean_simulated_network_delay))))),
+                            sent: Some(system_time_now()),
                             received: None,
                         };
                         self.proposals_timings
