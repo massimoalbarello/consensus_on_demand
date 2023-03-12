@@ -6,6 +6,7 @@ use futures::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::to_string;
+use time_source::Time;
 use std::{
     collections::BTreeMap,
     sync::{Arc, RwLock},
@@ -22,15 +23,23 @@ pub struct HeightMetrics {
 
 #[derive(Serialize, Deserialize, Debug)]
 struct BenchmarkResult {
-    results: BTreeMap<Height, Option<HeightMetrics>>,
+    finalization_times: BTreeMap<Height, Option<HeightMetrics>>,
+    proposals_timings: BTreeMap<CryptoHash, ArtifactDelayInfo>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ArtifactDelayInfo {
+    sent: Option<Time>,
+    received: Option<Time>,
 }
 
 pub mod network_layer;
 use crate::{
     consensus_layer::height_index::Height,
     network_layer::Peer,
-    time_source::{get_absolute_end_time, system_time_now},
+    time_source::{get_absolute_end_time, system_time_now}, crypto::CryptoHash,
 };
+
 pub mod artifact_manager;
 pub mod consensus_layer;
 pub mod crypto;
@@ -52,6 +61,8 @@ struct Opt {
     t: u64, // time to run replica
     #[structopt(short, long, default_value = "500")]
     d: u64, // notary delay
+    #[structopt(short, long, default_value = "")]
+    addresses: String    // address of peer to connect to
 }
 
 #[derive(Clone)]
@@ -76,7 +87,7 @@ impl SubnetParams {
 }
 
 async fn broadcast_message_future() {
-    sleep(Duration::from_millis(100)).await;
+    sleep(Duration::from_millis(10)).await;
 }
 
 #[async_std::main]
@@ -86,11 +97,16 @@ async fn main() {
     let finalizations_times = Arc::new(RwLock::new(BTreeMap::<Height, Option<HeightMetrics>>::new()));
     let cloned_finalization_times = Arc::clone(&finalizations_times);
 
+    let proposals_timings = Arc::new(RwLock::new(BTreeMap::<CryptoHash, ArtifactDelayInfo>::new()));
+    let cloned_proposals_timings = Arc::clone(&proposals_timings);
+
     let mut my_peer = Peer::new(
         opt.r,
+        opt.addresses,
         SubnetParams::new(opt.n, opt.f, opt.p, opt.cod, opt.d),
         "gossip_blocks",
         cloned_finalization_times,
+        cloned_proposals_timings,
     )
     .await;
 
@@ -121,11 +137,12 @@ async fn main() {
             // println!("\nStopped replica");
 
             let benchmark_result = BenchmarkResult {
-                results: finalizations_times.read().unwrap().clone(),
+                finalization_times: finalizations_times.read().unwrap().clone(),
+                proposals_timings: proposals_timings.read().unwrap().clone(),
             };
 
             let encoded = to_string(&benchmark_result).unwrap();
-            let mut file = File::create(format!("benchmark_result_{}.json", opt.r))
+            let mut file = File::create(format!("./benchmark/benchmark_result_{}.json", opt.r))
                 .await
                 .unwrap();
             file.write_all(encoded.as_bytes()).await.unwrap();

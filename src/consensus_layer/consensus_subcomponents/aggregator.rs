@@ -86,7 +86,7 @@ impl ShareAggregator {
         let height = pool.get_notarized_height() + 1;
         let notarization_shares = pool.get_notarization_shares(height);
         let grouped_shares_separated_from_acks = aggregate(notarization_shares); // in case CoD is used, shares and acks for the same proposal are in two separate entries
-                                                                                 // println!("Grouped shares separated from acks {:?}", grouped_shares_separated_from_acks);
+        // println!("Grouped shares separated from acks {:?}", grouped_shares_separated_from_acks);
         let grouped_shares = group_shares_and_acks(grouped_shares_separated_from_acks);
         // println!("Grouped shares: {:?}", grouped_shares);
         let notarizations = grouped_shares

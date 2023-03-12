@@ -90,7 +90,7 @@ impl BlockMaker {
                     let block_proposal = self
                         .propose_block(pool, rank, parent)
                         .map(|proposal| ConsensusMessage::BlockProposal(proposal));
-                    // println!("\nCreated block proposal: {:?}", block_proposal);
+                    println!("\nCreated block proposal: {:?}", block_proposal);
                     block_proposal
                 } else {
                     None

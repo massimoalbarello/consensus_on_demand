@@ -2,17 +2,18 @@ import subprocess
 import time
 import json
 import matplotlib.pyplot as plt
+import statistics
 
 
 
 def startHonestReplica(procs, i):
-    print("Starting honest replica", i)
-    shellCommand = 'cargo run --quiet -- --r ' + str(i) + ' --n ' + str(N) + ' --f ' + str(F) + ' --p ' + str(P) + ' --t ' + str(T) + ' --d ' + str(D) + (' --cod' if COD else '')
+    print("Starting honest replica", i, ("using COD" if COD else "using IC"))
+    shellCommand = 'cargo run -- --r ' + str(i) + ' --n ' + str(N) + ' --f ' + str(F) + ' --p ' + str(P) + ' --t ' + str(T) + ' --d ' + str(D) + ' --m ' + str(M) + ' --s ' + str(S) + (' --cod' if COD else '')
     procs.append(subprocess.Popen([shellCommand], shell=True, stderr=subprocess.DEVNULL))
 
 def startPassiveAdversaryReplica(procs, i):
-    print("Starting replica", i, "controlled by passive adversary")
-    shellCommand = 'cargo run --quiet -- --r ' + str(i) + ' --n ' + str(N) + ' --f ' + str(F) + ' --p ' + str(P) + ' --t ' + str(int(T/3)) + ' --d ' + str(D) + (' --cod' if COD else '')
+    print("Starting replica", i, ("using COD" if COD else "using IC"), "and controlled by passive adversary")
+    shellCommand = 'cargo run -- --r ' + str(i) + ' --n ' + str(N) + ' --f ' + str(F) + ' --p ' + str(P) + ' --t ' + str(int(T/3)) + ' --d ' + str(D) + ' --m ' + str(M) + ' --s ' + str(S) + (' --cod' if COD else '')
     procs.append(subprocess.Popen([shellCommand], shell=True, stderr=subprocess.DEVNULL))
 
 def startSubnet():
@@ -110,7 +111,7 @@ def printMetrics(
         print("- starting at", sequence["IC_index"], "with length", sequence["length"])
 
 
-def processResults(latencies, filled_iterations, filled_finalization_types):
+def processResults(latencies, filled_iterations, filled_finalization_types, delays_info, proposals_timings):
     average_latency = None
     if len(latencies) != 0:
         average_latency = sum(latencies) / len(latencies)
@@ -123,6 +124,20 @@ def processResults(latencies, filled_iterations, filled_finalization_types):
         sequences = countFpSequences(filled_iterations[0], filled_finalization_types)
         for sequence in sequences:
             sequences_length.append(sequence["length"])
+
+    for hash, timings in proposals_timings.items():
+        if hash not in delays_info:
+            delays_info[hash] = {
+                "sent": None,
+                "received": [],
+            }
+        if timings["sent"] != None:
+            delays_info[hash]["sent"] = timings["sent"]
+        elif timings["received"] != None:
+            delays_info[hash]["received"].append(timings["received"])
+        else:
+            print("Replica didn't send nor receive block", hash)
+
     return (
         average_latency,
         total_fp_finalizations,
@@ -143,19 +158,38 @@ def plotSequenceLengthDistribution(ax, arr):
     ax.bar(frequencies.keys(), frequencies.values(), width=1, color='orange')
 
 def plotLatencies(i, ax, filled_iterations, filled_latencies, filled_finalization_types):
+    colors = ["green", "blue"]
+    color_labels = {
+        "green": "FP-finalized block",
+        "blue": "IC-finalized block"
+    }
+    fp_bar = None
+    ic_bar = None
     for j, type in enumerate(filled_finalization_types):
         if type == "FP":
-            ax.bar(filled_iterations[j], filled_latencies[j], width=1, color='green')
+            fp_bar = ax.bar(filled_iterations[j], filled_latencies[j], width=1, color=colors[0], label=color_labels[colors[0]])
         elif type == "IC":
-            ax.bar(filled_iterations[j], filled_latencies[j], width=1, color="blue" )
+            ic_bar = ax.bar(filled_iterations[j], filled_latencies[j], width=1, color=colors[1], label=color_labels[colors[1]])
+    handles = [fp_bar, ic_bar]
+    labels = ["FP-finalized block", "IC-finalized block"]
+    ax.legend(handles, labels, loc="upper right")
+
+def computeNetworkDelays(delays_info):
+    for hash, delay_info in delays_info.items():
+        delays_info[hash]["network_delays"] = [(received_time-delay_info["sent"])*1e-9 for received_time in delay_info["received"]]
+        delays_info[hash]["average_network_delay"] = statistics.mean(delays_info[hash]["network_delays"]) if len(delays_info[hash]["network_delays"]) > 0 else None
+    proposals_network_delays = [proposal_info["average_network_delay"] for proposal_info in delays_info.values() if proposal_info["average_network_delay"] is not None]
+    return proposals_network_delays
 
 def getResults():
-    plt.figure()
+    fig, axs = plt.subplots(N, 1)
+    fig.suptitle("Block finalization latency using " + ("FICC" if COD else "ICC"))
+    delays_info = {}
     for i, benchmark in enumerate(benchmarks):
-        iterations = [int(iteration) for iteration in benchmark["results"].keys()]
-        latencies = [metrics["latency"]["secs"]+metrics["latency"]["nanos"]*1e-9 for metrics in benchmark["results"].values()]
+        iterations = [int(iteration) for iteration in benchmark["finalization_times"].keys()]
+        latencies = [metrics["latency"]["secs"]+metrics["latency"]["nanos"]*1e-9 for metrics in benchmark["finalization_times"].values()]
         filled_iterations, filled_latencies = fillMissingElements(iterations, latencies, 0)
-        finalization_types = ["FP" if metrics["fp_finalization"] == True else "IC" for metrics in benchmark["results"].values()]
+        finalization_types = ["FP" if metrics["fp_finalization"] == True else "IC" for metrics in benchmark["finalization_times"].values()]
         _, filled_finalization_types = fillMissingElements(iterations, finalization_types, "-")
 
         (
@@ -165,7 +199,7 @@ def getResults():
             total_non_finalizations,
             sequences,
             sequences_length
-        ) = processResults(latencies, filled_iterations, filled_finalization_types)
+        ) = processResults(latencies, filled_iterations, filled_finalization_types, delays_info, benchmark["proposals_timings"])
 
         printMetrics(
             i,
@@ -176,39 +210,54 @@ def getResults():
             sequences,
         )
 
-        ax_lat = plt.subplot(2*N if COD else N, 1, i+1)
+        ax_lat = axs[i]
+        ax_lat.set_xlabel("Iteration")
+        ax_lat.set_ylabel("Latency [secs]")
+
         plotLatencies(i, ax_lat, filled_iterations, filled_latencies, filled_finalization_types)
         if i == 0:
             xlim_lat = ax_lat.get_xlim()
         else:
             ax_lat.set_xlim(xlim_lat)
 
-        if COD:
-            ax_distr = plt.subplot(2*N, 1, N+i+1)
-            plotSequenceLengthDistribution(ax_distr, sequences_length)
-            if i == 0:
-                xlim_distr = ax_distr.get_xlim()
-            else:
-                ax_distr.set_xlim(xlim_distr)
+        # if COD:
+        #     ax_distr = plt.subplot(2*N, 1, N+i+1)
+        #     plotSequenceLengthDistribution(ax_distr, sequences_length)
+        #     if i == 0:
+        #         xlim_distr = ax_distr.get_xlim()
+        #     else:
+        #         ax_distr.set_xlim(xlim_distr)
+
+    proposals_network_delays = computeNetworkDelays(delays_info)
+    average_network_delay = statistics.mean(proposals_network_delays)
+    print("\nThe average network delay is:", average_network_delay)
 
     plt.show()
 
 
 
-ADVERSARY_TYPE = 1  # 0: no adversary, 1: passive adversary
 COD = True          # use FICC (True) or ICC (False)
+ADVERSARY_TYPE = 0  # 0: no adversary, 1: passive adversary
 N = 6               # total number of replicas
 F = 1               # number of corrupt replicas
 P = 1               # number of replicas that can disagree during fast-path finalization
-T = 100             # subnet simulation time (seconds)
+T = 60              # subnet simulation time (seconds)
 D = 500             # artifct delay for block proposals and notarization shares (milliseconds)
+M = 20             # mean of simulated network delay (milliseconds)
+S = 0               # standard deviation of simulated network delay (milliseconds)
 
 if N <= 3*F + 2*P or P > F:
     print("Wrong parameters: must satisfy: N > 3F + 2P and P <= F")
-elif T < 60:
+elif T < 20:
     print("Subnet must be run for at least 60 seconds")
 elif D < 100:
     print("Artifact delay must be at least 100 milliseconds")
+elif D < M:
+    print("Artifact delay must be greater than network delay")
+elif M < 10*S:
+    print("Mean has to be greater than ten times the standard deviation")
+elif M + 10*S > 1000:
+    print("Network delay too high")
 else: 
     print(
         "Runnning " + 
