@@ -58,7 +58,7 @@ pub struct Peer {
     rank: u64,
     floodsub_topic: Topic,
     swarm: Swarm<P2PBehaviour>,
-    peers_addresses: String,
+    peers_addresses: Vec<String>,
     subscribed_peers: BTreeSet<PeerId>,
     receiver_outgoing_artifact: Receiver<ConsensusMessage>,
     time_source: Arc<SysTimeSource>,
@@ -69,7 +69,7 @@ pub struct Peer {
 impl Peer {
     pub async fn new(
         replica_number: u8,
-        peers_addresses: String,
+        peers_addresses: Vec<String>,
         subnet_params: SubnetParams,
         topic: &str,
         finalization_times: Arc<RwLock<BTreeMap<Height, Option<HeightMetrics>>>>,
@@ -137,15 +137,23 @@ impl Peer {
             )
             .expect("swarm can be started");
         if self.replica_number == 1 {
-            let remote_peer_multiaddr: Multiaddr = self.peers_addresses.parse().expect("valid address");
-            self.swarm.dial(remote_peer_multiaddr.clone()).expect("known peer");
-            println!("Dialed remote peer: {:?}", self.peers_addresses);
-            let remote_peer_id = PeerId::try_from_multiaddr(&remote_peer_multiaddr).expect("multiaddress with peer ID");
-            self.swarm
-                .behaviour_mut()
-                .floodsub
-                .add_node_to_partial_view(remote_peer_id);
-            println!("Added peer with ID: {:?} to broadcast list", remote_peer_id);
+            let peers_addresses = self.peers_addresses.iter().fold(
+                vec![], |mut peers_addresses, peer_address| {
+                    peers_addresses.push(peer_address);
+                    peers_addresses
+                }
+            );
+            for peer_address in peers_addresses {
+                let remote_peer_multiaddr: Multiaddr = peer_address.parse().expect("valid address");
+                self.swarm.dial(remote_peer_multiaddr.clone()).expect("known peer");
+                println!("Dialed remote peer: {:?}", peer_address);
+                let remote_peer_id = PeerId::try_from_multiaddr(&remote_peer_multiaddr).expect("multiaddress with peer ID");
+                self.swarm
+                    .behaviour_mut()
+                    .floodsub
+                    .add_node_to_partial_view(remote_peer_id);
+                println!("Added peer with ID: {:?} to broadcast list", remote_peer_id);
+            }
         }
     }
 
