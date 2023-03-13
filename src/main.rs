@@ -87,7 +87,7 @@ impl SubnetParams {
 }
 
 async fn broadcast_message_future() {
-    sleep(Duration::from_millis(10)).await;
+    sleep(Duration::from_millis(1)).await;
 }
 
 #[async_std::main]
@@ -142,7 +142,7 @@ async fn main() {
             };
 
             let encoded = to_string(&benchmark_result).unwrap();
-            let mut file = File::create(format!("./benchmark/benchmark_result_{}.json", opt.r))
+            let mut file = File::create(format!("./benchmark/benchmark_results.json"))
                 .await
                 .unwrap();
             file.write_all(encoded.as_bytes()).await.unwrap();

@@ -1,46 +1,11 @@
-import subprocess
-import time
 import json
 import matplotlib.pyplot as plt
 import statistics
 
-
-
-def startHonestReplica(procs, i):
-    print("Starting honest replica", i, ("using COD" if COD else "using IC"))
-    shellCommand = 'cargo run -- --r ' + str(i) + ' --n ' + str(N) + ' --f ' + str(F) + ' --p ' + str(P) + ' --t ' + str(T) + ' --d ' + str(D) + ' --m ' + str(M) + ' --s ' + str(S) + (' --cod' if COD else '')
-    procs.append(subprocess.Popen([shellCommand], shell=True, stderr=subprocess.DEVNULL))
-
-def startPassiveAdversaryReplica(procs, i):
-    print("Starting replica", i, ("using COD" if COD else "using IC"), "and controlled by passive adversary")
-    shellCommand = 'cargo run -- --r ' + str(i) + ' --n ' + str(N) + ' --f ' + str(F) + ' --p ' + str(P) + ' --t ' + str(int(T/3)) + ' --d ' + str(D) + ' --m ' + str(M) + ' --s ' + str(S) + (' --cod' if COD else '')
-    procs.append(subprocess.Popen([shellCommand], shell=True, stderr=subprocess.DEVNULL))
-
-def startSubnet():
-    procs = []
-    if ADVERSARY_TYPE == 0:
-        for i in range(2, N+1):
-            startHonestReplica(procs, i)
-    else:
-        for i in range(2, 2+F):
-            startPassiveAdversaryReplica(procs, i)  # terminates after T/3 seconds
-        for i in range(2+F, N+1):
-            startHonestReplica(procs, i)
-
-    # replica number 1 must be start last
-    time.sleep(5)
-    startHonestReplica(procs, 1)
-    return procs
-
-def waitForSubnetTermination():
-    for p in processes:
-        p.communicate() # waits for replica to finish and return result (none)
-
 def getBenchmarks():
     results = []
-    for i, _ in enumerate(processes):
-        with open('benchmark_result_' + str(i+1) + '.json', 'r') as f:
-            results.append(json.loads(f.read()))
+    with open('./benchmark/benchmark_results.json', 'r') as f:
+        results.append(json.loads(f.read()))
     return results
 
 def fillMissingElements(iterations, metrics, default_element):
@@ -174,13 +139,6 @@ def plotLatencies(i, ax, filled_iterations, filled_latencies, filled_finalizatio
     labels = ["FP-finalized block", "IC-finalized block"]
     ax.legend(handles, labels, loc="upper right")
 
-def computeNetworkDelays(delays_info):
-    for hash, delay_info in delays_info.items():
-        delays_info[hash]["network_delays"] = [(received_time-delay_info["sent"])*1e-9 for received_time in delay_info["received"]]
-        delays_info[hash]["average_network_delay"] = statistics.mean(delays_info[hash]["network_delays"]) if len(delays_info[hash]["network_delays"]) > 0 else None
-    proposals_network_delays = [proposal_info["average_network_delay"] for proposal_info in delays_info.values() if proposal_info["average_network_delay"] is not None]
-    return proposals_network_delays
-
 def getResults():
     fig, axs = plt.subplots(N, 1)
     fig.suptitle("Block finalization latency using " + ("FICC" if COD else "ICC"))
@@ -227,24 +185,17 @@ def getResults():
         #         xlim_distr = ax_distr.get_xlim()
         #     else:
         #         ax_distr.set_xlim(xlim_distr)
-
-    proposals_network_delays = computeNetworkDelays(delays_info)
-    average_network_delay = statistics.mean(proposals_network_delays)
-    print("\nThe average network delay is:", average_network_delay)
-
     plt.show()
 
 
 
 COD = True          # use FICC (True) or ICC (False)
 ADVERSARY_TYPE = 0  # 0: no adversary, 1: passive adversary
-N = 6               # total number of replicas
-F = 1               # number of corrupt replicas
-P = 1               # number of replicas that can disagree during fast-path finalization
+N = 3               # total number of replicas
+F = 0               # number of corrupt replicas
+P = 0               # number of replicas that can disagree during fast-path finalization
 T = 60              # subnet simulation time (seconds)
 D = 500             # artifct delay for block proposals and notarization shares (milliseconds)
-M = 20             # mean of simulated network delay (milliseconds)
-S = 0               # standard deviation of simulated network delay (milliseconds)
 
 if N <= 3*F + 2*P or P > F:
     print("Wrong parameters: must satisfy: N > 3F + 2P and P <= F")
@@ -252,12 +203,6 @@ elif T < 20:
     print("Subnet must be run for at least 60 seconds")
 elif D < 100:
     print("Artifact delay must be at least 100 milliseconds")
-elif D < M:
-    print("Artifact delay must be greater than network delay")
-elif M < 10*S:
-    print("Mean has to be greater than ten times the standard deviation")
-elif M + 10*S > 1000:
-    print("Network delay too high")
 else: 
     print(
         "Runnning " + 
@@ -266,10 +211,6 @@ else:
         ("honest " if ADVERSARY_TYPE == 0 else "passive ") + 
         " adversary\n"
     )
-
-    processes = startSubnet()
-
-    waitForSubnetTermination()
 
     benchmarks = getBenchmarks()
 

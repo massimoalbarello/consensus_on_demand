@@ -6,6 +6,6 @@
 # will have compiled files and executables
 /target
 
-benchmark_result_*
+benchmark_results.json
 
 .env
