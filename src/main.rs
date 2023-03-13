@@ -62,7 +62,7 @@ struct Opt {
     #[structopt(long, default_value = "500")]
     d: u64, // notary delay
     #[structopt(long, default_value = "")]
-    a: Vec<String>,    // addresses of peers to connect to
+    a: String,    // addresses of peers to connect to
 }
 
 #[derive(Clone)]
