@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile
     image: consensus_on_demand:latest
-    command: ["--r", $REPLICA_NUMBER, "--n", $TOTAL_REPLICA_NUMBER, "--f", $FAULTY_REPLICAS, "--p", $DISAGREEING_REPLICA, "--t", $EXECUTION_TIME, "--d", $NOTARIZATION_DELAY, $COD, "--a2=", $A2, "--a3=", $A3]
+    command: ["--r", $REPLICA_NUMBER, "--n", $TOTAL_REPLICA_NUMBER, "--f", $FAULTY_REPLICAS, "--p", $DISAGREEING_REPLICA, "--t", $EXECUTION_TIME, "--d", $NOTARIZATION_DELAY, $COD, "--a2", $A2, "--a3", $A3]
     ports:
       - "56789:56789"
     volumes:
