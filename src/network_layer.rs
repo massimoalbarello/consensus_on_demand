@@ -64,7 +64,6 @@ pub struct Peer {
     receiver_outgoing_artifact: Receiver<ConsensusMessage>,
     time_source: Arc<SysTimeSource>,
     manager: ArtifactProcessorManager,
-    proposals_timings: Arc<RwLock<BTreeMap<CryptoHash, ArtifactDelayInfo>>>,
 }
 
 impl Peer {
@@ -75,7 +74,6 @@ impl Peer {
         first_block_delay: u64,
         topic: &str,
         finalization_times: Arc<RwLock<BTreeMap<Height, Option<HeightMetrics>>>>,
-        proposals_timings: Arc<RwLock<BTreeMap<CryptoHash, ArtifactDelayInfo>>>,
     ) -> Self {
         let starting_round = 1;
         // Create a random PeerId
@@ -122,7 +120,6 @@ impl Peer {
                 sender_outgoing_artifact,
                 finalization_times,
             ),
-            proposals_timings,
         };
         // println!(
         //     "Local node initialized with number: {} and peer id: {:?}",
@@ -145,28 +142,6 @@ impl Peer {
         match self.receiver_outgoing_artifact.try_recv() {
             Ok(outgoing_artifact) => {
                 // println!("Broadcasted locally generated artifact");
-                match &outgoing_artifact {
-                    ConsensusMessage::BlockProposal(block_proposal) => {
-                        if block_proposal.content.value.height == 1 {
-                            println!("Delaying first block proposal by {} ms", self.first_block_delay);
-                            sleep(Duration::from_millis(self.first_block_delay));
-                            println!("First block proposal sent");
-                        }
-                        let block_hash = block_proposal.content.hash.clone();
-                        let artifact_delay_info = ArtifactDelayInfo {
-                            // recording timestamp as if it was sent "mean_simulated_network_delay" milliseconds before
-                            // this is because in order to simulate the network delay, every artifact is delayed by "mean_simulated_network_delay" before being broadcasted
-                            sent: Some(system_time_now()),
-                            received: None,
-                        };
-                        self.proposals_timings
-                            .write()
-                            .unwrap()
-                            .insert(block_hash, artifact_delay_info);
-                    },
-                    _ => (),
-                    
-                }
                 self.swarm.behaviour_mut().floodsub.publish(
                     self.floodsub_topic.clone(),
                     serde_json::to_string::<Message>(&Message::ConsensusMessage(outgoing_artifact))
@@ -245,20 +220,6 @@ impl Peer {
         match message_variant {
             Message::KeepAliveMessage => (),
             Message::ConsensusMessage(consensus_message) => {
-                match &consensus_message {
-                    ConsensusMessage::BlockProposal(block_proposal) => {
-                        let block_hash = block_proposal.content.hash.clone();
-                        let artifact_delay_info = ArtifactDelayInfo {
-                            sent: None,
-                            received: Some(system_time_now()),
-                        };
-                        self.proposals_timings
-                            .write()
-                            .unwrap()
-                            .insert(block_hash, artifact_delay_info);
-                    },
-                    _ => ()
-                };
                 self.manager.on_artifact(
                     UnvalidatedArtifact::new(consensus_message, self.time_source.get_relative_time()),
                 );
