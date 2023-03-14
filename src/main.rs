@@ -62,7 +62,9 @@ struct Opt {
     #[structopt(long, default_value = "500")]
     d: u64, // notary delay
     #[structopt(long, default_value = "")]
-    a: String,    // addresses of peers to connect to
+    addresses: String,    // address of peer to connect to
+    #[structopt(name="first-block-delay", long, default_value = "500")]
+    first_block_delay: u64, // delay imposed on the first block sent by replica 1
 }
 
 #[derive(Clone)]
@@ -102,8 +104,9 @@ async fn main() {
 
     let mut my_peer = Peer::new(
         opt.r,
-        opt.a,
+        opt.addresses,
         SubnetParams::new(opt.n, opt.f, opt.p, opt.cod, opt.d),
+        opt.first_block_delay,
         "gossip_blocks",
         cloned_finalization_times,
         cloned_proposals_timings,

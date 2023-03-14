@@ -1,8 +1,8 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
-    sync::{Arc, RwLock},
+    sync::{Arc, RwLock}, time::Duration,
 };
-
+use std::thread::sleep;
 use crossbeam_channel::Receiver;
 use futures::{prelude::stream::StreamExt, stream::SelectNextSome};
 use libp2p::{
@@ -54,6 +54,7 @@ pub enum Message {
 pub struct Peer {
     replica_number: u8,
     id: PeerId,
+    first_block_delay: u64,
     round: usize,
     rank: u64,
     floodsub_topic: Topic,
@@ -71,6 +72,7 @@ impl Peer {
         replica_number: u8,
         peers_addresses: String,
         subnet_params: SubnetParams,
+        first_block_delay: u64,
         topic: &str,
         finalization_times: Arc<RwLock<BTreeMap<Height, Option<HeightMetrics>>>>,
         proposals_timings: Arc<RwLock<BTreeMap<CryptoHash, ArtifactDelayInfo>>>,
@@ -97,6 +99,7 @@ impl Peer {
         let local_peer = Self {
             replica_number,
             id: local_peer_id,
+            first_block_delay,
             round: starting_round,
             rank: 0, // updated after Peer object is instantiated
             floodsub_topic: floodsub_topic.clone(),
@@ -136,20 +139,6 @@ impl Peer {
                     .expect("can get a local socket"),
             )
             .expect("swarm can be started");
-        if self.replica_number == 1 {
-            for peer_address in self.peers_addresses.split(",") {
-                println!("{:?}", peer_address);
-                let remote_peer_multiaddr: Multiaddr = peer_address.parse().expect("valid address");
-                self.swarm.dial(remote_peer_multiaddr.clone()).expect("known peer");
-                println!("Dialed remote peer: {:?}", peer_address);
-                let remote_peer_id = PeerId::try_from_multiaddr(&remote_peer_multiaddr).expect("multiaddress with peer ID");
-                self.swarm
-                    .behaviour_mut()
-                    .floodsub
-                    .add_node_to_partial_view(remote_peer_id);
-                println!("Added peer with ID: {:?} to broadcast list", remote_peer_id);
-            }
-        }
     }
 
     pub fn broadcast_message(&mut self) {
@@ -158,6 +147,11 @@ impl Peer {
                 // println!("Broadcasted locally generated artifact");
                 match &outgoing_artifact {
                     ConsensusMessage::BlockProposal(block_proposal) => {
+                        if block_proposal.content.value.height == 1 {
+                            println!("Delaying first block proposal by {} ms", self.first_block_delay);
+                            sleep(Duration::from_millis(self.first_block_delay));
+                            println!("First block proposal sent");
+                        }
                         let block_hash = block_proposal.content.hash.clone();
                         let artifact_delay_info = ArtifactDelayInfo {
                             // recording timestamp as if it was sent "mean_simulated_network_delay" milliseconds before
@@ -199,6 +193,22 @@ impl Peer {
                     Multihash::from_bytes(&self.id.to_bytes()[..]).unwrap(),
                 ));
                 println!("Listening on {:?}", address);
+                if self.replica_number == 1 {
+                    for peer_address in self.peers_addresses.split(',') {
+                        let remote_peer_multiaddr: Multiaddr = peer_address.parse().expect("valid address");
+                        self.swarm.dial(remote_peer_multiaddr.clone()).expect("known peer");
+                        println!("Dialed remote peer: {:?}", peer_address);
+                        let remote_peer_id = PeerId::try_from_multiaddr(&remote_peer_multiaddr).expect("multiaddress with peer ID");
+                        if !self.subscribed_peers.contains(&remote_peer_id) {
+                            self.swarm
+                                .behaviour_mut()
+                                .floodsub
+                                .add_node_to_partial_view(remote_peer_id);
+                            self.subscribed_peers.insert(remote_peer_id);
+                            println!("Added peer with ID: {:?} to broadcast list", remote_peer_id);
+                        }
+                    }
+                }
             }
             SwarmEvent::Behaviour(OutEvent::Floodsub(floodsub_event)) => {
                 match floodsub_event {
@@ -208,14 +218,16 @@ impl Peer {
                             serde_json::from_str::<Message>(&floodsub_content).expect("can parse artifact");
                         self.handle_incoming_message(message);
                     },
-                    FloodsubEvent::Subscribed { peer_id, .. } => {
-                        if !self.subscribed_peers.contains(&peer_id) {
-                            self.swarm
-                                .behaviour_mut()
-                                .floodsub
-                                .add_node_to_partial_view(peer_id);
-                            self.subscribed_peers.insert(peer_id);
-                            println!("Added peer with ID: {:?} to broadcast list", peer_id);
+                    FloodsubEvent::Subscribed { peer_id: remote_peer_id, .. } => {
+                        if !self.subscribed_peers.contains(&remote_peer_id) {
+                            if self.replica_number != 1 {
+                                self.swarm
+                                    .behaviour_mut()
+                                    .floodsub
+                                    .add_node_to_partial_view(remote_peer_id);
+                                self.subscribed_peers.insert(remote_peer_id);
+                                println!("Added peer with ID: {:?} to broadcast list", remote_peer_id);
+                            }
                         }
                     },
                     _ => println!("Unhandled floodsub event"), 
