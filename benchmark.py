@@ -21,95 +21,37 @@ def fillMissingElements(iterations, metrics, default_element):
             filled_metrics.append(default_element)
     return filled_iterations, filled_metrics
 
-def countFpSequences(first_index_offset, arr):
-    sequences = []
-    sequence_length = None
-    not_finalized_sequence_len = 0
-    starting_index = 0 # genesis block is IC finalized
-    for i in range(len(arr)):
-        if arr[i] == 'IC':
-            # register previous sequence
-            sequences.append({
-                "length": sequence_length if sequence_length != None else 0,
-                "IC_index": starting_index,
-            })
-            # initialize new sequence
-            starting_index = i+first_index_offset
-            sequence_length = 0
-        elif arr[i] == 'FP':
-            if sequence_length == None: # sequence length can be "None" only for the first sequence
-                sequence_length = i+first_index_offset
-            else:
-                sequence_length += 1
-        elif arr[i] == '-':
-            not_finalized_sequence_len += 1
-            if i < len(arr)-1 and arr[i+1] == 'IC':
-                not_finalized_sequence_len = 0
-            elif i < len(arr)-1 and arr[i+1] == 'FP':
-                sequence_length += not_finalized_sequence_len
-                not_finalized_sequence_len = 0
-
-    # register last sequence
-    sequences.append({
-        "length": sequence_length,
-        "IC_index": starting_index, 
-    })
-
-    return sequences
-
 def printMetrics(
     i,
     average_latency,
     total_fp_finalizations,
     total_ic_finalizations,
+    total_dk_finalizations,
     total_non_finalizations,
-    sequences,
 ):
     print("\n### Replica", i+1, "###")
     print("The average time for block finalization is:", average_latency)
     print("The number of iterations in which the block is:")
     print("- FP finalized:", total_fp_finalizations)
     print("- IC finalized:", total_ic_finalizations)
+    print("- DK finalized:", total_dk_finalizations)
     print("- not explicitly finalized:", total_non_finalizations)
-    print("Found", len(sequences), "sequences:")
-    for sequence in sequences:
-        print("- starting at", sequence["IC_index"], "with length", sequence["length"])
 
-
-def processResults(latencies, filled_iterations, filled_finalization_types, delays_info, proposals_timings):
+def processResults(latencies, filled_iterations, filled_finalization_types):
     average_latency = None
     if len(latencies) != 0:
         average_latency = sum(latencies) / len(latencies)
     total_fp_finalizations = filled_finalization_types.count("FP")
     total_ic_finalizations = filled_finalization_types.count("IC")
+    total_dk_finalizations = filled_finalization_types.count("Dk")
     total_non_finalizations = filled_finalization_types.count("-")
-    sequences = []
-    sequences_length = []
-    if COD:
-        sequences = countFpSequences(filled_iterations[0], filled_finalization_types)
-        for sequence in sequences:
-            sequences_length.append(sequence["length"])
-
-    for hash, timings in proposals_timings.items():
-        if hash not in delays_info:
-            delays_info[hash] = {
-                "sent": None,
-                "received": [],
-            }
-        if timings["sent"] != None:
-            delays_info[hash]["sent"] = timings["sent"]
-        elif timings["received"] != None:
-            delays_info[hash]["received"].append(timings["received"])
-        else:
-            print("Replica didn't send nor receive block", hash)
 
     return (
         average_latency,
         total_fp_finalizations,
         total_ic_finalizations,
+        total_dk_finalizations,
         total_non_finalizations,
-        sequences,
-        sequences_length
     )
 
 def plotSequenceLengthDistribution(ax, arr):
@@ -123,10 +65,11 @@ def plotSequenceLengthDistribution(ax, arr):
     ax.bar(frequencies.keys(), frequencies.values(), width=1, color='orange')
 
 def plotLatencies(i, ax, filled_iterations, filled_latencies, filled_finalization_types):
-    colors = ["green", "blue"]
+    colors = ["green", "blue", "grey"]
     color_labels = {
         "green": "FP-finalized block",
-        "blue": "IC-finalized block"
+        "blue": "IC-finalized block",
+        "grey": "finalization from peer"
     }
     fp_bar = None
     ic_bar = None
@@ -135,8 +78,10 @@ def plotLatencies(i, ax, filled_iterations, filled_latencies, filled_finalizatio
             fp_bar = ax.bar(filled_iterations[j], filled_latencies[j], width=1, color=colors[0], label=color_labels[colors[0]])
         elif type == "IC":
             ic_bar = ax.bar(filled_iterations[j], filled_latencies[j], width=1, color=colors[1], label=color_labels[colors[1]])
+        elif type == "DK":
+            ic_bar = ax.bar(filled_iterations[j], filled_latencies[j], width=1, color=colors[2], label=color_labels[colors[2]])
     handles = [fp_bar, ic_bar]
-    labels = ["FP-finalized block", "IC-finalized block"]
+    labels = ["FP-finalized block", "IC-finalized block", "finalization from peer"]
     ax.legend(handles, labels, loc="upper right")
 
 def getResults():
@@ -147,25 +92,24 @@ def getResults():
         iterations = [int(iteration) for iteration in benchmark["finalization_times"].keys()]
         latencies = [metrics["latency"]["secs"]+metrics["latency"]["nanos"]*1e-9 for metrics in benchmark["finalization_times"].values()]
         filled_iterations, filled_latencies = fillMissingElements(iterations, latencies, 0)
-        finalization_types = ["FP" if metrics["fp_finalization"] == True else "IC" for metrics in benchmark["finalization_times"].values()]
+        finalization_types = [metrics["fp_finalization"] for metrics in benchmark["finalization_times"].values()]
         _, filled_finalization_types = fillMissingElements(iterations, finalization_types, "-")
 
         (
             average_latency,
             total_fp_finalizations,
             total_ic_finalizations,
+            total_dk_finalizations,
             total_non_finalizations,
-            sequences,
-            sequences_length
-        ) = processResults(latencies, filled_iterations, filled_finalization_types, delays_info, benchmark["proposals_timings"])
+        ) = processResults(latencies, filled_iterations, filled_finalization_types)
 
         printMetrics(
             i,
             average_latency,
             total_fp_finalizations,
             total_ic_finalizations,
+            total_dk_finalizations,
             total_non_finalizations,
-            sequences,
         )
 
         ax_lat = axs[i]
@@ -177,14 +121,6 @@ def getResults():
             xlim_lat = ax_lat.get_xlim()
         else:
             ax_lat.set_xlim(xlim_lat)
-
-        # if COD:
-        #     ax_distr = plt.subplot(2*N, 1, N+i+1)
-        #     plotSequenceLengthDistribution(ax_distr, sequences_length)
-        #     if i == 0:
-        #         xlim_distr = ax_distr.get_xlim()
-        #     else:
-        #         ax_distr.set_xlim(xlim_distr)
     plt.show()
 
 
