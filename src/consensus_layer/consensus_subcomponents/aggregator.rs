@@ -13,7 +13,7 @@ use crate::consensus_layer::consensus_subcomponents::goodifier::{
 use crate::consensus_layer::height_index::Height;
 use crate::consensus_layer::{artifacts::ConsensusMessage, pool_reader::PoolReader};
 use crate::crypto::{CryptoHashOf, Signed};
-use crate::{SubnetParams, HeightMetrics};
+use crate::{SubnetParams, HeightMetrics, FinalizationType};
 
 use super::block_maker::Block;
 use super::notary::{NotarizationShareContent, NotarizationShareContentCOD};
@@ -170,7 +170,7 @@ impl ShareAggregator {
                     {
                         let height_metrics = HeightMetrics {
                             latency: finalization_time,
-                            fp_finalization: false,
+                            fp_finalization: FinalizationType::IC,
                         };
 
                         finalization_times

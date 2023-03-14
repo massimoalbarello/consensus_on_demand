@@ -157,7 +157,7 @@ impl ConsensusImpl {
             (change_set, to_broadcast)
         };
 
-        let validate = || self.validator.on_state_change(&pool_reader);
+        let validate = || self.validator.on_state_change(&pool_reader, Arc::clone(&finalization_times));
 
         // must be the last component called as it can return the same artifact in multiple iterations
         // running it before the other components might starve them as we break out of the loop

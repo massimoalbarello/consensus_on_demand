@@ -17,7 +17,7 @@ use crate::{
         pool_reader::PoolReader,
     },
     crypto::Signed,
-    SubnetParams, HeightMetrics,
+    SubnetParams, HeightMetrics, FinalizationType,
 };
 
 /// A finalization share is a multi-signature share on a finalization content.
@@ -66,7 +66,7 @@ impl Acknowledger {
                         {
                             let height_metrics = HeightMetrics {
                                 latency: finalization_time,
-                                fp_finalization: true,
+                                fp_finalization: FinalizationType::FP,
                             };
 
                             finalization_times

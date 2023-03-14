@@ -16,9 +16,16 @@ use structopt::StructOpt;
 
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+enum FinalizationType {
+    IC,
+    FP,
+    DK,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct HeightMetrics {
     latency: Duration,
-    fp_finalization: bool,
+    fp_finalization: FinalizationType,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -88,7 +95,7 @@ impl SubnetParams {
 }
 
 async fn broadcast_message_future() {
-    sleep(Duration::from_millis(1)).await;
+    sleep(Duration::from_millis(10)).await;
 }
 
 #[async_std::main]
