@@ -47,22 +47,24 @@ pub mod time_source;
 
 #[derive(StructOpt, Debug)]
 struct Opt {
-    #[structopt(short, long)]
+    #[structopt(long)]
     r: u8, // replica number
-    #[structopt(short, long, default_value = "6")]
+    #[structopt(long, default_value = "6")]
     n: u8, // total number of nodes
-    #[structopt(short, long, default_value = "1")]
+    #[structopt(long, default_value = "1")]
     f: u8, // number of byzantine nodes
-    #[structopt(short, long, default_value = "1")]
+    #[structopt(long, default_value = "1")]
     p: u8, // number of disagreeing nodes
-    #[structopt(short, long)]
+    #[structopt(long)]
     cod: bool, // enable Fast IC Consensus
-    #[structopt(short, long, default_value = "300")]
+    #[structopt(long, default_value = "300")]
     t: u64, // time to run replica
-    #[structopt(short, long, default_value = "500")]
+    #[structopt(long, default_value = "500")]
     d: u64, // notary delay
-    #[structopt(short, long, default_value = "")]
-    addresses: String    // address of peer to connect to
+    #[structopt(long, default_value = "")]
+    addresses: String,    // address of peer to connect to
+    #[structopt(name="first-block-delay", long, default_value = "500")]
+    first_block_delay: u64, // delay imposed on the first block sent by replica 1
 }
 
 #[derive(Clone)]
@@ -104,6 +106,7 @@ async fn main() {
         opt.r,
         opt.addresses,
         SubnetParams::new(opt.n, opt.f, opt.p, opt.cod, opt.d),
+        opt.first_block_delay,
         "gossip_blocks",
         cloned_finalization_times,
         cloned_proposals_timings,
