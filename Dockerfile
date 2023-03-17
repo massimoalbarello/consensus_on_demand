@@ -26,4 +26,4 @@ COPY --from=builder /replica/target/debug/consensus_on_demand .
 
 EXPOSE 56789
 
-ENTRYPOINT ["./target/debug/consensus_on_demand"]
+ENTRYPOINT ["./consensus_on_demand"]
