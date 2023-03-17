@@ -27,7 +27,7 @@ pub struct Block {
     // the parent block that this block extends, forming a block chain
     pub parent: String,
     // the payload of the block
-    payload: Payload,
+    pub payload: Payload,
     // the height of the block, which is the height of the parent + 1
     pub height: u64,
     // rank indicates the rank of the block maker that created this block

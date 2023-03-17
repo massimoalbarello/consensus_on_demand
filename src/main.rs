@@ -1,4 +1,4 @@
-use async_std::{fs::File, io, task::sleep};
+use async_std::{fs::File, io, task, stream};
 use futures::{
     future::FutureExt,
     prelude::{stream::StreamExt, *},
@@ -94,10 +94,6 @@ impl SubnetParams {
     }
 }
 
-async fn broadcast_message_future() {
-    sleep(Duration::from_millis(10)).await;
-}
-
 #[async_std::main]
 async fn main() {
     let opt = Opt::from_args();
@@ -129,12 +125,15 @@ async fn main() {
     loop {
         // if !my_peer.manager.handle.as_ref().unwrap().is_finished() {
         if system_time_now() < absolute_end_time {
+            let mut broadcast_interval = stream::interval(Duration::from_millis(20));
             select! {
                 _ = stdin.select_next_some() => (),
-                _ = broadcast_message_future().fuse() => {
+                _ = broadcast_interval.next().fuse() => {
                     // prevent Mdns expiration event by periodically broadcasting keep alive messages to peers
                     // if any locally generated artifact, broadcast it
-                    my_peer.broadcast_message();
+                    if my_peer.can_start_proposing() {
+                        my_peer.broadcast_message();
+                    }
                 },
                 event = my_peer.get_next_event() => my_peer.match_event(event),
             }
