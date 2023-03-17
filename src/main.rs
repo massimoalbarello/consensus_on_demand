@@ -125,7 +125,7 @@ async fn main() {
     loop {
         // if !my_peer.manager.handle.as_ref().unwrap().is_finished() {
         if system_time_now() < absolute_end_time {
-            let mut broadcast_interval = stream::interval(Duration::from_millis(20));
+            let mut broadcast_interval = stream::interval(Duration::from_millis(30));
             select! {
                 _ = stdin.select_next_some() => (),
                 _ = broadcast_interval.next().fuse() => {

@@ -63,6 +63,7 @@ pub struct Peer {
     swarm: Swarm<P2PBehaviour>,
     peers_addresses: String,
     subscribed_peers: BTreeSet<PeerId>,
+    connected_peers: BTreeSet<PeerId>,
     receiver_outgoing_artifact: Receiver<ConsensusMessage>,
     sender_outgoing_artifact: Sender<ConsensusMessage>,
     finalization_times: Arc<RwLock<BTreeMap<Height, Option<HeightMetrics>>>>,
@@ -117,6 +118,7 @@ impl Peer {
             },
             peers_addresses,
             subscribed_peers: BTreeSet::new(),
+            connected_peers: BTreeSet::new(),
             receiver_outgoing_artifact,
             sender_outgoing_artifact,
             finalization_times,
@@ -147,8 +149,7 @@ impl Peer {
                     match &outgoing_artifact {
                         ConsensusMessage::BlockProposal(proposal) => {
                             if proposal.content.value.height == 1 {
-                                println!("Porco dio");
-                                sleep(Duration::from_millis(250));
+                                sleep(Duration::from_millis(500));
                             }
                         },
                         ConsensusMessage::NotarizationShare(share) => {
@@ -215,7 +216,7 @@ impl Peer {
                 address.push(Protocol::P2p(
                     Multihash::from_bytes(&self.id.to_bytes()[..]).unwrap(),
                 ));
-                println!("Listening on {:?}", address);
+                println!("Local peer ID: {:?}", self.id);
                 if self.replica_number == 1 {
                     for peer_address in self.peers_addresses.split(',') {
                         let remote_peer_multiaddr: Multiaddr = peer_address.parse().expect("valid address");
@@ -258,19 +259,21 @@ impl Peer {
                 
             },
             SwarmEvent::ConnectionEstablished {peer_id: remote_peer_id, ..} => {
-                println!("Connection established with remote peer: {:?}", remote_peer_id);
-                self.swarm.behaviour_mut().floodsub.publish(
-                    self.floodsub_topic.clone(),
-                    serde_json::to_string::<Message>(&Message::KeepAliveMessage).unwrap(),
-                );
-                self.can_start_proposing = true;
-                self.manager = Some(ArtifactProcessorManager::new(
-                    self.replica_number,
-                    self.subnet_params.clone(),
-                    Arc::clone(&self.time_source),
-                    self.sender_outgoing_artifact.clone(),
-                    Arc::clone(&self.finalization_times),
-                ));
+                if !self.connected_peers.contains(&remote_peer_id) {
+                    println!("Connection established with remote peer: {:?}", remote_peer_id);
+                    self.connected_peers.insert(remote_peer_id);
+                }
+                if self.connected_peers.len() == (self.subnet_params.total_nodes_number-1) as usize {
+                    println!("Can start proposing");
+                    self.can_start_proposing = true;
+                    self.manager = Some(ArtifactProcessorManager::new(
+                        self.replica_number,
+                        self.subnet_params.clone(),
+                        Arc::clone(&self.time_source),
+                        self.sender_outgoing_artifact.clone(),
+                        Arc::clone(&self.finalization_times),
+                    ));
+                }
             },
             _ => println!("unhandled swarm event"),
         }
