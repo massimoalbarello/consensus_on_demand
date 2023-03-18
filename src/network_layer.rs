@@ -263,7 +263,7 @@ impl Peer {
                     println!("Connection established with remote peer: {:?}", remote_peer_id);
                     self.connected_peers.insert(remote_peer_id);
                 }
-                if self.connected_peers.len() == (self.subnet_params.total_nodes_number-1) as usize {
+                if self.connected_peers.len() == (self.subnet_params.total_nodes_number-1) as usize || self.replica_number != 1 {
                     println!("Can start proposing");
                     self.can_start_proposing = true;
                     self.manager = Some(ArtifactProcessorManager::new(
