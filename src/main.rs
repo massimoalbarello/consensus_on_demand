@@ -1,4 +1,4 @@
-use async_std::{fs::File, io, task::sleep};
+use async_std::{fs::File, io, task, stream};
 use futures::{
     future::FutureExt,
     prelude::{stream::StreamExt, *},
@@ -69,8 +69,10 @@ struct Opt {
     d: u64, // notary delay
     #[structopt(long, default_value = "")]
     addresses: String,    // address of peer to connect to
-    #[structopt(name="first-block-delay", long, default_value = "500")]
-    first_block_delay: u64, // delay imposed on the first block sent by replica 1
+    #[structopt(long, default_value = "56789")]
+    port: u64,    // port which the peers listen for connections
+    #[structopt(name="broadcast_interval", long, default_value = "100")]
+    broadcast_interval: u64, // interval after which artifacts are broadcasted
 }
 
 #[derive(Clone)]
@@ -94,13 +96,10 @@ impl SubnetParams {
     }
 }
 
-async fn broadcast_message_future() {
-    sleep(Duration::from_millis(10)).await;
-}
-
 #[async_std::main]
 async fn main() {
     let opt = Opt::from_args();
+    println!("Running FICC: {}", opt.cod);
 
     let finalizations_times = Arc::new(RwLock::new(BTreeMap::<Height, Option<HeightMetrics>>::new()));
     let cloned_finalization_times = Arc::clone(&finalizations_times);
@@ -108,14 +107,14 @@ async fn main() {
     let mut my_peer = Peer::new(
         opt.r,
         opt.addresses,
+        opt.port,
         SubnetParams::new(opt.n, opt.f, opt.p, opt.cod, opt.d),
-        opt.first_block_delay,
         "gossip_blocks",
         cloned_finalization_times,
     )
     .await;
 
-    // Listen on all interfaces and whatever port the OS assigns
+    // Listen on all interfaces and at port 56789
     my_peer.listen_for_dialing();
 
     // Read full lines from stdin
@@ -127,14 +126,16 @@ async fn main() {
 
     // Process events
     loop {
-        // if !my_peer.manager.handle.as_ref().unwrap().is_finished() {
         if system_time_now() < absolute_end_time {
+            let mut broadcast_interval = stream::interval(Duration::from_millis(opt.broadcast_interval));
             select! {
                 _ = stdin.select_next_some() => (),
-                _ = broadcast_message_future().fuse() => {
+                _ = broadcast_interval.next().fuse() => {
                     // prevent Mdns expiration event by periodically broadcasting keep alive messages to peers
                     // if any locally generated artifact, broadcast it
-                    my_peer.broadcast_message();
+                    if my_peer.can_start_proposing() {
+                        my_peer.broadcast_message();
+                    }
                 },
                 event = my_peer.get_next_event() => my_peer.match_event(event),
             }

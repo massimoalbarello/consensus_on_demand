@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, RwLock}, time::Duration,
 };
 use std::thread::sleep;
-use crossbeam_channel::Receiver;
+use crossbeam_channel::{Receiver, Sender};
 use futures::{prelude::stream::StreamExt, stream::SelectNextSome};
 use libp2p::{
     floodsub::{Floodsub, FloodsubEvent, Topic},
@@ -19,10 +19,10 @@ use crate::{
     artifact_manager::ArtifactProcessorManager,
     consensus_layer::{
         artifacts::{ConsensusMessage, UnvalidatedArtifact},
-        height_index::Height,
+        height_index::Height, consensus_subcomponents::{block_maker::{BlockProposal, Block, Payload}, notary::{NotarizationShareContentICC, NotarizationShareContentCOD, NotarizationShareContent}},
     },
     time_source::{SysTimeSource, TimeSource, system_time_now},
-    SubnetParams, HeightMetrics, crypto::CryptoHash, ArtifactDelayInfo,
+    SubnetParams, HeightMetrics, crypto::{CryptoHash, Hashed, Signed}, ArtifactDelayInfo,
 };
 
 // We create a custom network behaviour that combines floodsub and mDNS.
@@ -54,24 +54,29 @@ pub enum Message {
 pub struct Peer {
     replica_number: u8,
     id: PeerId,
-    first_block_delay: u64,
+    can_start_proposing: bool,
+    subnet_params: SubnetParams,
     round: usize,
     rank: u64,
     floodsub_topic: Topic,
     swarm: Swarm<P2PBehaviour>,
     peers_addresses: String,
+    listening_port: u64,
     subscribed_peers: BTreeSet<PeerId>,
+    connected_peers: BTreeSet<PeerId>,
     receiver_outgoing_artifact: Receiver<ConsensusMessage>,
+    sender_outgoing_artifact: Sender<ConsensusMessage>,
+    finalization_times: Arc<RwLock<BTreeMap<Height, Option<HeightMetrics>>>>,
     time_source: Arc<SysTimeSource>,
-    manager: ArtifactProcessorManager,
+    manager: Option<ArtifactProcessorManager>,
 }
 
 impl Peer {
     pub async fn new(
         replica_number: u8,
         peers_addresses: String,
+        listening_port: u64,
         subnet_params: SubnetParams,
-        first_block_delay: u64,
         topic: &str,
         finalization_times: Arc<RwLock<BTreeMap<Height, Option<HeightMetrics>>>>,
     ) -> Self {
@@ -97,7 +102,8 @@ impl Peer {
         let local_peer = Self {
             replica_number,
             id: local_peer_id,
-            first_block_delay,
+            can_start_proposing: false,
+            subnet_params,
             round: starting_round,
             rank: 0, // updated after Peer object is instantiated
             floodsub_topic: floodsub_topic.clone(),
@@ -110,16 +116,14 @@ impl Peer {
                 Swarm::new(transport, behaviour, local_peer_id)
             },
             peers_addresses,
+            listening_port,
             subscribed_peers: BTreeSet::new(),
+            connected_peers: BTreeSet::new(),
             receiver_outgoing_artifact,
-            time_source: time_source.clone(),
-            manager: ArtifactProcessorManager::new(
-                replica_number,
-                subnet_params,
-                time_source,
-                sender_outgoing_artifact,
-                finalization_times,
-            ),
+            sender_outgoing_artifact,
+            finalization_times,
+            time_source,
+            manager: None,
         };
         // println!(
         //     "Local node initialized with number: {} and peer id: {:?}",
@@ -131,7 +135,7 @@ impl Peer {
     pub fn listen_for_dialing(&mut self) {
         self.swarm
             .listen_on(
-                "/ip4/0.0.0.0/tcp/56789"
+                format!("/ip4/0.0.0.0/tcp/{}", self.listening_port)
                     .parse()
                     .expect("can get a local socket"),
             )
@@ -141,7 +145,63 @@ impl Peer {
     pub fn broadcast_message(&mut self) {
         match self.receiver_outgoing_artifact.try_recv() {
             Ok(outgoing_artifact) => {
-                // println!("Broadcasted locally generated artifact");
+                if self.replica_number == 1 {
+                    match &outgoing_artifact {
+                        ConsensusMessage::BlockProposal(proposal) => {
+                            if proposal.content.value.height == 1 {
+                                sleep(Duration::from_millis(500));
+                            }
+                        },
+                        ConsensusMessage::NotarizationShare(share) => {
+                            match &share.content {
+                                NotarizationShareContent::COD(ack) => {
+                                    if ack.height == 1 {
+                                        println!("Rebroadcasting first block proposal");
+                                        self.swarm.behaviour_mut().floodsub.publish(
+                                            self.floodsub_topic.clone(),
+                                            serde_json::to_string::<Message>(&Message::ConsensusMessage(ConsensusMessage::BlockProposal(Signed {
+                                                content: Hashed {
+                                                    hash: String::from("426d3a77ace30d95db82aaaa9c49dbb6718bfbf106968ae0218f0f588871e229"),
+                                                    value: Block {
+                                                        parent: String::from("8c43f94e4759170f3b528ba6ff62171f4d26fd12ca4f4cca1da81a6534746715"),
+                                                        payload: Payload::new(),
+                                                        height: 1,
+                                                        rank: 0,
+                                                    },
+                                                },
+                                                signature: self.replica_number,
+                                            })))
+                                                .unwrap(),
+                                        );
+                                    }
+                                }
+                                NotarizationShareContent::ICC(share) => {
+                                    if share.height == 1 {
+                                        println!("Rebroadcasting first block proposal");
+                                        self.swarm.behaviour_mut().floodsub.publish(
+                                            self.floodsub_topic.clone(),
+                                            serde_json::to_string::<Message>(&Message::ConsensusMessage(ConsensusMessage::BlockProposal(Signed {
+                                                content: Hashed {
+                                                    hash: String::from("426d3a77ace30d95db82aaaa9c49dbb6718bfbf106968ae0218f0f588871e229"),
+                                                    value: Block {
+                                                        parent: String::from("8c43f94e4759170f3b528ba6ff62171f4d26fd12ca4f4cca1da81a6534746715"),
+                                                        payload: Payload::new(),
+                                                        height: 1,
+                                                        rank: 0,
+                                                    },
+                                                },
+                                                signature: self.replica_number,
+                                            })))
+                                                .unwrap(),
+                                        );
+                                    }
+                                }
+                            }
+                        },
+                        _ => (),
+                    }
+                }
+                // println!("\nBroadcasted locally generated artifact: {:?}", outgoing_artifact);
                 self.swarm.behaviour_mut().floodsub.publish(
                     self.floodsub_topic.clone(),
                     serde_json::to_string::<Message>(&Message::ConsensusMessage(outgoing_artifact))
@@ -149,6 +209,7 @@ impl Peer {
                 );
             }
             Err(_) => {
+                // println!("Sending keepalive");
                 self.swarm.behaviour_mut().floodsub.publish(
                     self.floodsub_topic.clone(),
                     serde_json::to_string::<Message>(&Message::KeepAliveMessage).unwrap(),
@@ -167,20 +228,20 @@ impl Peer {
                 address.push(Protocol::P2p(
                     Multihash::from_bytes(&self.id.to_bytes()[..]).unwrap(),
                 ));
-                println!("Listening on {:?}", address);
+                println!("Listening on: {:?}", address);
+                println!("Local peer ID: {:?}", self.id);
                 if self.replica_number == 1 {
                     for peer_address in self.peers_addresses.split(',') {
                         let remote_peer_multiaddr: Multiaddr = peer_address.parse().expect("valid address");
-                        self.swarm.dial(remote_peer_multiaddr.clone()).expect("known peer");
-                        println!("Dialed remote peer: {:?}", peer_address);
                         let remote_peer_id = PeerId::try_from_multiaddr(&remote_peer_multiaddr).expect("multiaddress with peer ID");
                         if !self.subscribed_peers.contains(&remote_peer_id) {
+                            self.swarm.dial(remote_peer_multiaddr.clone()).expect("known peer");
                             self.swarm
                                 .behaviour_mut()
                                 .floodsub
                                 .add_node_to_partial_view(remote_peer_id);
                             self.subscribed_peers.insert(remote_peer_id);
-                            println!("Added peer with ID: {:?} to broadcast list", remote_peer_id);
+                            println!("Dialed remote peer: {:?} and added to broadcast list", peer_address);
                         }
                     }
                 }
@@ -210,9 +271,24 @@ impl Peer {
                 }
                 
             },
-            _ => {
-                // println!("Unhandled swarm event");
-            }
+            SwarmEvent::ConnectionEstablished {peer_id: remote_peer_id, ..} => {
+                if !self.connected_peers.contains(&remote_peer_id) {
+                    println!("Connection established with remote peer: {:?}", remote_peer_id);
+                    self.connected_peers.insert(remote_peer_id);
+                }
+                if self.connected_peers.len() == (self.subnet_params.total_nodes_number-1) as usize || self.replica_number != 1 {
+                    println!("Can start proposing");
+                    self.can_start_proposing = true;
+                    self.manager = Some(ArtifactProcessorManager::new(
+                        self.replica_number,
+                        self.subnet_params.clone(),
+                        Arc::clone(&self.time_source),
+                        self.sender_outgoing_artifact.clone(),
+                        Arc::clone(&self.finalization_times),
+                    ));
+                }
+            },
+            _ => println!("unhandled swarm event"),
         }
     }
 
@@ -220,10 +296,20 @@ impl Peer {
         match message_variant {
             Message::KeepAliveMessage => (),
             Message::ConsensusMessage(consensus_message) => {
-                self.manager.on_artifact(
-                    UnvalidatedArtifact::new(consensus_message, self.time_source.get_relative_time()),
-                );
+                // println!("\nReceived message: {:?}", consensus_message);
+                match &self.manager {
+                    Some(manager) => {
+                        manager.on_artifact(
+                            UnvalidatedArtifact::new(consensus_message, self.time_source.get_relative_time())
+                        );
+                    },
+                    None => (),
+                };
             }
         }
+    }
+
+    pub fn can_start_proposing(&self) -> bool {
+        self.can_start_proposing
     }
 }

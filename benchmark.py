@@ -86,6 +86,12 @@ def getResults():
         total_non_finalizations,
     ) = processResults(latencies, filled_iterations, filled_finalization_types)
 
+    ax = plt.gca()
+    ax.set_xlabel("Round")
+    ax.set_ylabel("Latency [s]")
+    plotLatencies(plt.gca(), filled_iterations, filled_latencies, filled_finalization_types)
+    plt.show()
+
     printMetrics(
         average_latency,
         total_fp_finalizations,
@@ -93,11 +99,6 @@ def getResults():
         total_dk_finalizations,
         total_non_finalizations,
     )
-    ax = plt.gca()
-    ax.set_xlabel("Round")
-    ax.set_ylabel("Latency [s]")
-    plotLatencies(plt.gca(), filled_iterations, filled_latencies, filled_finalization_types)
-    plt.show()
 
 
 
