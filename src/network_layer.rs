@@ -54,7 +54,6 @@ pub enum Message {
 pub struct Peer {
     replica_number: u8,
     id: PeerId,
-    first_block_delay: u64,
     can_start_proposing: bool,
     subnet_params: SubnetParams,
     round: usize,
@@ -62,6 +61,7 @@ pub struct Peer {
     floodsub_topic: Topic,
     swarm: Swarm<P2PBehaviour>,
     peers_addresses: String,
+    listening_port: u64,
     subscribed_peers: BTreeSet<PeerId>,
     connected_peers: BTreeSet<PeerId>,
     receiver_outgoing_artifact: Receiver<ConsensusMessage>,
@@ -75,8 +75,8 @@ impl Peer {
     pub async fn new(
         replica_number: u8,
         peers_addresses: String,
+        listening_port: u64,
         subnet_params: SubnetParams,
-        first_block_delay: u64,
         topic: &str,
         finalization_times: Arc<RwLock<BTreeMap<Height, Option<HeightMetrics>>>>,
     ) -> Self {
@@ -102,7 +102,6 @@ impl Peer {
         let local_peer = Self {
             replica_number,
             id: local_peer_id,
-            first_block_delay,
             can_start_proposing: false,
             subnet_params,
             round: starting_round,
@@ -117,6 +116,7 @@ impl Peer {
                 Swarm::new(transport, behaviour, local_peer_id)
             },
             peers_addresses,
+            listening_port,
             subscribed_peers: BTreeSet::new(),
             connected_peers: BTreeSet::new(),
             receiver_outgoing_artifact,
@@ -135,7 +135,7 @@ impl Peer {
     pub fn listen_for_dialing(&mut self) {
         self.swarm
             .listen_on(
-                "/ip4/0.0.0.0/tcp/56789"
+                format!("/ip4/0.0.0.0/tcp/{}", self.listening_port)
                     .parse()
                     .expect("can get a local socket"),
             )
@@ -149,7 +149,7 @@ impl Peer {
                     match &outgoing_artifact {
                         ConsensusMessage::BlockProposal(proposal) => {
                             if proposal.content.value.height == 1 {
-                                sleep(Duration::from_millis(1000));
+                                sleep(Duration::from_millis(500));
                             }
                         },
                         ConsensusMessage::NotarizationShare(share) => {
@@ -228,6 +228,7 @@ impl Peer {
                 address.push(Protocol::P2p(
                     Multihash::from_bytes(&self.id.to_bytes()[..]).unwrap(),
                 ));
+                println!("Listening on: {:?}", address);
                 println!("Local peer ID: {:?}", self.id);
                 if self.replica_number == 1 {
                     for peer_address in self.peers_addresses.split(',') {

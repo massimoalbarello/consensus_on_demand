@@ -69,8 +69,10 @@ struct Opt {
     d: u64, // notary delay
     #[structopt(long, default_value = "")]
     addresses: String,    // address of peer to connect to
-    #[structopt(name="first-block-delay", long, default_value = "500")]
-    first_block_delay: u64, // delay imposed on the first block sent by replica 1
+    #[structopt(long, default_value = "56789")]
+    port: u64,    // port which the peers listen for connections
+    #[structopt(name="broadcast_interval", long, default_value = "100")]
+    broadcast_interval: u64, // interval after which artifacts are broadcasted
 }
 
 #[derive(Clone)]
@@ -96,8 +98,8 @@ impl SubnetParams {
 
 #[async_std::main]
 async fn main() {
-    println!("FICC v1.2");
     let opt = Opt::from_args();
+    println!("Running FICC: {}", opt.cod);
 
     let finalizations_times = Arc::new(RwLock::new(BTreeMap::<Height, Option<HeightMetrics>>::new()));
     let cloned_finalization_times = Arc::clone(&finalizations_times);
@@ -105,8 +107,8 @@ async fn main() {
     let mut my_peer = Peer::new(
         opt.r,
         opt.addresses,
+        opt.port,
         SubnetParams::new(opt.n, opt.f, opt.p, opt.cod, opt.d),
-        opt.first_block_delay,
         "gossip_blocks",
         cloned_finalization_times,
     )
@@ -125,7 +127,7 @@ async fn main() {
     // Process events
     loop {
         if system_time_now() < absolute_end_time {
-            let mut broadcast_interval = stream::interval(Duration::from_millis(75));
+            let mut broadcast_interval = stream::interval(Duration::from_millis(opt.broadcast_interval));
             select! {
                 _ = stdin.select_next_some() => (),
                 _ = broadcast_interval.next().fuse() => {
