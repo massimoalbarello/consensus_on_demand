@@ -96,7 +96,7 @@ impl SubnetParams {
 
 #[async_std::main]
 async fn main() {
-    println!("FICC v1");
+    println!("FICC v1.1");
     let opt = Opt::from_args();
 
     let finalizations_times = Arc::new(RwLock::new(BTreeMap::<Height, Option<HeightMetrics>>::new()));
@@ -126,7 +126,7 @@ async fn main() {
     loop {
         // if !my_peer.manager.handle.as_ref().unwrap().is_finished() {
         if system_time_now() < absolute_end_time {
-            let mut broadcast_interval = stream::interval(Duration::from_millis(20));
+            let mut broadcast_interval = stream::interval(Duration::from_millis(100));
             select! {
                 _ = stdin.select_next_some() => (),
                 _ = broadcast_interval.next().fuse() => {
