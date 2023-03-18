@@ -177,11 +177,23 @@ impl Peer {
                                 }
                                 NotarizationShareContent::ICC(share) => {
                                     if share.height == 1 {
-                                        // self.swarm.behaviour_mut().floodsub.publish(
-                                        //     self.floodsub_topic.clone(),
-                                        //     serde_json::to_string::<Message>(&Message::ConsensusMessage())
-                                        //         .unwrap(),
-                                        // );
+                                        println!("Rebroadcasting first block proposal");
+                                        self.swarm.behaviour_mut().floodsub.publish(
+                                            self.floodsub_topic.clone(),
+                                            serde_json::to_string::<Message>(&Message::ConsensusMessage(ConsensusMessage::BlockProposal(Signed {
+                                                content: Hashed {
+                                                    hash: String::from("426d3a77ace30d95db82aaaa9c49dbb6718bfbf106968ae0218f0f588871e229"),
+                                                    value: Block {
+                                                        parent: String::from("8c43f94e4759170f3b528ba6ff62171f4d26fd12ca4f4cca1da81a6534746715"),
+                                                        payload: Payload::new(),
+                                                        height: 1,
+                                                        rank: 0,
+                                                    },
+                                                },
+                                                signature: self.replica_number,
+                                            })))
+                                                .unwrap(),
+                                        );
                                     }
                                 }
                             }

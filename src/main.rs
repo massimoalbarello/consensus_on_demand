@@ -112,7 +112,7 @@ async fn main() {
     )
     .await;
 
-    // Listen on all interfaces and whatever port the OS assigns
+    // Listen on all interfaces and at port 56789
     my_peer.listen_for_dialing();
 
     // Read full lines from stdin
@@ -125,7 +125,7 @@ async fn main() {
     // Process events
     loop {
         if system_time_now() < absolute_end_time {
-            let mut broadcast_interval = stream::interval(Duration::from_millis(80));
+            let mut broadcast_interval = stream::interval(Duration::from_millis(75));
             select! {
                 _ = stdin.select_next_some() => (),
                 _ = broadcast_interval.next().fuse() => {
