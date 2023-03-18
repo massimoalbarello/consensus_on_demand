@@ -209,9 +209,24 @@ fn find_lowest_ranked_proposals(pool: &PoolReader<'_>, h: Height) -> Vec<BlockPr
     best_proposals
 }
 
+
 /// Calculate the required delay for notary based on the rank of block to
-/// notarize
+/// notarize, adjusted by a multiplier depending the gap between finalized and
+/// notarized heights, by how far the certified height lags behind the finalized
+/// height, and by how far we have advanced beyond a summary block without
+/// creating a CUP.
 pub fn get_adjusted_notary_delay(pool: &PoolReader<'_>, height: Height, rank: u8, notarization_delay: u64) -> Duration {
-    let ranked_delay = notarization_delay * rank as u64;
-    Duration::from_millis(ranked_delay)
+    // We adjust regular delay based on the gap between finalization and
+    // notarization to make it exponentially longer to keep the gap from growing too
+    // big. This is because increasing delay leads to higher chance of notarizing
+    // only 1 block, which leads to higher chance of getting a finalization for that
+    // round.  This exponential backoff does not apply to block rank 0.
+    let finalized_height = pool.get_finalized_height();
+    let ranked_delay = notarization_delay as f32 * rank as f32;
+    let finality_gap = (pool.get_notarized_height() - finalized_height) as i32;
+    println!("Finality gap: {}", finality_gap);
+    let finality_adjusted_delay =
+        (ranked_delay * 1.5_f32.powi(finality_gap)) as u64;
+    println!("Delay: {}", finality_adjusted_delay);
+    Duration::from_millis(finality_adjusted_delay)
 }
