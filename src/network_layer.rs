@@ -189,7 +189,7 @@ impl Peer {
                         _ => (),
                     }
                 }
-                println!("\nBroadcasted locally generated artifact: {:?}", outgoing_artifact);
+                // println!("\nBroadcasted locally generated artifact: {:?}", outgoing_artifact);
                 self.swarm.behaviour_mut().floodsub.publish(
                     self.floodsub_topic.clone(),
                     serde_json::to_string::<Message>(&Message::ConsensusMessage(outgoing_artifact))
@@ -283,7 +283,7 @@ impl Peer {
         match message_variant {
             Message::KeepAliveMessage => (),
             Message::ConsensusMessage(consensus_message) => {
-                println!("\nReceived message: {:?}", consensus_message);
+                // println!("\nReceived message: {:?}", consensus_message);
                 match &self.manager {
                     Some(manager) => {
                         manager.on_artifact(
