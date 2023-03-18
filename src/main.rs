@@ -99,7 +99,7 @@ impl SubnetParams {
 #[async_std::main]
 async fn main() {
     let opt = Opt::from_args();
-    println!("Running FICC: {}", opt.cod);
+    println!("Replica number: {} running FICC: {}, with F: {}, P: {}, and notarization delay: {}", opt.r, opt.cod, opt.f, opt.p, opt.d);
 
     let finalizations_times = Arc::new(RwLock::new(BTreeMap::<Height, Option<HeightMetrics>>::new()));
     let cloned_finalization_times = Arc::clone(&finalizations_times);
