@@ -224,9 +224,7 @@ pub fn get_adjusted_notary_delay(pool: &PoolReader<'_>, height: Height, rank: u8
     let finalized_height = pool.get_finalized_height();
     let ranked_delay = notarization_delay as f32 * rank as f32;
     let finality_gap = (pool.get_notarized_height() - finalized_height) as i32;
-    println!("Finality gap: {}", finality_gap);
     let finality_adjusted_delay =
         (ranked_delay * 1.5_f32.powi(finality_gap)) as u64;
-    println!("Delay: {}", finality_adjusted_delay);
     Duration::from_millis(finality_adjusted_delay)
 }
