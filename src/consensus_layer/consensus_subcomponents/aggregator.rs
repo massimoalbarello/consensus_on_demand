@@ -159,12 +159,12 @@ impl ShareAggregator {
                     >= (self.subnet_params.total_nodes_number
                         - self.subnet_params.byzantine_nodes_number) as usize
                 {
-                    // println!(
-                    //     "\nFinalization of block with hash: {} at height {} by committee: {:?}",
-                    //     finalization_content.block.get_ref(),
-                    //     finalization_content.height,
-                    //     shares
-                    // );
+                    println!(
+                        "\nFinalization of block with hash: {} at height {} by committee: {:?}",
+                        finalization_content.block.get_ref(),
+                        finalization_content.height,
+                        shares
+                    );
                     if let Some(finalization_time) =
                         pool.get_finalization_time(finalization_content.height)
                     {

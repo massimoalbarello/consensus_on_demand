@@ -81,6 +81,7 @@ impl Finalizer {
             )),
         );
         // add 10 to make the hash of the finalization share different from the one of the notarization share
+        // needed in order not to overwrite the notarization share for the same block in the artifact pool (indexed by hash)
         let signature = 10 + self.node_id;
         Some(FinalizationShare { content, signature })
     }
