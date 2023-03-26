@@ -130,11 +130,10 @@ async fn main() -> Result<()> {
         SubnetParams::new(opt.n, opt.f, opt.p, opt.cod, opt.d),
         "gossip_blocks",
         cloned_finalization_times,
-    )
-    .await;
+    ).await;
 
+    // Listen on all available interfaces at port specified in opt.port
     let local_peer_id = my_peer.id.to_string();
-    println!("{local_peer_id}");
 
     let (sender_peers_addresses, receiver_peers_addresses) = 
     crossbeam_channel::unbounded::<String>();
@@ -142,16 +141,50 @@ async fn main() -> Result<()> {
     thread::spawn(move || {
         let mut peers_addresses = String::new();
         println!("Waiting to receive peers addresses...");
-        loop {
-            match receiver_peers_addresses.recv_timeout(Duration::from_millis(1000)) {
-                Ok(addresses) => {
-                    peers_addresses.push_str(&addresses);
-                    break;
-                },
-                Err(_) => (),
-            }
+        match receiver_peers_addresses.recv() {
+            Ok(addresses) => {
+                peers_addresses.push_str(&addresses);
+            },
+            Err(_) => (),
         }
         println!("Received peers addresses: {}", peers_addresses);
+
+        task::block_on(async {
+            my_peer.listen_for_dialing();
+
+            let starting_time = system_time_now();
+            let relative_duration = Duration::from_millis(opt.t * 1000);
+            let absolute_end_time = get_absolute_end_time(starting_time, relative_duration);
+            loop {
+                if system_time_now() < absolute_end_time {
+                    let mut broadcast_interval = stream::interval(Duration::from_millis(opt.broadcast_interval));
+                    select! {
+                        _ = broadcast_interval.next().fuse() => {
+                            // prevent Mdns expiration event by periodically broadcasting keep alive messages to peers
+                            // if any locally generated artifact, broadcast it
+                            if my_peer.can_start_proposing() {
+                                my_peer.broadcast_message();
+                            }
+                        },
+                        event = my_peer.get_next_event() => my_peer.match_event(event),
+                    }
+                } else {
+                    // println!("\nStopped replica");
+                    let benchmark_result = BenchmarkResult {
+                        finalization_times: finalizations_times.read().unwrap().clone(),
+                    };
+
+                    let encoded = to_string(&benchmark_result).unwrap();
+                    let mut file = File::create(format!("./benchmark/benchmark_results.json"))
+                        .await
+                        .unwrap();
+                    file.write_all(encoded.as_bytes()).await.unwrap();
+
+                    break;
+                }
+            }
+            std::process::exit(0);
+        });
     });
 
     let mut app = tide::with_state(local_peer_id);
@@ -164,48 +197,7 @@ async fn main() -> Result<()> {
     app.at("/remote_peers_addresses")
         .post(move |req| post_remote_peers_addresses(req, Arc::clone(&cloned_arc_sender_peers_addresses)));
 
-    app.listen("127.0.0.1:8000").await?;
+    app.listen("0.0.0.0:8000").await?;
 
     Ok(())
-    // // Listen on all available interfaces at port specified in opt.port
-    // my_peer.listen_for_dialing();
-
-    // // Read full lines from stdin
-    // let mut stdin = io::BufReader::new(io::stdin()).lines().fuse();
-
-    // let starting_time = system_time_now();
-    // let relative_duration = Duration::from_millis(opt.t * 1000);
-    // let absolute_end_time = get_absolute_end_time(starting_time, relative_duration);
-
-    // // Process events
-    // loop {
-    //     if system_time_now() < absolute_end_time {
-    //         let mut broadcast_interval = stream::interval(Duration::from_millis(opt.broadcast_interval));
-    //         select! {
-    //             _ = stdin.select_next_some() => (),
-    //             _ = broadcast_interval.next().fuse() => {
-    //                 // prevent Mdns expiration event by periodically broadcasting keep alive messages to peers
-    //                 // if any locally generated artifact, broadcast it
-    //                 if my_peer.can_start_proposing() {
-    //                     my_peer.broadcast_message();
-    //                 }
-    //             },
-    //             event = my_peer.get_next_event() => my_peer.match_event(event),
-    //         }
-    //     } else {
-    //         // println!("\nStopped replica");
-
-    //         let benchmark_result = BenchmarkResult {
-    //             finalization_times: finalizations_times.read().unwrap().clone(),
-    //         };
-
-    //         let encoded = to_string(&benchmark_result).unwrap();
-    //         let mut file = File::create(format!("./benchmark/benchmark_results.json"))
-    //             .await
-    //             .unwrap();
-    //         file.write_all(encoded.as_bytes()).await.unwrap();
-
-    //         break;
-    //     }
-    // }
 }
