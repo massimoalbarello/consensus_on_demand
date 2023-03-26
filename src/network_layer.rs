@@ -53,7 +53,7 @@ pub enum Message {
 
 pub struct Peer {
     replica_number: u8,
-    id: PeerId,
+    pub id: PeerId,
     can_start_proposing: bool,
     subnet_params: SubnetParams,
     round: usize,

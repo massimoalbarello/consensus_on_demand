@@ -10,10 +10,11 @@ use time_source::Time;
 use std::{
     collections::BTreeMap,
     sync::{Arc, RwLock},
-    time::Duration,
+    time::Duration, thread,
 };
+use crossbeam_channel::{Receiver, Sender};
 use structopt::StructOpt;
-
+use tide::{Body, Request, Response, Result};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 enum FinalizationType {
@@ -96,8 +97,26 @@ impl SubnetParams {
     }
 }
 
+async fn get_local_peer_id(req: Request<String>) -> Result {
+    let peer_id = req.state();
+    let res = Response::builder(200)
+        .header("Content-Type", "application/json")
+        .body(Body::from_json(peer_id)?)
+        .build();
+    Ok(res)
+}
+
+async fn post_remote_peers_addresses(mut req: Request<String>, sender: Arc<RwLock<Sender<String>>>) -> Result {
+    let addresses = req.body_string().await?;
+    sender.write().unwrap().send(addresses).unwrap();
+    let res = Response::builder(200)
+        .header("Content-Type", "application/json")
+        .build();
+    Ok(res)
+}
+
 #[async_std::main]
-async fn main() {
+async fn main() -> Result<()> {
     let opt = Opt::from_args();
     println!("Replica number: {} running FICC: {}, with F: {}, P: {}, and notarization delay: {}", opt.r, opt.cod, opt.f, opt.p, opt.d);
 
@@ -114,45 +133,79 @@ async fn main() {
     )
     .await;
 
-    // Listen on all interfaces and at port 56789
-    my_peer.listen_for_dialing();
+    let local_peer_id = my_peer.id.to_string();
+    println!("{local_peer_id}");
 
-    // Read full lines from stdin
-    let mut stdin = io::BufReader::new(io::stdin()).lines().fuse();
+    let (sender_peers_addresses, receiver_peers_addresses) = 
+    crossbeam_channel::unbounded::<String>();
 
-    let starting_time = system_time_now();
-    let relative_duration = Duration::from_millis(opt.t * 1000);
-    let absolute_end_time = get_absolute_end_time(starting_time, relative_duration);
-
-    // Process events
-    loop {
-        if system_time_now() < absolute_end_time {
-            let mut broadcast_interval = stream::interval(Duration::from_millis(opt.broadcast_interval));
-            select! {
-                _ = stdin.select_next_some() => (),
-                _ = broadcast_interval.next().fuse() => {
-                    // prevent Mdns expiration event by periodically broadcasting keep alive messages to peers
-                    // if any locally generated artifact, broadcast it
-                    if my_peer.can_start_proposing() {
-                        my_peer.broadcast_message();
-                    }
+    thread::spawn(move || {
+        let mut peers_addresses = String::new();
+        println!("Waiting to receive peers addresses...");
+        loop {
+            match receiver_peers_addresses.recv_timeout(Duration::from_millis(1000)) {
+                Ok(addresses) => {
+                    peers_addresses.push_str(&addresses);
+                    break;
                 },
-                event = my_peer.get_next_event() => my_peer.match_event(event),
+                Err(_) => (),
             }
-        } else {
-            // println!("\nStopped replica");
-
-            let benchmark_result = BenchmarkResult {
-                finalization_times: finalizations_times.read().unwrap().clone(),
-            };
-
-            let encoded = to_string(&benchmark_result).unwrap();
-            let mut file = File::create(format!("./benchmark/benchmark_results.json"))
-                .await
-                .unwrap();
-            file.write_all(encoded.as_bytes()).await.unwrap();
-
-            break;
         }
-    }
+        println!("Received peers addresses: {}", peers_addresses);
+    });
+
+    let mut app = tide::with_state(local_peer_id);
+
+    app.at("/local_peer_id")
+        .get(get_local_peer_id);
+
+    let arc_sender_peers_addresses: Arc<RwLock<Sender<String>>> = Arc::new(RwLock::new(sender_peers_addresses));
+    let cloned_arc_sender_peers_addresses = Arc::clone(&arc_sender_peers_addresses);
+    app.at("/remote_peers_addresses")
+        .post(move |req| post_remote_peers_addresses(req, Arc::clone(&cloned_arc_sender_peers_addresses)));
+
+    app.listen("127.0.0.1:8000").await?;
+
+    Ok(())
+    // // Listen on all available interfaces at port specified in opt.port
+    // my_peer.listen_for_dialing();
+
+    // // Read full lines from stdin
+    // let mut stdin = io::BufReader::new(io::stdin()).lines().fuse();
+
+    // let starting_time = system_time_now();
+    // let relative_duration = Duration::from_millis(opt.t * 1000);
+    // let absolute_end_time = get_absolute_end_time(starting_time, relative_duration);
+
+    // // Process events
+    // loop {
+    //     if system_time_now() < absolute_end_time {
+    //         let mut broadcast_interval = stream::interval(Duration::from_millis(opt.broadcast_interval));
+    //         select! {
+    //             _ = stdin.select_next_some() => (),
+    //             _ = broadcast_interval.next().fuse() => {
+    //                 // prevent Mdns expiration event by periodically broadcasting keep alive messages to peers
+    //                 // if any locally generated artifact, broadcast it
+    //                 if my_peer.can_start_proposing() {
+    //                     my_peer.broadcast_message();
+    //                 }
+    //             },
+    //             event = my_peer.get_next_event() => my_peer.match_event(event),
+    //         }
+    //     } else {
+    //         // println!("\nStopped replica");
+
+    //         let benchmark_result = BenchmarkResult {
+    //             finalization_times: finalizations_times.read().unwrap().clone(),
+    //         };
+
+    //         let encoded = to_string(&benchmark_result).unwrap();
+    //         let mut file = File::create(format!("./benchmark/benchmark_results.json"))
+    //             .await
+    //             .unwrap();
+    //         file.write_all(encoded.as_bytes()).await.unwrap();
+
+    //         break;
+    //     }
+    // }
 }
