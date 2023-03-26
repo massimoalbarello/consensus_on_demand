@@ -265,7 +265,6 @@ impl Peer {
                     _ => println!("Unhandled floodsub event"), 
 
                 }
-                
             },
             SwarmEvent::ConnectionEstablished {peer_id: remote_peer_id, ..} => {
                 if !self.connected_peers.contains(&remote_peer_id) {
@@ -284,6 +283,12 @@ impl Peer {
                     }
                 }
             },
+            SwarmEvent::ConnectionClosed { peer_id, .. } => println!("Peer: {} disconnected", peer_id),
+            SwarmEvent::Dialing(peer_id) => println!("Dialed peer {}", peer_id),
+            SwarmEvent::ListenerError { listener_id, .. } => println!("Listener with ID: {:?}", listener_id),
+            SwarmEvent::IncomingConnection {..} => println!("Incoming connection"),
+            SwarmEvent::IncomingConnectionError { local_addr, .. } => println!("Incoming connection error: {:?}", local_addr),
+            SwarmEvent::ListenerClosed { listener_id, .. } => println!("Listener closed: {:?}", listener_id),
             _ => println!("unhandled swarm event"),
         }
     }
