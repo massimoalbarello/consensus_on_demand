@@ -68,8 +68,6 @@ struct Opt {
     t: u64, // time to run replica
     #[structopt(long, default_value = "500")]
     d: u64, // notary delay
-    #[structopt(long, default_value = "")]
-    addresses: String,    // address of peer to connect to
     #[structopt(long, default_value = "56789")]
     port: u64,    // port which the peers listen for connections
     #[structopt(name="broadcast_interval", long, default_value = "100")]
@@ -125,7 +123,6 @@ async fn main() -> Result<()> {
 
     let mut my_peer = Peer::new(
         opt.r,
-        opt.addresses,
         opt.port,
         SubnetParams::new(opt.n, opt.f, opt.p, opt.cod, opt.d),
         "gossip_blocks",
@@ -133,6 +130,7 @@ async fn main() -> Result<()> {
     ).await;
 
     // Listen on all available interfaces at port specified in opt.port
+    my_peer.listen_for_dialing();
     let local_peer_id = my_peer.id.to_string();
 
     let (sender_peers_addresses, receiver_peers_addresses) = 
@@ -150,7 +148,7 @@ async fn main() -> Result<()> {
         println!("Received peers addresses: {}", peers_addresses);
 
         task::block_on(async {
-            my_peer.listen_for_dialing();
+            my_peer.dial_peers(peers_addresses);
 
             let starting_time = system_time_now();
             let relative_duration = Duration::from_millis(opt.t * 1000);
@@ -162,7 +160,7 @@ async fn main() -> Result<()> {
                         _ = broadcast_interval.next().fuse() => {
                             // prevent Mdns expiration event by periodically broadcasting keep alive messages to peers
                             // if any locally generated artifact, broadcast it
-                            if my_peer.can_start_proposing() {
+                            if my_peer.artifact_manager_started() {
                                 my_peer.broadcast_message();
                             }
                         },
@@ -197,7 +195,7 @@ async fn main() -> Result<()> {
     app.at("/remote_peers_addresses")
         .post(move |req| post_remote_peers_addresses(req, Arc::clone(&cloned_arc_sender_peers_addresses)));
 
-    app.listen("0.0.0.0:8000").await?;
+    app.listen(format!("0.0.0.0:{}", opt.port+1)).await?;
 
     Ok(())
 }
