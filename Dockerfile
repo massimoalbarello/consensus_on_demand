@@ -24,6 +24,6 @@ WORKDIR /replica
 # copy the ficc binary
 COPY --from=builder /replica/target/debug/consensus_on_demand .
 
-EXPOSE 56789
+EXPOSE 56789 56790
 
 ENTRYPOINT ["./consensus_on_demand"]
