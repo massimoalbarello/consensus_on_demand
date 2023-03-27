@@ -6,6 +6,8 @@
 # will have compiled files and executables
 /target
 
-benchmark_results.json
+benchmark_results*
 
 .env
+
+/keys/peer_*

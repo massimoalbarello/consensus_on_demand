@@ -1,28 +1,50 @@
 import requests
+import subprocess
+import time
+import os
 
 peers = {
     "peer_2": {
-        "ip": "127.0.0.1",
+        "number": "2",
+        "ip": "3.80.211.224",
         "web_server_port": "56790",
         "libp2p_port": "56789",
+        "key_file": "peer_2_nw_aws_rsa_key.pem",
         "id": "",
-        "remote_peers_addresses": ""
+        "remote_peers_addresses": "",
     },
     "peer_3": {
-        "ip": "127.0.0.1",
-        "web_server_port": "56796",
-        "libp2p_port": "56795",
+        "number": "3",
+        "ip": "54.233.148.20",
+        "web_server_port": "56790",
+        "libp2p_port": "56789",
+        "key_file": "peer_3_sao_aws_rsa_key.pem",
         "id": "",
         "remote_peers_addresses": ""
     },
     "peer_1": {
-        "ip": "127.0.0.1",
-        "web_server_port": "56781",
-        "libp2p_port": "56780",
+        "number": "1",
+        "ip": "13.214.195.192",
+        "web_server_port": "56790",
+        "libp2p_port": "56789",
+        "key_file": "peer_1_sing_aws_rsa_key.pem",
         "id": "",
         "remote_peers_addresses": ""
     },
 }
+
+processes = []
+for peer in peers.values():
+    os.chmod("./keys/"+peer["key_file"], 0o400)
+    start_replica_cmd = f'ssh -i ./keys/{peer["key_file"]} -t ubuntu@{peer["ip"]} "cd consensus_on_demand && docker compose up --build"'
+    process = subprocess.Popen(start_replica_cmd, shell=True, stdout=subprocess.DEVNULL)
+    processes.append(process)
+
+print("Replicas started")
+
+time.sleep(10)
+
+print("Connecting peers")
 
 for peer in peers.values(): 
     response = requests.get("http://"+peer["ip"]+":"+peer["web_server_port"]+"/local_peer_id")
@@ -35,7 +57,17 @@ for i,peer in enumerate(peers.values()):
         if i != j:
             remote_peers_addresses += "/ip4/"+other_peer["ip"]+"/tcp/"+other_peer["libp2p_port"]+"/p2p/"+other_peer["id"]+","
     peer["remote_peers_addresses"] = remote_peers_addresses[0:-1]
-    print(peer["remote_peers_addresses"])
 
 for peer in peers.values():
     requests.post("http://"+peer["ip"]+":"+peer["web_server_port"]+"/remote_peers_addresses", data=peer["remote_peers_addresses"])
+
+print("Protocol started")
+
+for p in processes:
+    p.communicate() # waits for replica to finish
+
+print("Replicas stopped")
+
+for peer in peers.values():
+    get_benchmark_results_cmd = f'scp -i ./keys/{peer["key_file"]} ubuntu@{peer["ip"]}:consensus_on_demand/benchmark/benchmark_results.json benchmark/benchmark_results_{peer["number"]}.json'
+    subprocess.run(get_benchmark_results_cmd, shell=True, stdout=subprocess.DEVNULL)

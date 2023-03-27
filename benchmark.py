@@ -1,6 +1,5 @@
 import json
 import matplotlib.pyplot as plt
-import statistics
 
 def getBenchmarks():
     with open('./benchmark/benchmark_results.json', 'r') as f:
