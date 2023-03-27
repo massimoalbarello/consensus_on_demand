@@ -33,6 +33,28 @@ peers = {
     },
 }
 
+N = 3
+F = 0
+P = 0
+T = 60
+
+for peer in peers.values():
+    with open(".env.example", "r") as file:
+        contents = file.readlines()
+        contents[0] = "REPLICA_NUMBER="+peer["number"]+"\n"
+        contents[1] = "TOTAL_REPLICA_NUMBER="+str(N)+"\n"
+        contents[2] = "FAULTY_REPLICAS="+str(F)+"\n"
+        contents[3] = "DISAGREEING_REPLICA="+str(P)+"\n"
+        contents[4] = "EXECUTION_TIME="+str(T)+"\n"
+
+    with open("./.env.example", "w") as file:
+        file.writelines(contents)
+
+    set_params_cmd = f'scp -i ./keys/{peer["key_file"]} ./.env.example ubuntu@{peer["ip"]}:consensus_on_demand/.env'
+    subprocess.run(set_params_cmd, shell=True)
+
+print("Parameters set")
+
 processes = []
 for peer in peers.values():
     os.chmod("./keys/"+peer["key_file"], 0o400)
