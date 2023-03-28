@@ -4,6 +4,15 @@ import time
 import os
 
 peers = {
+    "peer_16": {
+        "number": "16",
+        "ip": "13.37.57.131",
+        "web_server_port": "56790",
+        "libp2p_port": "56789",
+        "key_file": "peer_16_par_aws_rsa_key.pem",
+        "id": "",
+        "remote_peers_addresses": "",
+    },
 }
 
 for peer in peers.values():
