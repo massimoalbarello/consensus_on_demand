@@ -2,7 +2,7 @@ import json
 import matplotlib.pyplot as plt
 
 def getBenchmarks():
-    with open('./benchmark/benchmark_results.json', 'r') as f:
+    with open('./benchmark/benchmark_results_1.json', 'r') as f:
         return json.loads(f.read())
 
 def fillMissingElements(iterations, metrics, default_element):
