@@ -3,8 +3,8 @@ import subprocess
 import time
 import os
 
-peers = {
-    "peer_16": {
+peers = [
+    {
         "number": "16",
         "ip": "13.37.57.131",
         "web_server_port": "56790",
@@ -13,9 +13,9 @@ peers = {
         "id": "",
         "remote_peers_addresses": "",
     },
-}
+]
 
-for peer in peers.values():
+for peer in peers:
     print("\nInstalling docker for replica", peer["number"])
     os.chmod("./keys/"+peer["key_file"], 0o400)
     docker_installation_cmds = [
@@ -34,7 +34,7 @@ for peer in peers.values():
 
 print("\nDocker installed on new replicas")
 
-for peer in peers.values():
+for peer in peers:
     print("\nCloning repo for replica", peer["number"])
     clone_repo_cmd = f'ssh -i ./keys/{peer["key_file"]} -t -q ubuntu@{peer["ip"]} \'git clone https://github.com/massimoalbarello/consensus_on_demand.git\''
     process = subprocess.Popen(clone_repo_cmd, shell=True)
@@ -43,7 +43,7 @@ for peer in peers.values():
 print("\nRepo cloned on new replicas")
 
 processes = []
-for peer in peers.values():
+for peer in peers:
     print("\nBuilding container for replica", peer["number"])
     build_container_cmd = f'ssh -i ./keys/{peer["key_file"]} -t -q ubuntu@{peer["ip"]} \'cd consensus_on_demand && docker compose build\''
     process = subprocess.Popen(build_container_cmd, shell=True, stdout=subprocess.DEVNULL)

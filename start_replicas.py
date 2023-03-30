@@ -2,9 +2,11 @@ import requests
 import subprocess
 import time
 import os
+import json
+import matplotlib.pyplot as plt
 
-peers = {
-    "peer_2": {
+peers = [
+    {
         "number": "2",
         "ip": "3.84.220.66",
         "web_server_port": "56790",
@@ -13,7 +15,7 @@ peers = {
         "id": "",
         "remote_peers_addresses": "",
     },
-    "peer_3": {
+    {
         "number": "3",
         "ip": "15.228.190.23",
         "web_server_port": "56790",
@@ -22,7 +24,7 @@ peers = {
         "id": "",
         "remote_peers_addresses": ""
     },
-    "peer_4": {
+    {
         "number": "4",
         "ip": "13.239.15.224",
         "web_server_port": "56790",
@@ -31,7 +33,7 @@ peers = {
         "id": "",
         "remote_peers_addresses": ""
     },
-    "peer_5": {
+    {
         "number": "5",
         "ip": "18.198.2.4",
         "web_server_port": "56790",
@@ -40,7 +42,7 @@ peers = {
         "id": "",
         "remote_peers_addresses": ""
     },
-    "peer_6": {
+    {
         "number": "6",
         "ip": "16.171.6.33",
         "web_server_port": "56790",
@@ -49,7 +51,7 @@ peers = {
         "id": "",
         "remote_peers_addresses": ""
     },
-    "peer_7": {
+    {
         "number": "7",
         "ip": "54.153.46.116",
         "web_server_port": "56790",
@@ -58,7 +60,7 @@ peers = {
         "id": "",
         "remote_peers_addresses": ""
     },
-    "peer_8": {
+    {
         "number": "8",
         "ip": "3.20.225.7",
         "web_server_port": "56790",
@@ -67,7 +69,7 @@ peers = {
         "id": "",
         "remote_peers_addresses": "",
     },
-    "peer_9": {
+    {
         "number": "9",
         "ip": "35.93.0.69",
         "web_server_port": "56790",
@@ -76,7 +78,7 @@ peers = {
         "id": "",
         "remote_peers_addresses": "",
     },
-    "peer_10": {
+    {
         "number": "10",
         "ip": "3.111.51.88",
         "web_server_port": "56790",
@@ -85,7 +87,7 @@ peers = {
         "id": "",
         "remote_peers_addresses": "",
     },
-    "peer_11": {
+    {
         "number": "11",
         "ip": "13.208.168.106",
         "web_server_port": "56790",
@@ -94,7 +96,7 @@ peers = {
         "id": "",
         "remote_peers_addresses": "",
     },
-    "peer_12": {
+    {
         "number": "12",
         "ip": "3.36.69.67",
         "web_server_port": "56790",
@@ -103,7 +105,7 @@ peers = {
         "id": "",
         "remote_peers_addresses": "",
     },
-    "peer_13": {
+    {
         "number": "13",
         "ip": "52.194.251.20",
         "web_server_port": "56790",
@@ -112,7 +114,7 @@ peers = {
         "id": "",
         "remote_peers_addresses": "",
     },
-    "peer_14": {
+    {
         "number": "14",
         "ip": "15.223.47.218",
         "web_server_port": "56790",
@@ -121,7 +123,7 @@ peers = {
         "id": "",
         "remote_peers_addresses": "",
     },
-    "peer_15": {
+    {
         "number": "15",
         "ip": "3.250.174.210",
         "web_server_port": "56790",
@@ -130,7 +132,7 @@ peers = {
         "id": "",
         "remote_peers_addresses": "",
     },
-    "peer_16": {
+    {
         "number": "16",
         "ip": "35.180.196.144",
         "web_server_port": "56790",
@@ -139,7 +141,7 @@ peers = {
         "id": "",
         "remote_peers_addresses": "",
     },
-    "peer_1": {
+    {
         "number": "1",
         "ip": "18.140.244.236",
         "web_server_port": "56790",
@@ -148,9 +150,9 @@ peers = {
         "id": "",
         "remote_peers_addresses": ""
     },
-}
+]
 
-N = len(peers.keys())
+N = len(peers)
 F = 2
 P = 0
 T = 60
@@ -159,7 +161,7 @@ FICC = True
 
 print("\nStarting subnet running " + ("FICC" if FICC else "ICC") + f" with n={N}, f={F} and p={P}")
 
-for peer in peers.values():
+for peer in peers:
     with open(".env.example", "r") as file:
         contents = file.readlines()
         contents[0] = "REPLICA_NUMBER="+peer["number"]+"\n"
@@ -186,14 +188,14 @@ with open("docker-compose.yml", "r") as file:
 with open("docker-compose.yml", "w") as file:
     file.writelines(contents)
 
-for peer in peers.values():
+for peer in peers:
     set_protocol_cmd = f'scp -i ./keys/{peer["key_file"]} ./docker-compose.yml ubuntu@{peer["ip"]}:consensus_on_demand/docker-compose.yml'
     subprocess.run(set_protocol_cmd, shell=True)
 
 print("\nReplicas parameters set")
 
 processes = []
-for peer in peers.values():
+for peer in peers:
     start_replica_cmd = f'ssh -i ./keys/{peer["key_file"]} -t -q ubuntu@{peer["ip"]} "cd consensus_on_demand && docker compose up --build"'
     process = subprocess.Popen(start_replica_cmd, shell=True, stdout=subprocess.DEVNULL)
     processes.append(process)
@@ -204,21 +206,21 @@ time.sleep(15)  # wait for docker containers to start
 
 print("\nConnecting peers")
 
-for peer in peers.values(): 
+for peer in peers: 
     response = requests.get("http://"+peer["ip"]+":"+peer["web_server_port"]+"/local_peer_id")
     if response.status_code == 200:
         peer["id"] = response.text[1:-1]
     else:
         print("Peer " + peer["number"] + " not reachable")
 
-for i,peer in enumerate(peers.values()):
+for i,peer in enumerate(peers):
     remote_peers_addresses = ""
-    for j,other_peer in enumerate(peers.values()):
+    for j,other_peer in enumerate(peers):
         if i != j:
             remote_peers_addresses += "/ip4/"+other_peer["ip"]+"/tcp/"+other_peer["libp2p_port"]+"/p2p/"+other_peer["id"]+","
     peer["remote_peers_addresses"] = remote_peers_addresses[0:-1]
 
-for peer in peers.values():
+for peer in peers:
     requests.post("http://"+peer["ip"]+":"+peer["web_server_port"]+"/remote_peers_addresses", data=peer["remote_peers_addresses"])
 
 print(f"\nProtocol started for {T} seconds")
@@ -229,10 +231,115 @@ for p in processes:
 print("\nReplicas stopped")
 
 now = int(time.time())
-subprocess.run(f'cd benchmark && mkdir {("FICC" if FICC else "ICC")}_{N}_{F}_{P}_{D}_{T}_{now}', shell=True, stdout=subprocess.DEVNULL)
+folder = '{("FICC" if FICC else "ICC")}_{N}_{F}_{P}_{D}_{T}_{now}'
+subprocess.run(f'cd benchmark && mkdir {folder}', shell=True, stdout=subprocess.DEVNULL)
 
-for peer in peers.values():
+for peer in peers:
     get_benchmark_results_cmd = f'scp -i ./keys/{peer["key_file"]} ubuntu@{peer["ip"]}:consensus_on_demand/benchmark/benchmark_results.json benchmark/{("FICC" if FICC else "ICC")}_{N}_{F}_{P}_{D}_{T}_{now}/benchmark_results_{peer["number"]}.json'
     subprocess.run(get_benchmark_results_cmd, shell=True, stdout=subprocess.DEVNULL)
 
-print(f'\nResults written in folder benchmark/{("FICC" if FICC else "ICC")}_{N}_{F}_{P}_{D}_{T}_{now}')
+print(f'\nResults written in folder benchmark/{folder}')
+
+def getBenchmarks():
+    with open('./benchmark/{folder}/benchmark_results_1.json', 'r') as f:
+        return json.loads(f.read())
+
+def fillMissingElements(iterations, metrics, default_element):
+    filled_iterations = []
+    filled_metrics = []
+    for i in range(min(iterations), max(iterations) + 1):
+        if i in iterations:
+            index = iterations.index(i)
+            filled_iterations.append(iterations[index])
+            filled_metrics.append(metrics[index])
+        else:
+            filled_iterations.append(i)
+            filled_metrics.append(default_element)
+    return filled_iterations, filled_metrics
+
+def printMetrics(
+    average_latency,
+    total_fp_finalizations,
+    total_ic_finalizations,
+    total_dk_finalizations,
+    total_non_finalizations,
+):
+    print("The average time for block finalization is:", average_latency)
+    print("The number of iterations in which the block is:")
+    print("- FP finalized:", total_fp_finalizations)
+    print("- IC finalized:", total_ic_finalizations)
+    print("- DK finalized:", total_dk_finalizations)
+    print("- not explicitly finalized:", total_non_finalizations)
+
+def processResults(latencies, filled_iterations, filled_finalization_types):
+    average_latency = None
+    if len(latencies) != 0:
+        average_latency = sum(latencies) / len(latencies)
+    total_fp_finalizations = filled_finalization_types.count("FP")
+    total_ic_finalizations = filled_finalization_types.count("IC")
+    total_dk_finalizations = filled_finalization_types.count("DK")
+    total_non_finalizations = filled_finalization_types.count("-")
+
+    return (
+        average_latency,
+        total_fp_finalizations,
+        total_ic_finalizations,
+        total_dk_finalizations,
+        total_non_finalizations,
+    )
+
+def plotLatencies(ax, filled_iterations, filled_latencies, filled_finalization_types):
+    colors = ["green", "blue", "grey"]
+    color_labels = {
+        "green": "FP-finalized block",
+        "blue": "IC-finalized block",
+        "grey": "finalization from peer"
+    }
+    fp_bar = None
+    ic_bar = None
+    for j, type in enumerate(filled_finalization_types):
+        if type == "FP":
+            fp_bar = ax.bar(filled_iterations[j], filled_latencies[j], width=1, color=colors[0], label=color_labels[colors[0]])
+        elif type == "IC":
+            ic_bar = ax.bar(filled_iterations[j], filled_latencies[j], width=1, color=colors[1], label=color_labels[colors[1]])
+        elif type == "DK":
+            ic_bar = ax.bar(filled_iterations[j], filled_latencies[j], width=1, color=colors[2], label=color_labels[colors[2]])
+    handles = [fp_bar, ic_bar]
+    labels = ["FP-finalized block", "IC-finalized block", "finalization from peer"]
+    ax.legend(handles, labels, loc="upper right")
+
+def getResults():
+    plt.plot() 
+    iterations = [int(iteration) for iteration in benchmark["finalization_times"].keys()]
+    latencies = [metrics["latency"]["secs"]+metrics["latency"]["nanos"]*1e-9 for metrics in benchmark["finalization_times"].values()]
+    filled_iterations, filled_latencies = fillMissingElements(iterations, latencies, 0)
+    finalization_types = [metrics["fp_finalization"] for metrics in benchmark["finalization_times"].values()]
+    _, filled_finalization_types = fillMissingElements(iterations, finalization_types, "-")
+
+    (
+        average_latency,
+        total_fp_finalizations,
+        total_ic_finalizations,
+        total_dk_finalizations,
+        total_non_finalizations,
+    ) = processResults(latencies, filled_iterations, filled_finalization_types)
+
+    ax = plt.gca()
+    ax.set_xlabel("Round")
+    ax.set_ylabel("Latency [s]")
+    plotLatencies(plt.gca(), filled_iterations, filled_latencies, filled_finalization_types)
+    plt.show()
+
+    printMetrics(
+        average_latency,
+        total_fp_finalizations,
+        total_ic_finalizations,
+        total_dk_finalizations,
+        total_non_finalizations,
+    )
+
+print("Displaying results for replica 1")
+
+benchmark = getBenchmarks()
+
+getResults()
