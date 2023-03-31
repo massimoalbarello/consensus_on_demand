@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 peers = [
     {
         "number": "2",
-        "ip": "3.84.220.66",
+        "ip": "54.210.81.31",
         "web_server_port": "56790",
         "libp2p_port": "56789",
         "key_file": "peer_2_nw_aws_rsa_key.pem",
@@ -17,7 +17,7 @@ peers = [
     },
     {
         "number": "3",
-        "ip": "15.228.190.23",
+        "ip": "15.228.227.36",
         "web_server_port": "56790",
         "libp2p_port": "56789",
         "key_file": "peer_3_sao_aws_rsa_key.pem",
@@ -26,7 +26,7 @@ peers = [
     },
     {
         "number": "4",
-        "ip": "13.239.15.224",
+        "ip": "3.26.213.144",
         "web_server_port": "56790",
         "libp2p_port": "56789",
         "key_file": "peer_4_syd_aws_rsa_key.pem",
@@ -35,7 +35,7 @@ peers = [
     },
     {
         "number": "5",
-        "ip": "18.198.2.4",
+        "ip": "3.73.36.227",
         "web_server_port": "56790",
         "libp2p_port": "56789",
         "key_file": "peer_5_frank_aws_rsa_key.pem",
@@ -44,7 +44,7 @@ peers = [
     },
     {
         "number": "6",
-        "ip": "16.171.6.33",
+        "ip": "13.49.67.115",
         "web_server_port": "56790",
         "libp2p_port": "56789",
         "key_file": "peer_6_stock_aws_rsa_key.pem",
@@ -53,7 +53,7 @@ peers = [
     },
     {
         "number": "7",
-        "ip": "54.153.46.116",
+        "ip": "13.57.33.51",
         "web_server_port": "56790",
         "libp2p_port": "56789",
         "key_file": "peer_7_cali_aws_rsa_key.pem",
@@ -62,7 +62,7 @@ peers = [
     },
     {
         "number": "8",
-        "ip": "3.20.225.7",
+        "ip": "18.191.194.254",
         "web_server_port": "56790",
         "libp2p_port": "56789",
         "key_file": "peer_8_ohio_aws_rsa_key.pem",
@@ -71,7 +71,7 @@ peers = [
     },
     {
         "number": "9",
-        "ip": "35.93.0.69",
+        "ip": "34.217.54.233",
         "web_server_port": "56790",
         "libp2p_port": "56789",
         "key_file": "peer_9_oreg_aws_rsa_key.pem",
@@ -80,7 +80,7 @@ peers = [
     },
     {
         "number": "10",
-        "ip": "3.111.51.88",
+        "ip": "43.204.231.47",
         "web_server_port": "56790",
         "libp2p_port": "56789",
         "key_file": "peer_10_mum_aws_rsa_key.pem",
@@ -89,7 +89,7 @@ peers = [
     },
     {
         "number": "11",
-        "ip": "13.208.168.106",
+        "ip": "15.168.61.197",
         "web_server_port": "56790",
         "libp2p_port": "56789",
         "key_file": "peer_11_osaka_aws_rsa_key.pem",
@@ -98,7 +98,7 @@ peers = [
     },
     {
         "number": "12",
-        "ip": "3.36.69.67",
+        "ip": "3.38.168.92",
         "web_server_port": "56790",
         "libp2p_port": "56789",
         "key_file": "peer_12_seo_aws_rsa_key.pem",
@@ -107,7 +107,7 @@ peers = [
     },
     {
         "number": "13",
-        "ip": "52.194.251.20",
+        "ip": "52.198.49.69",
         "web_server_port": "56790",
         "libp2p_port": "56789",
         "key_file": "peer_13_tok_aws_rsa_key.pem",
@@ -125,7 +125,7 @@ peers = [
     },
     {
         "number": "15",
-        "ip": "3.250.174.210",
+        "ip": "34.242.179.135",
         "web_server_port": "56790",
         "libp2p_port": "56789",
         "key_file": "peer_15_ire_aws_rsa_key.pem",
@@ -134,7 +134,7 @@ peers = [
     },
     {
         "number": "16",
-        "ip": "35.180.196.144",
+        "ip": "13.39.84.63",
         "web_server_port": "56790",
         "libp2p_port": "56789",
         "key_file": "peer_16_par_aws_rsa_key.pem",
@@ -143,7 +143,7 @@ peers = [
     },
     {
         "number": "1",
-        "ip": "18.140.244.236",
+        "ip": "18.138.229.108",
         "web_server_port": "56790",
         "libp2p_port": "56789",
         "key_file": "peer_1_sing_aws_rsa_key.pem",
@@ -153,11 +153,11 @@ peers = [
 ]
 
 N = len(peers)
-F = 2
+F = 5
 P = 0
-T = 60
+T = 300
 D = 3000
-FICC = True
+FICC = False
 
 print("\nStarting subnet running " + ("FICC" if FICC else "ICC") + f" with n={N}, f={F} and p={P}")
 
@@ -231,7 +231,7 @@ for p in processes:
 print("\nReplicas stopped")
 
 now = int(time.time())
-folder = '{("FICC" if FICC else "ICC")}_{N}_{F}_{P}_{D}_{T}_{now}'
+folder = f'{("FICC" if FICC else "ICC")}_{N}_{F}_{P}_{D}_{T}_{now}'
 subprocess.run(f'cd benchmark && mkdir {folder}', shell=True, stdout=subprocess.DEVNULL)
 
 for peer in peers:
@@ -241,7 +241,7 @@ for peer in peers:
 print(f'\nResults written in folder benchmark/{folder}')
 
 def getBenchmarks():
-    with open('./benchmark/{folder}/benchmark_results_1.json', 'r') as f:
+    with open(f'./benchmark/{folder}/benchmark_results_1.json', 'r') as f:
         return json.loads(f.read())
 
 def fillMissingElements(iterations, metrics, default_element):
