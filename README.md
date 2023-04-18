@@ -59,6 +59,7 @@ results = [
         "label": "ICC n=16 f=0"
     },
     # results of other runs
+]
 ```
 
 Running `python3 benchmark.py` will show the comparison of the plot bars, one for each run.

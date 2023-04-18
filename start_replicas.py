@@ -8,7 +8,25 @@ import matplotlib.pyplot as plt
 peers = [
     {
         "number": "2",
-        "ip": "54.210.81.31",
+        "ip": "18.207.122.55",
+        "web_server_port": "56790",
+        "libp2p_port": "56789",
+        "key_file": "ficc_peer_b_aws_rsa_key.pem",
+        "id": "",
+        "remote_peers_addresses": "",
+    },
+    {
+        "number": "3",
+        "ip": "3.89.57.68",
+        "web_server_port": "56790",
+        "libp2p_port": "56789",
+        "key_file": "ficc_peer_b_aws_rsa_key.pem",
+        "id": "",
+        "remote_peers_addresses": "",
+    },
+    {
+        "number": "4",
+        "ip": "3.90.64.216",
         "web_server_port": "56790",
         "libp2p_port": "56789",
         "key_file": "peer_2_nw_aws_rsa_key.pem",
@@ -16,148 +34,126 @@ peers = [
         "remote_peers_addresses": "",
     },
     {
-        "number": "3",
-        "ip": "15.228.227.36",
-        "web_server_port": "56790",
-        "libp2p_port": "56789",
-        "key_file": "peer_3_sao_aws_rsa_key.pem",
-        "id": "",
-        "remote_peers_addresses": ""
-    },
-    {
-        "number": "4",
-        "ip": "3.26.213.144",
-        "web_server_port": "56790",
-        "libp2p_port": "56789",
-        "key_file": "peer_4_syd_aws_rsa_key.pem",
-        "id": "",
-        "remote_peers_addresses": ""
-    },
-    {
         "number": "5",
-        "ip": "3.73.36.227",
+        "ip": "54.90.237.53",
         "web_server_port": "56790",
         "libp2p_port": "56789",
-        "key_file": "peer_5_frank_aws_rsa_key.pem",
-        "id": "",
-        "remote_peers_addresses": ""
-    },
-    {
-        "number": "6",
-        "ip": "13.49.67.115",
-        "web_server_port": "56790",
-        "libp2p_port": "56789",
-        "key_file": "peer_6_stock_aws_rsa_key.pem",
-        "id": "",
-        "remote_peers_addresses": ""
-    },
-    {
-        "number": "7",
-        "ip": "13.57.33.51",
-        "web_server_port": "56790",
-        "libp2p_port": "56789",
-        "key_file": "peer_7_cali_aws_rsa_key.pem",
-        "id": "",
-        "remote_peers_addresses": ""
-    },
-    {
-        "number": "8",
-        "ip": "18.191.194.254",
-        "web_server_port": "56790",
-        "libp2p_port": "56789",
-        "key_file": "peer_8_ohio_aws_rsa_key.pem",
+        "key_file": "ficc_peer_bb_aws_rsa_key.pem",
         "id": "",
         "remote_peers_addresses": "",
-    },
-    {
-        "number": "9",
-        "ip": "34.217.54.233",
+    },{
+        "number": "6",
+        "ip": "54.221.129.22",
         "web_server_port": "56790",
         "libp2p_port": "56789",
-        "key_file": "peer_9_oreg_aws_rsa_key.pem",
+        "key_file": "ficc_peer_bb_aws_rsa_key.pem",
+        "id": "",
+        "remote_peers_addresses": "",
+    },{
+        "number": "7",
+        "ip": "3.80.25.119",
+        "web_server_port": "56790",
+        "libp2p_port": "56789",
+        "key_file": "ficc_peer_bb_aws_rsa_key.pem",
+        "id": "",
+        "remote_peers_addresses": "",
+    },{
+        "number": "8",
+        "ip": "34.204.49.128",
+        "web_server_port": "56790",
+        "libp2p_port": "56789",
+        "key_file": "ficc_peer_bb_aws_rsa_key.pem",
+        "id": "",
+        "remote_peers_addresses": "",
+    },{
+        "number": "9",
+        "ip": "54.242.231.70",
+        "web_server_port": "56790",
+        "libp2p_port": "56789",
+        "key_file": "ficc_peer_bb_aws_rsa_key.pem",
         "id": "",
         "remote_peers_addresses": "",
     },
     {
         "number": "10",
-        "ip": "43.204.231.47",
+        "ip": "54.176.162.128",
         "web_server_port": "56790",
         "libp2p_port": "56789",
-        "key_file": "peer_10_mum_aws_rsa_key.pem",
+        "key_file": "ficc_peer_a_aws_rsa_key.cer",
         "id": "",
         "remote_peers_addresses": "",
     },
     {
         "number": "11",
-        "ip": "15.168.61.197",
+        "ip": "13.57.221.56",
         "web_server_port": "56790",
         "libp2p_port": "56789",
-        "key_file": "peer_11_osaka_aws_rsa_key.pem",
+        "key_file": "ficc_peer_a_aws_rsa_key.cer",
         "id": "",
         "remote_peers_addresses": "",
     },
     {
         "number": "12",
-        "ip": "3.38.168.92",
+        "ip": "3.101.26.91",
         "web_server_port": "56790",
         "libp2p_port": "56789",
-        "key_file": "peer_12_seo_aws_rsa_key.pem",
+        "key_file": "peer_7_cali_aws_rsa_key.pem",
         "id": "",
         "remote_peers_addresses": "",
     },
     {
         "number": "13",
-        "ip": "52.198.49.69",
+        "ip": "13.52.163.27",
         "web_server_port": "56790",
         "libp2p_port": "56789",
-        "key_file": "peer_13_tok_aws_rsa_key.pem",
+        "key_file": "ficc_peer_a_aws_rsa_key.cer",
         "id": "",
         "remote_peers_addresses": "",
     },
     {
         "number": "14",
-        "ip": "15.223.47.218",
+        "ip": "54.219.209.156",
         "web_server_port": "56790",
         "libp2p_port": "56789",
-        "key_file": "peer_14_can_aws_rsa_key.pem",
+        "key_file": "ficc_peer_ab_aws_rsa_key.pem",
         "id": "",
         "remote_peers_addresses": "",
     },
     {
         "number": "15",
-        "ip": "34.242.179.135",
+        "ip": "54.67.18.230",
         "web_server_port": "56790",
         "libp2p_port": "56789",
-        "key_file": "peer_15_ire_aws_rsa_key.pem",
+        "key_file": "ficc_peer_ab_aws_rsa_key.pem",
         "id": "",
         "remote_peers_addresses": "",
     },
     {
         "number": "16",
-        "ip": "13.39.84.63",
+        "ip": "184.169.205.232",
         "web_server_port": "56790",
         "libp2p_port": "56789",
-        "key_file": "peer_16_par_aws_rsa_key.pem",
+        "key_file": "ficc_peer_ab_aws_rsa_key.pem",
         "id": "",
         "remote_peers_addresses": "",
     },
     {
         "number": "1",
-        "ip": "18.138.229.108",
+        "ip": "52.53.194.157",
         "web_server_port": "56790",
         "libp2p_port": "56789",
-        "key_file": "peer_1_sing_aws_rsa_key.pem",
+        "key_file": "ficc_peer_ab_aws_rsa_key.pem",
         "id": "",
-        "remote_peers_addresses": ""
+        "remote_peers_addresses": "",
     },
 ]
 
 N = len(peers)
-F = 5
-P = 0
+F = 3
+P = 3
 T = 300
 D = 3000
-FICC = False
+FICC = True
 
 print("\nStarting subnet running " + ("FICC" if FICC else "ICC") + f" with n={N}, f={F} and p={P}")
 
@@ -202,7 +198,7 @@ for peer in peers:
 
 print("\nReplicas started")
 
-time.sleep(15)  # wait for docker containers to start
+time.sleep(100)  # wait for docker containers to start
 
 print("\nConnecting peers")
 

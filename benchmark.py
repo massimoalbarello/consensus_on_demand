@@ -1,20 +1,19 @@
 import os
 import json
-import statistics
 import matplotlib.pyplot as plt
 
 results = [
     {
-        "folder": "./benchmark/ICC_16_0_0_3000_60_1680033093",
-        "label": "ICC n=16 f=0"
+        "folder": "./benchmark/ICC_16_5_0_3000_300_1680773781",
+        "label": "ICC n=16 f=5"
     },
     {
-        "folder": "./benchmark/res_16_2_0_3000_60_1680020111",
-        "label": "FICC n=16 f=2 p=0"
+        "folder": "./benchmark/FICC_16_5_0_3000_300_1680774307",
+        "label": "FICC n=16 f=5 p=0"
     },
     {
-        "folder": "./benchmark/res_16_0_0_3000_300_1680028847",
-        "label": "FICC n=16 f=p=0"
+        "folder": "./benchmark/FICC_16_3_3_3000_300_1680774842",
+        "label": "FICC n=16 f=3 p=3"
     },
 ]
 
@@ -34,6 +33,5 @@ for res in results:
 
 # create the boxplot
 plt.boxplot(box_plots, labels=labels, showfliers=True, flierprops=dict(marker='o', markerfacecolor='gray', markersize=4, linestyle='none', markeredgecolor='gray'))
-plt.title('Latency Distribution')
 plt.ylabel('Latency (seconds)')
 plt.show()

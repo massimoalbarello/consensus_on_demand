@@ -10,4 +10,4 @@ benchmark_results*
 
 .env
 
-/keys/peer_*
+/keys/
