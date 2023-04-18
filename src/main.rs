@@ -72,6 +72,8 @@ struct Opt {
     port: u64,    // port which the peers listen for connections
     #[structopt(name="broadcast_interval", long, default_value = "100")]
     broadcast_interval: u64, // interval after which artifacts are broadcasted
+    #[structopt(name="artifact_manager_polling_interval", long, default_value = "200")]
+    artifact_manager_polling_interval: u64, // periodic duration of `PollEvent` in milliseconds
 }
 
 #[derive(Clone)]
@@ -81,16 +83,18 @@ pub struct SubnetParams {
     disagreeing_nodes_number: u8,
     consensus_on_demand: bool,
     artifact_delay: u64,
+    artifact_manager_polling_interval: u64,
 }
 
 impl SubnetParams {
-    fn new(n: u8, f: u8, p: u8, cod: bool, d: u64) -> Self {
+    fn new(n: u8, f: u8, p: u8, cod: bool, d: u64, artifact_manager_polling_interval: u64) -> Self {
         Self {
             total_nodes_number: n,
             byzantine_nodes_number: f,
             disagreeing_nodes_number: p,
             consensus_on_demand: cod,
             artifact_delay: d,
+            artifact_manager_polling_interval,
         }
     }
 }
@@ -116,7 +120,7 @@ async fn post_remote_peers_addresses(mut req: Request<String>, sender: Arc<RwLoc
 #[async_std::main]
 async fn main() -> Result<()> {
     let opt = Opt::from_args();
-    println!("Replica number: {} running FICC: {}, with F: {}, P: {}, and notarization delay: {}", opt.r, opt.cod, opt.f, opt.p, opt.d);
+    println!("Replica number: {} running FICC: {}, with F: {}, P: {}, notarization delay: {}, broadcast_interval: {}, and artifact manager polling interval: {}", opt.r, opt.cod, opt.f, opt.p, opt.d, opt. broadcast_interval, opt.artifact_manager_polling_interval);
 
     let finalizations_times = Arc::new(RwLock::new(BTreeMap::<Height, Option<HeightMetrics>>::new()));
     let cloned_finalization_times = Arc::clone(&finalizations_times);
@@ -124,7 +128,14 @@ async fn main() -> Result<()> {
     let mut my_peer = Peer::new(
         opt.r,
         opt.port,
-        SubnetParams::new(opt.n, opt.f, opt.p, opt.cod, opt.d),
+        SubnetParams::new(
+            opt.n,
+            opt.f,
+            opt.p,
+            opt.cod,
+            opt.d,
+            opt.artifact_manager_polling_interval
+        ),
         "gossip_blocks",
         cloned_finalization_times,
     ).await;

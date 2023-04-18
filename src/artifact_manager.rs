@@ -16,9 +16,6 @@ use crate::{
     SubnetParams,
 };
 
-// Periodic duration of `PollEvent` in milliseconds.
-const ARTIFACT_MANAGER_TIMER_DURATION_MSEC: u64 = 200;
-
 struct ProcessRequest;
 
 // The result of a single 'process_changes' call can result in either:
@@ -55,7 +52,7 @@ impl ArtifactProcessorManager {
 
         let client = Box::new(ConsensusProcessor::new(
             replica_number,
-            subnet_params,
+            subnet_params.clone(),
             Arc::clone(&time_source) as Arc<_>,
         ));
 
@@ -73,6 +70,7 @@ impl ArtifactProcessorManager {
                     receiver_incoming_request,
                     sender_outgoing_artifact,
                     finalization_times,
+                    subnet_params,
                 );
             })
             .unwrap();
@@ -92,9 +90,10 @@ impl ArtifactProcessorManager {
         receiver_incoming_request: Receiver<ProcessRequest>,
         sender_outgoing_artifact: Sender<ConsensusMessage>,
         finalization_times: Arc<RwLock<BTreeMap<Height, Option<HeightMetrics>>>>,
+        subnet_params: SubnetParams,
     ) {
         // println!("Incoming artifacts thread loop started");
-        let recv_timeout = std::time::Duration::from_millis(ARTIFACT_MANAGER_TIMER_DURATION_MSEC);
+        let recv_timeout = std::time::Duration::from_millis(subnet_params.artifact_manager_polling_interval);
         loop {
             let ret = receiver_incoming_request.recv_timeout(recv_timeout);
 
