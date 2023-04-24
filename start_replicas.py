@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 peers = [
     {
         "number": "2",
-        "ip": "44.212.45.29",
+        "ip": "3.86.224.219",
         "web_server_port": "56790",
         "libp2p_port": "56789",
         "key_file": "peer_2_nw_aws_rsa_key.pem",
@@ -17,7 +17,7 @@ peers = [
     },
     {
         "number": "3",
-        "ip": "54.233.213.217",
+        "ip": "54.207.134.206",
         "web_server_port": "56790",
         "libp2p_port": "56789",
         "key_file": "peer_3_sao_aws_rsa_key.pem",
@@ -26,7 +26,7 @@ peers = [
     },
     {
         "number": "4",
-        "ip": "3.27.137.153",
+        "ip": "3.26.15.159",
         "web_server_port": "56790",
         "libp2p_port": "56789",
         "key_file": "peer_4_syd_aws_rsa_key.pem",
@@ -35,7 +35,7 @@ peers = [
     },
     {
         "number": "1",
-        "ip": "13.214.145.252",
+        "ip": "13.212.225.27",
         "web_server_port": "56790",
         "libp2p_port": "56789",
         "key_file": "peer_1_sing_aws_rsa_key.pem",
@@ -47,14 +47,14 @@ peers = [
 N = len(peers)
 F = 1
 P = 0
-T = 100
+T = 60
 D = 3000
 BROADCAST_INTERVAL = 50
 ARTIFACT_MANAGER_POLLING_INTERVAL = 50
-FICC = True
+FICC = False
 GOODIFIER = True
 
-print("\nStarting subnet running " + ("FICC" if FICC else "ICC") + f" with n={N}, f={F} and p={P}" + " with Goodifier" if GOODIFIER else " without Goodifier")
+print("\nStarting subnet running " + ("FICC" if FICC else "ICC") + f" with n={N}, f={F} and p={P}" + (" with Goodifier" if GOODIFIER else " without Goodifier"))
 
 for peer in peers:
     with open(".env.example", "r") as file:
@@ -68,8 +68,6 @@ for peer in peers:
         contents[6] = "BROADCAST_INTERVAL="+str(BROADCAST_INTERVAL)+"\n"
         contents[8] = "ARTIFACT_MANAGER_POLLING_INTERVAL="+str(ARTIFACT_MANAGER_POLLING_INTERVAL)+"\n"
 
-
-
     with open("./.env.example", "w") as file:
         file.writelines(contents)
 
@@ -80,11 +78,11 @@ for peer in peers:
 with open("docker-compose.yml", "r") as file:
     contents = file.readlines()
     if FICC:
-        contents[8] = '    command: ["--cod", "--goodifier", "--r", $REPLICA_NUMBER, "--n", $TOTAL_REPLICA_NUMBER, "--f", $FAULTY_REPLICAS, "--p", $DISAGREEING_REPLICA, "--t", $EXECUTION_TIME, "--d", $NOTARIZATION_DELAY, "--broadcast_interval", "$BROADCAST_INTERVAL", "--port", $PORT]\n'
+        contents[8] = '    command: ["--cod", "--goodifier", "--r", $REPLICA_NUMBER, "--n", $TOTAL_REPLICA_NUMBER, "--f", $FAULTY_REPLICAS, "--p", $DISAGREEING_REPLICA, "--t", $EXECUTION_TIME, "--d", $NOTARIZATION_DELAY, "--broadcast_interval", "$BROADCAST_INTERVAL", "--port", $PORT, "--artifact_manager_polling_interval", $ARTIFACT_MANAGER_POLLING_INTERVAL]\n'
     elif GOODIFIER:
-        contents[8] = '    command: ["--goodifier", "--r", $REPLICA_NUMBER, "--n", $TOTAL_REPLICA_NUMBER, "--f", $FAULTY_REPLICAS, "--p", $DISAGREEING_REPLICA, "--t", $EXECUTION_TIME, "--d", $NOTARIZATION_DELAY, "--broadcast_interval", "$BROADCAST_INTERVAL", "--port", $PORT]\n'
+        contents[8] = '    command: ["--goodifier", "--r", $REPLICA_NUMBER, "--n", $TOTAL_REPLICA_NUMBER, "--f", $FAULTY_REPLICAS, "--p", $DISAGREEING_REPLICA, "--t", $EXECUTION_TIME, "--d", $NOTARIZATION_DELAY, "--broadcast_interval", "$BROADCAST_INTERVAL", "--port", $PORT, "--artifact_manager_polling_interval", $ARTIFACT_MANAGER_POLLING_INTERVAL]\n'
     else :
-        contents[8] = '    command: ["--r", $REPLICA_NUMBER, "--n", $TOTAL_REPLICA_NUMBER, "--f", $FAULTY_REPLICAS, "--p", $DISAGREEING_REPLICA, "--t", $EXECUTION_TIME, "--d", $NOTARIZATION_DELAY, "--broadcast_interval", "$BROADCAST_INTERVAL", "--port", $PORT]\n'
+        contents[8] = '    command: ["--r", $REPLICA_NUMBER, "--n", $TOTAL_REPLICA_NUMBER, "--f", $FAULTY_REPLICAS, "--p", $DISAGREEING_REPLICA, "--t", $EXECUTION_TIME, "--d", $NOTARIZATION_DELAY, "--broadcast_interval", "$BROADCAST_INTERVAL", "--port", $PORT, "--artifact_manager_polling_interval", $ARTIFACT_MANAGER_POLLING_INTERVAL]\n'
 
 with open("docker-compose.yml", "w") as file:
     file.writelines(contents)
@@ -98,7 +96,7 @@ print("\nReplicas parameters set")
 processes = []
 for peer in peers:
     start_replica_cmd = f'ssh -i ./keys/{peer["key_file"]} -t -q ubuntu@{peer["ip"]} "cd consensus_on_demand && docker compose up --build"'
-    process = subprocess.Popen(start_replica_cmd, shell=True, stdout=subprocess.DEVNULL)
+    process = subprocess.Popen(start_replica_cmd, shell=True)
     processes.append(process)
 
 print("\nReplicas started")

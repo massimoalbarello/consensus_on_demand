@@ -98,8 +98,6 @@ impl Goodifier {
                             }
                         };
                     }
-                } else {
-                    panic!("goodifier called while running original IC consensus");
                 }
                 grouped_acks_by_parent
             },
