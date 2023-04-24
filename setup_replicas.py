@@ -5,11 +5,38 @@ import os
 
 peers = [
     {
-        "number": "16",
-        "ip": "13.37.57.131",
+        "number": "2",
+        "ip": "44.212.45.29",
         "web_server_port": "56790",
         "libp2p_port": "56789",
-        "key_file": "peer_16_par_aws_rsa_key.pem",
+        "key_file": "peer_2_nw_aws_rsa_key.pem",
+        "id": "",
+        "remote_peers_addresses": "",
+    },
+    {
+        "number": "3",
+        "ip": "54.233.213.217",
+        "web_server_port": "56790",
+        "libp2p_port": "56789",
+        "key_file": "peer_3_sao_aws_rsa_key.pem",
+        "id": "",
+        "remote_peers_addresses": "",
+    },
+    {
+        "number": "4",
+        "ip": "3.27.137.153",
+        "web_server_port": "56790",
+        "libp2p_port": "56789",
+        "key_file": "peer_4_syd_aws_rsa_key.pem",
+        "id": "",
+        "remote_peers_addresses": "",
+    },
+    {
+        "number": "1",
+        "ip": "13.214.145.252",
+        "web_server_port": "56790",
+        "libp2p_port": "56789",
+        "key_file": "peer_1_sing_aws_rsa_key.pem",
         "id": "",
         "remote_peers_addresses": "",
     },
@@ -45,8 +72,8 @@ print("\nRepo cloned on new replicas")
 processes = []
 for peer in peers:
     print("\nBuilding container for replica", peer["number"])
-    build_container_cmd = f'ssh -i ./keys/{peer["key_file"]} -t -q ubuntu@{peer["ip"]} \'cd consensus_on_demand && docker compose build\''
-    process = subprocess.Popen(build_container_cmd, shell=True, stdout=subprocess.DEVNULL)
+    build_container_cmd = f'ssh -i ./keys/{peer["key_file"]} -t -q ubuntu@{peer["ip"]} \'cd consensus_on_demand && git checkout origin test-goodifier && docker compose build\''
+    process = subprocess.Popen(build_container_cmd, shell=True)
     processes.append(process)
 
 for p in processes:

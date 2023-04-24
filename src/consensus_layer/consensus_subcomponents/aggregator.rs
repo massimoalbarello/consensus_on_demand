@@ -106,7 +106,7 @@ impl ShareAggregator {
                     >= (self.subnet_params.total_nodes_number
                         - self.subnet_params.byzantine_nodes_number) as usize
                 {
-                    if self.subnet_params.consensus_on_demand {
+                    if self.subnet_params.consensus_on_demand || self.subnet_params.goodifier {
                         // println!("\nBlock with hash: {} received at least n-f notarization shares", notary_content.block.get_ref());
                         let block = get_block_by_hash_and_height(
                             pool,

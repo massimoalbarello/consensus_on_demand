@@ -74,6 +74,8 @@ struct Opt {
     broadcast_interval: u64, // interval after which artifacts are broadcasted
     #[structopt(name="artifact_manager_polling_interval", long, default_value = "200")]
     artifact_manager_polling_interval: u64, // periodic duration of `PollEvent` in milliseconds
+    #[structopt(long)]
+    goodifier: bool, // enable disable goodifier (to use just for testing)
 }
 
 #[derive(Clone)]
@@ -84,10 +86,11 @@ pub struct SubnetParams {
     consensus_on_demand: bool,
     artifact_delay: u64,
     artifact_manager_polling_interval: u64,
+    goodifier: bool,
 }
 
 impl SubnetParams {
-    fn new(n: u8, f: u8, p: u8, cod: bool, d: u64, artifact_manager_polling_interval: u64) -> Self {
+    fn new(n: u8, f: u8, p: u8, cod: bool, d: u64, artifact_manager_polling_interval: u64, goodifier: bool) -> Self {
         Self {
             total_nodes_number: n,
             byzantine_nodes_number: f,
@@ -95,6 +98,7 @@ impl SubnetParams {
             consensus_on_demand: cod,
             artifact_delay: d,
             artifact_manager_polling_interval,
+            goodifier,
         }
     }
 }
@@ -134,7 +138,8 @@ async fn main() -> Result<()> {
             opt.p,
             opt.cod,
             opt.d,
-            opt.artifact_manager_polling_interval
+            opt.artifact_manager_polling_interval,
+            opt.goodifier,
         ),
         "gossip_blocks",
         cloned_finalization_times,

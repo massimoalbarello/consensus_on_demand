@@ -72,7 +72,7 @@ impl BlockMaker {
         // println!("\n########## Block maker ##########");
         let my_node_id = self.node_id;
         let (beacon, parent) =
-            get_dependencies(pool, self.subnet_params.consensus_on_demand).unwrap();
+            get_dependencies(pool, self.subnet_params.consensus_on_demand, self.subnet_params.goodifier).unwrap();
         let height: u64 = parent.height + 1;
         match self.get_block_maker_rank(height, &beacon, my_node_id) {
             rank => {
@@ -159,6 +159,7 @@ impl BlockMaker {
 fn get_dependencies(
     pool: &PoolReader<'_>,
     is_consensus_on_demand: bool,
+    uses_goodfier: bool,
 ) -> Option<(RandomBeacon, Block)> {
     let notarized_height = pool.get_notarized_height();
     // println!("Last block notarized at height: {}", notarized_height);
@@ -168,7 +169,7 @@ fn get_dependencies(
     let parent = pool
         .get_notarized_blocks(notarized_height)
         .filter(|block| {
-            if is_consensus_on_demand {
+            if is_consensus_on_demand || uses_goodfier {
                 // CoD rule 3a: extend only "good" blocks
                 let is_good = block_is_good(pool, &block);
                 // println!("Notarized block {:?} is good: {}", block, is_good);

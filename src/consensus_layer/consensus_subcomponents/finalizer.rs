@@ -126,7 +126,7 @@ impl Finalizer {
             }
         };
 
-        if self.subnet_params.consensus_on_demand {
+        if self.subnet_params.consensus_on_demand || self.subnet_params.goodifier {
             // CoD rule 3b: send finalization share only for "good" block
             if !block_is_good(pool, &notarized_block) {
                 return None;
