@@ -2,6 +2,9 @@
 
 This repo is an implementation of an improved consensus algorithm for the Internet Computer blockchain. The modified algorithm, called Fast Internet Computer Consensus (FICC), improves the latency of block finalization by 30% compared to the original Internet Computer Consensus (ICC).
 
+## Paper
+More info: https://arxiv.org/abs/2312.05869
+
 ## AWS deployment
 To test the FICC implementation and compare it to the ICC implementation you have to setup `n` AWS EC2 instances (ideally at least 4 in different datacenters).
 
